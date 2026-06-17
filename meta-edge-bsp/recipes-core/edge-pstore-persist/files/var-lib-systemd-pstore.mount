@@ -1,0 +1,24 @@
+# Redirect systemd-pstore's archive directory to /data so kernel oops/panic
+# records survive RAUC slot switches. The unit is pulled in on demand by
+# the systemd-pstore.service drop-in (10-edge-pstore-persist.conf), so no
+# [Install] section is needed.
+
+[Unit]
+Description=Bind /data-backed pstore archive over /var/lib/systemd/pstore
+Documentation=man:systemd-pstore.service(8)
+DefaultDependencies=no
+After=data.mount systemd-tmpfiles-setup.service
+Wants=data.mount
+RequiresMountsFor=/data
+ConditionPathIsMountPoint=/data
+ConditionPathIsDirectory=/data/crash/pstore
+Before=systemd-pstore.service umount.target
+Conflicts=umount.target
+
+[Mount]
+What=/data/crash/pstore
+Where=/var/lib/systemd/pstore
+Type=none
+Options=bind,nodev,nosuid,noexec
+DirectoryMode=0700
+TimeoutSec=10s
