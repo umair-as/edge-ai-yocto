@@ -1,0 +1,18 @@
+# EDGE AI OS dev-tier sudo override.
+#
+# Shipped ONLY in edge-image-dev (via the edge-sudoers-nopasswd sub-package).
+# edge-image-base does NOT install this file — production posture keeps
+# the password gate from 10-edge-wheel.
+#
+# Sudo evaluates files in /etc/sudoers.d/ in lexical order, last match
+# per spec wins. 15- comes after 10-edge-wheel, so the NOPASSWD spec
+# below overrides the password-required line in 10-edge-wheel for the
+# %wheel group.
+#
+# Reasoning: dev images are for bring-up / profiling / stress testing.
+# Every interactive command path is repeated dozens of times per
+# session; the password prompt is friction without security value on a
+# bench box. Production (edge-image-base) keeps the password gate
+# because that is the CRA-aligned posture for shipped devices.
+
+%wheel ALL=(ALL:ALL) NOPASSWD: ALL

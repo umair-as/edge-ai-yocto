@@ -1,0 +1,20 @@
+# EDGE AI OS sudo policy — base/prod tier.
+#
+# Members of the wheel group can run any command as any user.
+# Password authentication is REQUIRED — no NOPASSWD: rule. Matches
+# CRA's "no default authorization escalation" intent and the project
+# rule that interactive admin work prompts.
+#
+# devel is added to wheel by edge-users.inc at image build time. To
+# onboard another admin, add them to wheel, never to this file.
+
+%wheel ALL=(ALL:ALL) ALL
+
+# Convention: no other recipe in edge-* ships /etc/sudoers.d/. The one
+# sanctioned exception is the bench override 15-edge-wheel-nopasswd,
+# shipped by the edge-sudoers-nopasswd sub-package of THIS recipe and
+# pulled into edge-image-dev only. sudo evaluates drop-ins in lexical
+# order, last match wins per spec, so 15-… overrides the password
+# requirement above only when the sub-package is installed.
+# edge-image-base does NOT install it. Any other recipe that ships a
+# drop-in here is a bug.

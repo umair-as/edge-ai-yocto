@@ -1,0 +1,20 @@
+[Unit]
+Description=OpenSSH Key Generation
+Documentation=man:ssh-keygen(1)
+RequiresMountsFor=/var /run
+ConditionFileNotEmpty=|!/etc/ssh/ssh_host_ed25519_key
+ConditionFileNotEmpty=|!/etc/ssh/ssh_host_rsa_key
+ConditionFileNotEmpty=|!/etc/ssh/ssh_host_ecdsa_key
+
+[Service]
+# `ssh-keygen -A` generates host keys of ALL default key types (rsa,
+# ecdsa, ed25519) that don't already exist in /etc/ssh/. Atomic intent,
+# no per-key shell loop. Replaces oe-core's sshd_check_keys which uses
+# a manual loop with no error propagation — under transient I/O (NFS
+# root, slow flash), one key-type's failure silently leaves the rest
+# ungenerated, and sshd ends up offering nothing the client's modern
+# HostKeyAlgorithms list will accept.
+Type=oneshot
+RemainAfterExit=yes
+Nice=10
+ExecStart=/usr/bin/ssh-keygen -A

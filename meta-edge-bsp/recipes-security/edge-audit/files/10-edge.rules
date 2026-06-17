@@ -1,0 +1,95 @@
+## EDGE AI OS audit ruleset.
+##
+## Loaded by auditd at boot from /etc/audit/rules.d/. CIS Distribution
+## Independent Linux Benchmark Level-1 minimum + a small set of edge-
+## specific rules. Deliberately tight — full syscall auditing is GBs/day
+## and we don't have a SIEM pipeline yet (Phase 2).
+##
+## A `-D` first clears any previously-loaded rule, so this file is the
+## source of truth.
+
+## Clear previous rules.
+-D
+
+## Set buffer size sufficient to absorb short bursts without losing audit records.
+-b 8192
+
+## Failure mode: when the audit subsystem can't keep up:
+##   0 = silent (lose records — never)
+##   1 = printk to dmesg (CIS recommended)
+##   2 = panic (paranoid)
+-f 1
+
+## --- Identity + auth events ---------------------------------------------
+
+## Watch /etc/sudoers + /etc/sudoers.d for any change. -k tags the event
+## for easy filtering by `ausearch -k identity-sudo`.
+-w /etc/sudoers          -p wa -k identity-sudo
+-w /etc/sudoers.d/       -p wa -k identity-sudo
+
+## /etc/passwd, /etc/group, /etc/shadow, /etc/gshadow — every write or
+## attribute change becomes an audit event.
+-w /etc/passwd           -p wa -k identity
+-w /etc/group            -p wa -k identity
+-w /etc/shadow           -p wa -k identity
+-w /etc/gshadow          -p wa -k identity
+-w /etc/security/opasswd -p wa -k identity
+
+## --- Login + session events ---------------------------------------------
+
+-w /var/log/lastlog -p wa -k logins
+-w /var/log/wtmp    -p wa -k logins
+-w /var/log/btmp    -p wa -k logins
+-w /var/run/utmp    -p wa -k logins
+
+## --- ssh policy + keys --------------------------------------------------
+
+-w /etc/ssh/sshd_config   -p wa -k ssh-policy
+-w /etc/ssh/sshd_config.d -p wa -k ssh-policy
+
+## --- Boot / kernel modules ----------------------------------------------
+
+## Module load/unload — every loaded kernel module is auditable. On a
+## prod image with modules_disabled=1 this rule never fires.
+-w /sbin/insmod  -p x -k modules
+-w /sbin/rmmod   -p x -k modules
+-w /sbin/modprobe -p x -k modules
+
+## --- Time changes -------------------------------------------------------
+
+## Tampering with the clock can defeat log analysis. Watch the syscalls.
+-a always,exit -F arch=b64 -S clock_settime    -k time-change
+-a always,exit -F arch=b64 -S adjtimex         -k time-change
+-a always,exit -F arch=b64 -S settimeofday     -k time-change
+-w /etc/localtime -p wa -k time-change
+
+## --- Network policy -----------------------------------------------------
+
+## Any change to /etc/hosts (the local DNS shortcut) is interesting.
+-w /etc/hosts                                 -p wa -k network-policy
+-w /etc/network/                              -p wa -k network-policy
+-w /etc/systemd/network/                      -p wa -k network-policy
+-w /etc/resolv.conf                           -p wa -k network-policy
+
+## --- RAUC slot + bundle install ----------------------------------------
+
+## Audit RAUC binary execution + policy-config writes. Originally this
+## block also watched /data/rauc/ but that path doesn't exist at
+## audit-load time on either boot mode (NFS-root: /data is just an
+## empty dir in the rootfs; mmc boot: /data is a separate ext4
+## partition and /data/rauc/ is only created when `rauc install`
+## first runs). auditctl errors on -w of a non-existent path with
+## ENOENT, augenrules exits at first error → the remaining rules in
+## this file (including the final -e 2 immutable lock) never load,
+## leaving audit policy non-locked. Watching the binary captures every
+## bundle install + slot mark without depending on runtime state.
+-w /usr/bin/rauc                              -p x  -k rauc-action
+-w /etc/rauc/system.conf                      -p wa -k rauc-state
+-w /etc/rauc/ca.cert.pem                      -p wa -k rauc-state
+
+## --- Lock the audit rules at the end -----------------------------------
+
+## -e 2 makes the audit config IMMUTABLE until next boot: no runtime
+## ruleset changes, even by root. Final line; nothing after this gets
+## interpreted as a rule.
+-e 2
