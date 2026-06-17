@@ -1,0 +1,33 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+Date: Tue, 16 Jun 2026 11:00:00 +0000
+Subject: [PATCH] plat-rz/g2l: relax int-conversion errors for gcc 14+
+
+Upstream-Status: Inappropriate [bringup workaround pending vendor source cleanup]
+
+gcc 14 promoted -Wint-conversion and -Wincompatible-pointer-types from
+warnings to default-errors. Multiple sites in plat-rz/common (r_sce
+public/private, pta_sce, sflash callers) pass typed pointers where the
+prototype declares uintptr_t, or vice versa. The OP-TEE 4.8 Renesas fork
+predates this gcc change and has not been swept clean.
+
+Demote these to warnings at the platform level so the build succeeds.
+Diagnostics remain visible; remove this line once plat-rz source is
+updated to compile clean against gcc 14+.
+
+Signed-off-by: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+---
+ core/arch/arm/plat-rz/g2l/rzg2l_conf.mk | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/core/arch/arm/plat-rz/g2l/rzg2l_conf.mk b/core/arch/arm/plat-rz/g2l/rzg2l_conf.mk
+--- a/core/arch/arm/plat-rz/g2l/rzg2l_conf.mk
++++ b/core/arch/arm/plat-rz/g2l/rzg2l_conf.mk
+@@ -44,3 +44,7 @@ ifeq ($(PLATFORM_FLAVOR),g2ul_smarc)
+ else
+ CFG_SPI_FLASH_DEV ?= MT25QU512ABB
+ endif
++
++# gcc 14+ default-errors; vendor source predates the change.
++core-platform-cflags += -Wno-error=int-conversion
++core-platform-cflags += -Wno-error=incompatible-pointer-types

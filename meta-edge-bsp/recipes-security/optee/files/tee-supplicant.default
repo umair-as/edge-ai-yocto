@@ -1,0 +1,5 @@
+# Default args for tee-supplicant@.service. The unit references
+# $OPTARGS via EnvironmentFile=-/etc/default/tee-supplicant. Without
+# this file the var is unset and systemd warns at every start.
+# Empty value = stock daemon flags.
+OPTARGS=""

@@ -1,0 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+Date: Tue, 16 Jun 2026 10:50:00 +0000
+Subject: [PATCH] plat-rz: hw_rng_tsip: cast memcpy destination back to void *
+
+Upstream-Status: Pending
+
+GCC 15.2 (wrynose toolchain default) rejects passing a uintptr_t to memcpy's
+void * destination argument under -Werror=int-conversion. Wrap the integer
+arithmetic in (void *) so the cast back to a pointer is explicit at the call
+site.
+
+Signed-off-by: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+---
+ core/arch/arm/plat-rz/common/hw_rng_tsip.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/core/arch/arm/plat-rz/common/hw_rng_tsip.c b/core/arch/arm/plat-rz/common/hw_rng_tsip.c
+--- a/core/arch/arm/plat-rz/common/hw_rng_tsip.c
++++ b/core/arch/arm/plat-rz/common/hw_rng_tsip.c
+@@ -49,7 +49,7 @@ TEE_Result hw_get_random_bytes(void *buf, size_t len)
+ 		if (TEE_SUCCESS != ret)
+ 			return ret;
+
+-		memcpy((uintptr_t)buf + i, buffer, MIN(sizeof(buffer), len - i));
++		memcpy((void *)((uintptr_t)buf + i), buffer, MIN(sizeof(buffer), len - i));
+ 	}
+
+ 	return ret;
