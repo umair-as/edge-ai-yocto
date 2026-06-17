@@ -1,0 +1,9 @@
+# edge-ai-yocto systemd presets.
+#
+# v0: no masks. Vendor-layer units (v4l2-init, audio-init) from meta-rz-distro
+# are suppressed at parse time via BBMASK in kas/base.yml, not here. Future
+# tiers can add lines like:
+#
+#   disable v4l2-init.service
+#   disable rpcbind.service
+#   disable rpcbind.socket
