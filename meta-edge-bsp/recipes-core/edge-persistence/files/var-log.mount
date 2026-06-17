@@ -1,0 +1,20 @@
+# /var/log is a real directory (volatile-log fs-perms table dropped in
+# edge-floor.inc). Bind /data/log over it before systemd-journald reads
+# its storage path. tmpfiles seeds /data/log via edge-persistence.conf.
+
+[Unit]
+Description=Persistent /var/log on /data
+DefaultDependencies=no
+Requires=data.mount
+After=data.mount
+Before=systemd-journald.service systemd-tmpfiles-setup.service local-fs.target shutdown.target
+Conflicts=umount.target shutdown.target
+
+[Mount]
+What=/data/log
+Where=/var/log
+Type=none
+Options=bind,nosuid,nodev
+
+[Install]
+WantedBy=local-fs.target

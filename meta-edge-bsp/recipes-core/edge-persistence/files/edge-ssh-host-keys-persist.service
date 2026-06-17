@@ -1,0 +1,20 @@
+# Capture-or-restore sshd host keys before sshdgenkeys generates new ones.
+# Wants= (not Requires=) on data.mount so a broken /data does not cascade
+# into a no-SSH device — the nofail fstab + this unit keep ssh recoverable.
+
+[Unit]
+Description=Capture or restore sshd host keys from /data
+DefaultDependencies=no
+ConditionPathIsMountPoint=/data
+Wants=data.mount
+After=data.mount
+Before=sshdgenkeys.service sshd.service sshd.socket sysinit.target shutdown.target
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/edge-ssh-host-keys-persist
+
+[Install]
+WantedBy=sysinit.target

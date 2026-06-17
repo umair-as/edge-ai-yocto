@@ -1,0 +1,18 @@
+# User homes on /data: shells, .ssh/authorized_keys, operator state.
+
+[Unit]
+Description=Persistent /home on /data
+DefaultDependencies=no
+Requires=data.mount
+After=data.mount
+Before=local-fs.target shutdown.target
+Conflicts=umount.target shutdown.target
+
+[Mount]
+What=/data/home
+Where=/home
+Type=none
+Options=bind,nosuid,nodev
+
+[Install]
+WantedBy=local-fs.target

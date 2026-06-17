@@ -1,0 +1,19 @@
+# Capture-or-restore /etc/machine-id before systemd-machine-id-commit locks
+# the slot-local value in.
+
+[Unit]
+Description=Capture or restore /etc/machine-id from /data
+DefaultDependencies=no
+ConditionPathIsMountPoint=/data
+Requires=data.mount
+After=data.mount
+Before=systemd-machine-id-commit.service sysinit.target shutdown.target
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/edge-machine-id-persist
+
+[Install]
+WantedBy=sysinit.target

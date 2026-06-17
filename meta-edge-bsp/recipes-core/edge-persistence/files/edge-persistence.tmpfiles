@@ -1,0 +1,10 @@
+# Seed /data subdirectories that the bind mount units bind onto. The .mount
+# units already gate on data.mount; tmpfiles fixes perms deterministically
+# regardless of which mount fires first on a fresh /data.
+d /data/log         2755 root systemd-journal -
+d /data/containers  0700 root root            -
+d /data/systemd     0755 root root            -
+d /data/nm          0700 root root            -
+d /data/home        0755 root root            -
+d /data/ssh         0700 root root            -
+d /data/machine-id  0755 root root            -

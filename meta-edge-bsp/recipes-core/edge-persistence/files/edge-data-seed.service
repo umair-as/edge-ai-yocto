@@ -1,0 +1,22 @@
+# Seed /data subdirs from rootfs before the persistence binds activate.
+# Ordered Before= each bind so an empty /data subdir gets the image's
+# initial content (notably /home/devel) instead of being mounted empty
+# over the rootfs version.
+
+[Unit]
+Description=Seed /data subdirs from rootfs on first boot
+DefaultDependencies=no
+ConditionPathIsMountPoint=/data
+ConditionPathExists=!/data/.edge-seeded
+Requires=data.mount
+After=data.mount
+Before=home.mount var-log.mount var-lib-containers.mount var-lib-systemd.mount var-lib-NetworkManager.mount sysinit.target shutdown.target
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/edge-data-seed
+
+[Install]
+WantedBy=sysinit.target

@@ -1,0 +1,19 @@
+# Persistent random-seed, timers, backlight. Slot-swap inherits the
+# previous slot's entropy state instead of cold-starting.
+
+[Unit]
+Description=Persistent /var/lib/systemd on /data
+DefaultDependencies=no
+Requires=data.mount
+After=data.mount
+Before=systemd-random-seed.service local-fs.target shutdown.target
+Conflicts=umount.target shutdown.target
+
+[Mount]
+What=/data/systemd
+Where=/var/lib/systemd
+Type=none
+Options=bind
+
+[Install]
+WantedBy=local-fs.target

@@ -1,0 +1,19 @@
+# Container image store on /data so pulled image layers survive RAUC slot
+# swaps and do not need re-fetching on every OS image update.
+
+[Unit]
+Description=Persistent container storage on /data
+DefaultDependencies=no
+Requires=data.mount
+After=data.mount
+Before=podman.service podman.socket local-fs.target shutdown.target
+Conflicts=umount.target shutdown.target
+
+[Mount]
+What=/data/containers
+Where=/var/lib/containers
+Type=none
+Options=bind
+
+[Install]
+WantedBy=local-fs.target
