@@ -1,0 +1,23 @@
+[Unit]
+Description=Mark eth0 unmanaged by NetworkManager during NFS-root boot
+Documentation=https://github.com/umair-as/edge-ai-yocto
+# Runtime gate: fires only when the kernel cmdline carries root=/dev/nfs.
+# On MMC boots (or any non-NFS root) this Condition fails and the unit
+# is a no-op — NetworkManager manages eth0 normally. Same image, both
+# boot modes; no build-time gating needed.
+ConditionKernelCommandLine=root=/dev/nfs
+Before=NetworkManager.service
+After=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# /run/NetworkManager/conf.d/ is the runtime-volatile include path NM
+# scans alongside /etc/NetworkManager/conf.d/. Creating the dir is
+# idempotent; the file ships under /usr/share so we don't pollute /etc
+# on prod images.
+ExecStart=/bin/mkdir -p /run/NetworkManager/conf.d
+ExecStart=/bin/ln -sf /usr/share/edge-network-profiles/90-netboot-unmanaged.conf /run/NetworkManager/conf.d/90-netboot-unmanaged.conf
+
+[Install]
+WantedBy=multi-user.target
