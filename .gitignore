@@ -1,0 +1,49 @@
+#
+# This file ignores **categories** of state — build outputs, kas-managed
+# workspace, operator overlays, secrets, editor scratch. It deliberately
+# does NOT name individual upstream layers (bitbake, openembedded-core,
+# meta-arm, meta-rauc) — those land in
+# $KAS_WORK_DIR (= .kas/) per the Makefile and are caught by the .kas/
+# entry below. Adding a new upstream layer is a `repos:` block in
+# kas/base.yml; nothing here needs to change.
+
+# === Build + kas state ===
+build/
+.kas/
+sstate-cache/
+downloads/
+
+# === Operator overlays + secrets ===
+kas/local.yml
+kas/*-local.yml
+*.secrets.yml
+.env
+keys/
+# CLOSED-licensed vendor blobs: present in the tree at build time, never committed.
+meta-edge-bsp/recipes-security/libsecureip/files/*.tar.gz
+# FIT signing dev keys are generated on first build under keys/dev/
+# (UBOOT_SIGN_KEYDIR in meta-edge-distro/conf/distro/edge-ai.conf).
+# Never commit them; treat as ephemeral dev material.
+/keys/dev/
+
+# === Editor / scratch / logs ===
+*.pyc
+*.pyo
+__pycache__/
+*~
+*.swp
+*.bak
+*.log
+.vscode/
+.idea/
+*.code-workspace
+.kas_*
+.kas_shell_history
+tio-session-logs/
+scratch/**
+
+# === Parked: pending separate publish-review ===
+.claude/
+CLAUDE.md
+AGENTS.md
+docs/adr/

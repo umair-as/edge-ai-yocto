@@ -1,0 +1,65 @@
+# Capability fragment: meta-virtualization + OCI container engine
+# (podman) wiring via packagegroup-edge-containers.
+#
+# Self-contained: pure additive overlay. No `includes:`. Compose with
+# the base+machine stack at invocation time:
+#   kas build kas/base.yml:kas/machines/<board>.yml:kas/virtualization.yml
+#   make dev VIRT=1                               # via Makefile flag
+#
+# meta-virtualization LAYERDEPENDS: core, openembedded-layer (meta-oe),
+# networking-layer, filesystems-layer, meta-python. All are activated
+# unconditionally in kas/base.yml.
+#
+# Adding this fragment flips EDGE_ENABLE_CONTAINERS = 1, which pulls
+# packagegroup-edge-containers (podman + crun + conmon + netavark +
+# aardvark-dns + catatonit) into the image at common.inc.
+#
+# Runtime choices encoded here:
+#   - OCI runtime: crun (C, no Go/Rust; smaller + faster than runc).
+#   - Network backend: netavark (Rust). Modern upstream default; CNI
+#     is legacy and no longer recommended by the podman project.
+#   - DNS backend: aardvark-dns (Rust). Pairs with netavark; gives
+#     containers per-network DNS so they resolve each other by name.
+#   - PODMAN_FEATURES = ""  drops the `docker` shim binary that podman
+#     installs by default — we deploy OCI images directly, no docker
+#     CLI emulation needed (and it RCONFLICTS with real docker, which
+#     is awkward if anything downstream pulls docker in).
+#
+# netavark and aardvark-dns are written in Rust. Their meta-virtualization
+# recipes carry pre-generated crates.inc files that list every crate
+# dependency with a checksum; BitBake's crate:// fetcher pre-fetches each
+# one into DL_DIR before the build starts, so cargo never reaches out to
+# crates.io dynamically inside the sandbox. wrynose OE-Core ships Rust
+# 1.94.1 natively — no external Rust layer is needed.
+
+header:
+  version: 19
+
+repos:
+  meta-virtualization:
+    url: https://git.yoctoproject.org/meta-virtualization
+    branch: wrynose
+    commit: 781735b97ae5013cacabbecd38e6da6b510cf3fb
+    layers:
+      .:
+
+  meta-rust-bin:
+    url: https://github.com/rust-embedded/meta-rust-bin.git
+    branch: master
+    commit: eae842ee3de3c80dcb1c054a34178ecd610db1fd
+    layers:
+      .:
+
+local_conf_header:
+  virtualization: |
+    DISTRO_FEATURES:append              = " virtualization"
+    VIRTUAL-RUNTIME_container_runtime    = "crun"
+    VIRTUAL-RUNTIME_container_networking = "netavark"
+    VIRTUAL-RUNTIME_container_dns        = "aardvark-dns"
+    PODMAN_FEATURES:pn-podman            = ""
+    EDGE_ENABLE_CONTAINERS               = "1"
+    PREFERRED_VERSION_rust-native        = "1.94.%"
+    PREFERRED_VERSION_rust-cross-aarch64 = "1.94.%"
+    PREFERRED_VERSION_cargo-native       = "1.94.%"
+    PREFERRED_VERSION_libstd-rs          = "1.94.%"
+    LAYERSERIES_COMPAT_rust-bin-layer:append = " wrynose"

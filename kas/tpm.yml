@@ -1,0 +1,48 @@
+# Capability fragment: meta-secure-core (Wind River) — TPM2 + IMA/EVM
+# integrity + signing-key tooling + LUKS-with-TPM userspace.
+#
+# Self-contained: pure additive overlay. No `includes:`. Compose with
+# the base+machine stack at invocation time:
+#   kas build kas/base.yml:kas/machines/<board>.yml:kas/tpm.yml
+#   make dev TPM=1                                # via Makefile flag
+#
+# Composition by default: boards with TPM hardware include this from
+# their kas/machines/<board>.yml. RZ/V2L SMARC EVK has no on-board TPM
+# and does NOT compose this fragment by default; the Makefile TPM=1
+# flag is the manual opt-in for bench rigs with an external TPM module.
+#
+# Sublayers loaded:
+#   meta-secure-core-common  — scaffolding required by the others
+#   meta-signing-key         — required by meta-secure-core-common /
+#                              meta-integrity via LAYERDEPENDS
+#   meta-tpm2                — tpm2-tools / tpm2-tss / tpm2-abrmd / tpm2-pkcs11
+#   meta-encrypted-storage   — LUKS userspace (cryptsetup), for /data sealing
+#   meta-integrity           — IMA/EVM kernel integrity userspace
+#
+# Sublayers intentionally NOT loaded:
+#   meta-efi-secure-boot     — no UEFI on RZ/V2L
+#   meta-ids                 — heavyweight intrusion detection; later phase
+#
+# meta-tpm2 LAYERDEPENDS on meta-python (in meta-openembedded). meta-python
+# is unconditionally activated by kas/base.yml so bitbake's LAYERDEPENDS
+# validation passes without restating it here.
+#
+# No BBMASK workaround needed: edge does not load meta-security, so the
+# duplicate-tpm2-provider conflict (meta-security/meta-tpm vs
+# meta-secure-core/meta-tpm2) cannot arise. See the security-harvest
+# session for any future meta-security reintroduction policy.
+
+header:
+  version: 19
+
+repos:
+  meta-secure-core:
+    url: https://github.com/Wind-River/meta-secure-core
+    branch: wrynose
+    commit: 07a99ae241acd488a2feda1ededf87dc70dfde80
+    layers:
+      meta-secure-core-common:
+      meta-signing-key:
+      meta-tpm2:
+      meta-encrypted-storage:
+      meta-integrity:

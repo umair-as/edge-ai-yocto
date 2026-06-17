@@ -1,0 +1,32 @@
+# U-Boot version overlay: Renesas CIP fork at v2024.07.
+#
+# Source: github.com/renesas-rz/renesas-u-boot-cip (NOT denx mainline).
+# Why the fork: configs/smarc-rzv2l_defconfig + the smarc-rzv2l DTS are
+# downstream-only artifacts — they are not in denx mainline at any tag.
+# Mainline upstreamed the board as renesas_rzg2l_smarc_defconfig with
+# different paths. The in-tree patch series targets the fork's naming,
+# so we follow the fork. See meta-edge-bsp/recipes-bsp/u-boot/u-boot_2024.07.bb
+# for the SRCREV pin and the full rationale.
+#
+# TF-A also stays on a Renesas-CIP fork (the rzg_trusted-firmware-a
+# tree) — its mainline 2.10.x has no RZ/V2L support. See
+# kas/trusted-firmware-a/renesas-cip-2.10.yml. OP-TEE 4.9 comes from
+# meta-arm (mainline); recipe-side wiring lives in
+# meta-edge-bsp/recipes-security/optee/.
+#
+# meta-renesas's meta-rz-bsp ships u-boot_2021.10, _2023.10, _2024.07
+# for rzg2l-family. The 2024.07 line is the one that carries the
+# RAUC A/B bootcmd parsing we need; we pin to that here.
+#
+# Future direction: sibling kas/u-boot/<variant>.yml files can add a
+# version-selection family without changing kas/base.yml. A future
+# kas/u-boot/mainline-2025.xx.yml would point at denx mainline and
+# require a patch rebase to renesas_rzg2l_smarc_defconfig naming.
+
+header:
+  version: 19
+
+local_conf_header:
+  u-boot: |
+    PREFERRED_PROVIDER_virtual/bootloader = "u-boot"
+    PREFERRED_VERSION_u-boot              = "2024.07%"

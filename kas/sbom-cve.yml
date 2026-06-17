@@ -1,0 +1,90 @@
+# Tuning fragment: SBOM (SPDX 3.0) + CVE check per-build knobs.
+#
+# Self-contained: pure additive overlay. No `includes:`. Compose with
+# the base+machine stack at invocation time:
+#   kas build kas/base.yml:kas/machines/<board>.yml:kas/sbom-cve.yml
+#   make dev SBOM_TUNE=1                          # via Makefile flag
+#
+# The edge-ai distro ships SBOM + CVE always-on with sensible defaults
+# (see meta-edge-distro/conf/distro/edge-ai.conf). NOTHING is enabled by
+# composing this fragment alone — every knob below is commented;
+# uncomment what you need for the specific build.
+#
+# Knobs come from:
+#   openembedded-core/meta/classes/create-spdx-3.0.bbclass
+#   openembedded-core/meta/classes/sbom-cve-check-common.bbclass
+#   openembedded-core/meta/conf/fragments/yocto/sbom-cve-check.conf
+
+header:
+  version: 19
+
+local_conf_header:
+  sbom_cve_disable: |
+    # Disable SBOM (SPDX 3.0) + CVE check entirely. Use for fast-iteration
+    # builds where the do_create_spdx-per-recipe + CVE-DB fetch cost is not
+    # worth paying (development inner loop only — production / release
+    # builds MUST keep this off so SBOM stays on).
+    #
+    # Uncomment all three lines together; they're paired.
+    #
+    # INHERIT:remove       = "create-spdx"
+    # OE_FRAGMENTS:remove  = "yocto/sbom-cve-check"
+    # IMAGE_CLASSES:remove = "sbom-cve-check"
+
+  spdx_profiles: |
+    # SPDX_PROFILES — which SPDX 3.0 profile sections appear in each doc.
+    # Defaults: "core build software simpleLicensing security"
+    #
+    # Drop "build" if you only care about software composition + licensing +
+    # CVE (skips the build-environment fingerprinting; smaller docs, ~10%
+    # faster do_create_spdx).
+    #
+    # SPDX_PROFILES = "core software simpleLicensing security"
+
+  spdx_vex: |
+    # SPDX_INCLUDE_VEX — VEX (Vulnerability EXploitability eXchange)
+    # annotations embedded in the SBOM. Values:
+    #   "all"     — every CVE for every component (default per the fragment)
+    #   "current" — only un-fixed CVEs (smaller; common for compliance audits)
+    #   "none"    — no VEX annotations
+    #
+    # SPDX_INCLUDE_VEX = "current"
+
+  spdx_timestamps: |
+    # SPDX_INCLUDE_TIMESTAMPS — include real wall-clock timestamps in SPDX
+    # docs. Default 0 (reproducible builds). Flip to 1 only when you want
+    # an audit-grade dated artifact and don't care about reproducibility.
+    #
+    # SPDX_INCLUDE_TIMESTAMPS = "1"
+
+  cve_db_autorev: |
+    # CVE database freshness. The edge.conf pins SRCREVs of the two
+    # native CVE-DB recipes for reproducibility. Uncomment to re-enable
+    # AUTOREV (latest NVD/CVEList tip) — useful for CVE-triage builds
+    # but breaks build determinism.
+    #
+    # SRCREV:pn-sbom-cve-check-update-nvd-native     = "${AUTOREV}"
+    # SRCREV:pn-sbom-cve-check-update-cvelist-native = "${AUTOREV}"
+
+  spdx_compiled_sources_extra: |
+    # SPDX_INCLUDE_COMPILED_SOURCES — when set to "1" for a recipe, the
+    # SBOM filters CVEs to source files actually compiled (vs every file
+    # in the upstream tarball). edge.conf already sets this for
+    # linux-renesas; add per-recipe overrides here for other large recipes
+    # where unused-source over-reporting is noisy (e.g. qemu, gcc-runtime).
+    #
+    # SPDX_INCLUDE_COMPILED_SOURCES:pn-qemu        = "1"
+    # SPDX_INCLUDE_COMPILED_SOURCES:pn-gcc-runtime = "1"
+
+  fail_on_critical_cve: |
+    # Wrynose dropped the scarthgap-era CVE_ERROR_PHRASES knob. To fail
+    # the build on CVEs above a threshold you need a post-task hook that
+    # parses the SBOM. Sketch (uncomment + adapt the script path):
+    #
+    # IMAGE_POSTPROCESS_COMMAND:append = " edge_fail_on_critical_cve;"
+    # python edge_fail_on_critical_cve() {
+    #     import json, os
+    #     sbom = os.path.join(d.getVar('DEPLOY_DIR_IMAGE'),
+    #         d.getVar('IMAGE_NAME') + '.spdx.json')
+    #     # ... walk SPDX 3.0 Security profile, count CVEs with CVSSv3 >= 7, bail
+    # }

@@ -1,0 +1,43 @@
+# Autofetch entry point for first-time and clean-slate operators.
+#
+# What this file is for:
+#   A self-contained kas stack that pulls every upstream layer this
+#   project depends on and lands them in $KAS_WORK_DIR (= .kas/, per
+#   Makefile). Used when there is no existing workspace and no shared
+#   git-alternates cache — first-time setup, CI builders, fresh clones.
+#
+# What this file is NOT:
+#   The single source of truth for SHA pins. That stays in kas/base.yml
+#   (where every upstream `repos:` entry already declares a `commit:`
+#   pin). This file only includes base + machine; the pins flow in
+#   through `includes:`. Keeping pins in one place avoids two-file drift.
+#
+# Operator workflow:
+#   # Via make (env vars exported automatically):
+#   make shell                                # uses kas/local.yml + git alternates
+#
+#   # Standalone kas (interactive debugging, ad-hoc `kas` invocations):
+#   . scripts/env.sh                          # exports KAS_WORK_DIR + KAS_REPO_REF_DIR
+#   kas shell kas/edge-autofetch.yml          # or any other kas command
+#
+# Why sourcing matters: without scripts/env.sh, a standalone `kas shell`
+# inherits no KAS_WORK_DIR and re-clones every upstream layer into the
+# repo root.
+#
+# Shared cache vs autofetch interplay:
+#   If KAS_REPO_REF_DIR points at a populated dir, kas uses it as git
+#   alternates regardless of which entry point composes the stack.
+#   Autofetch is therefore safe even when the shared cache exists —
+#   kas just consults alternates first and falls back to the upstream
+#   URLs declared in kas/base.yml for anything missing.
+
+header:
+  version: 19
+  includes:
+    - kas/base.yml
+    - kas/machines/rzv2l.yml
+
+# Default bitbake target if the operator runs `kas build` directly.
+# The Makefile passes `bitbake <target>` explicitly, so this is only
+# the standalone `kas build kas/edge-autofetch.yml` path.
+target: edge-image-base

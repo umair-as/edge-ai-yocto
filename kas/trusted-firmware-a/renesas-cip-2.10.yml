@@ -1,0 +1,34 @@
+# TF-A version overlay: Renesas CIP fork at v2.10.x.
+#
+# Base recipe: meta-renesas/meta-rz-bsp/recipes-bsp/trusted-firmware-a/
+# trusted-firmware-a_2.10.bb (PV = "2.10+git${SRCPV}").
+#
+# Source override: github.com/renesas-rz/rzg_trusted-firmware-a (NOT
+# mainline TF-A). Why the fork: mainline TF-A 2.10.x has zero RZ/V2L
+# support — its plat/renesas/rzg/ tree is actually R-Car-based old
+# RZ/G1/G2 code (includes rcar_def.h, qos_init.h). We need the
+# downstream plat/renesas/rz/common/ refactor where RZ/V2L + RZ/G2L
+# share BL2 code, which only the Renesas fork carries.
+#
+# This is the second piece of the boot/trust chain that stays on a
+# Renesas-CIP fork (the first being U-Boot — see
+# kas/u-boot/renesas-cip-2024.07.yml). OP-TEE 4.9 (from meta-arm) and
+# Linux 6.12 (linux-renesas, CIP-base) round out the chain.
+#
+# Pinning: the wildcard matches meta-renesas's "2.10+git<SRCPV>"
+# expansion. The SRCREV that selects the specific Renesas-fork commit
+# is set in our recipe-side override at
+# meta-edge-bsp/recipes-bsp/trusted-firmware-a/trusted-firmware-a_%.bbappend.
+#
+# Future direction: sibling kas/trusted-firmware-a/<variant>.yml files
+# can add a version-selection family without changing kas/base.yml. A
+# future kas/trusted-firmware-a/mainline-X.Y.yml would point at
+# review.trustedfirmware.org/TF-A and require RZ/V2L upstream support
+# (does not exist as of this writing).
+
+header:
+  version: 19
+
+local_conf_header:
+  trusted-firmware-a: |
+    PREFERRED_VERSION_trusted-firmware-a = "2.10+git%"

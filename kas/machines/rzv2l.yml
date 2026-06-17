@@ -1,0 +1,85 @@
+# Machine overlay: Renesas RZ/V2L SMARC EVK.
+#
+# Composes onto kas/base.yml + kas/kernel.yml. Inlines the machine pick
+# directly so this repo fully owns the machine selection.
+#
+# Pulls in the Renesas-fork TF-A and U-Boot pins here, not in base.yml.
+# base.yml is board-neutral distro policy; this file is where RZ/V2L's
+# bootloader stack — TF-A + U-Boot + (via TF-A's bbappend) bptool — gets
+# wired. A second board (i.MX93, VF2, …) will ship its own machines/<b>.yml
+# including its own kas/{trusted-firmware-a,u-boot}/<flavor>.yml.
+
+header:
+  version: 19
+  includes:
+    - kas/trusted-firmware-a/renesas-cip-2.10.yml
+    - kas/u-boot/renesas-cip-2024.07.yml
+
+machine: smarc-rzv2l
+
+local_conf_header:
+  wic: |
+    # FIP placement for the RZ/V2L eSD boot ROM. Sector 256 = 0x20000
+    # bytes = 128 KB. This is the SoC boot-ROM expectation for SD boot,
+    # documented in the Renesas RZ/V2L Hardware User's Manual (loader
+    # location section, eSD boot mode).
+    FIP_WIC_OFFSET = "--offset 256s"
+
+    # Make FIP_WIC_OFFSET visible to WIC's WKS preprocessor. WIC only
+    # expands ${VAR} inside .wks files for variables listed in WICVARS;
+    # without this append, ${FIP_WIC_OFFSET} in edge-image-rzv2l.wks
+    # would pass through as a literal string → argparse consumes it as
+    # a positional mountpoint → the --offset argument is silently absent
+    # → the FIP partition lands at byte 0x10000 instead of the SoC ROM's
+    # expected 0x20000 (RZG2L_SD_FIP_BASE in TF-A's
+    # plat/renesas/rz/common/include/rz_soc_def.h). Boot silently dies
+    # in BL2 before its banner.
+    WICVARS:append = " FIP_WIC_OFFSET"
+
+  boot: |
+    # Per-board boot artifacts. edge-image-common.inc consumes these.
+    # See the comment block on EDGE_BOOT_* in that file for contract.
+    #
+    # The DTB filename is the flat basename — WIC's IMAGE_BOOT_FILES
+    # handler strips the renesas/ prefix from KERNEL_DEVICETREE.
+    # splash.bmp is required because U-Boot's bootcmd calls splashload
+    # before kernel handoff.
+    EDGE_BOOT_DTB         = "r9a07g054l2-smarc.dtb"
+    EDGE_BOOT_EXTRA       = "splash.bmp"
+    EDGE_BOOT_DEPLOY_DEPS = "edge-splash-assets:do_deploy trusted-firmware-a:do_deploy edge-kernel-fit:do_deploy"
+
+    # WIC layout — RZ/V2L's eSD SD-boot partitioning (BL2 at sector 0,
+    # FIP at sector 256, raw env area, /boot, A/B rootfs slots). SoC-ROM
+    # specific; named for the board so a sibling board adds its own .wks.
+    #
+    # Override-form (:smarc-rzv2l) is load-bearing: bitbake's parse order
+    # is local.conf → distro.conf → machine.conf, so a plain `WKS_FILE =`
+    # in local_conf_header gets overwritten by smarc-rzv2l.conf:44's
+    # conditional. The machine override takes priority over plain `=`
+    # regardless of parse order.
+    WKS_FILE:smarc-rzv2l = "edge-image-rzv2l.wks"
+
+    # FIT runtime addresses. RZ/V2L: 0x48080000 matches the SoC's
+    # kernel text base and the U-Boot bootcmd's loadaddr. Consumed by
+    # linux-renesas (FIT signing context) and by edge-kernel-fit
+    # (UBOOT_LOADADDRESS / UBOOT_ENTRYPOINT). Conf-level so both see it.
+    EDGE_FIT_LOADADDRESS = "0x48080000"
+    EDGE_FIT_ENTRYPOINT  = "0x48080000"
+
+  pmic: |
+    # Build the PMIC variants of BL2/BL31/FIP. The SMARC RZ/V2L EVK
+    # DDR4 carrier ships with the Renesas RAA215300 PMIC; BL2's DDR/
+    # regulator bring-up needs the PMIC init path or it traps before
+    # reaching BL31 (banner-then-reset loop on serial). This matches
+    # meta-renesas's own default for smarc-rzv2l.conf:36.
+    #
+    # The QA bridging — meta-renesas's :rzg2l-family installs _pmic
+    # variants at the legacy /firmware/ path; meta-arm's FIRMWARE_DIR is
+    # /firmware/${PN}/, so the files would be installed-but-not-shipped
+    # AND missing from sysroot (firmware-pack reads from sysroot/PN). Our
+    # trusted-firmware-a_%.bbappend mirrors the _pmic files into
+    # FIRMWARE_DIR so SYSROOT_DIRS picks them up, and claims the legacy
+    # /firmware/ copies in FILES:${PN} so QA passes. Originals stay where
+    # meta-renesas put them — that keeps its do_deploy:append (which cp's
+    # from /firmware/*pmic.bin → DEPLOYDIR) working untouched.
+    PMIC_SUPPORT = "1"

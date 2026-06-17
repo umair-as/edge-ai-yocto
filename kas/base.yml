@@ -1,0 +1,195 @@
+# Canonical, tracked KAS composition for edge-ai-yocto.
+#
+# Single source of truth for the layer set, pin policy, and base
+# local.conf. Self-contained — wrynose and kernel composition are
+# transcribed here so this repo owns and curates its own layer set.
+#
+# Pinning policy:
+#   - Upstream Yocto layers (openembedded-core, bitbake, meta-yocto,
+#     meta-arm, meta-openembedded) are SHA-pinned. The starting baseline
+#     mirrors the community BSP's wrynose.yml as of rz-community-bsp
+#     commit 24d43a0 (2026-06). Bump SHAs deliberately, not by drift.
+#   - Project-local layers (meta-edge-distro, meta-edge-bsp) live in-tree
+#     via `path:`.
+#
+# Composition:
+#   kas build kas/base.yml:kas/machines/<board>.yml:kas/images/<tier>.yml
+# or via the wrapper:
+#   make base
+
+header:
+  version: 19
+  includes:
+    # kas/kernel.yml is distro policy. CIP is the kernel base for every
+    # edge board (consumed via the linux-renesas recipe = rz_linux-cip,
+    # see docs/adr/0001-kernel-base.md). TF-A and U-Boot forks are board
+    # policy and live in kas/machines/<board>.yml.
+    - kas/kernel.yml
+
+distro: edge-ai
+
+repos:
+  # --- Renesas vendor BSP (meta-renesas: meta-rz-bsp + meta-rz-distro) ---
+  # No wrynose branch upstream — newest Yocto branch is scarthgap/rz
+  # (Yocto 5.0). We pin the scarthgap/rz HEAD and carry the
+  # scarthgap→wrynose port locally (override syntax, debug-tweaks
+  # split, DISTRO_FEATURES_DEFAULTS, LAYERSERIES_COMPAT, ...).
+  # meta-rz-bsp: machine conf for smarc-rzv2l, bptool/firmware-pack,
+  # multimedia kernel modules.
+  # meta-rz-distro: multimedia userspace .inc plumbing
+  # (rz-distro-common.inc → RENESAS_DATADIR, vspmif.inc, mmngr_lib.inc).
+  # Its rz-bsp / rz-vlp distro confs are passive while DISTRO=edge-ai.
+  meta-renesas:
+    url: https://github.com/renesas-rz/meta-renesas
+    branch: scarthgap/rz
+    commit: b396a94cc9c0a1e491c3a0426416cb8a1dfcb04f
+    layers:
+      meta-rz-bsp:
+      meta-rz-distro:
+    # Scarthgap→wrynose port handled entirely in-layer (no kas-patches
+    # on meta-renesas). LAYERSERIES_COMPAT amendment lives in
+    # local_conf_header below; the do_unpack S = "${WORKDIR}/git"
+    # rejection is fixed via per-recipe bbappends
+    # (meta-edge-bsp/recipes-bsp/{u-boot,trusted-firmware-a}/
+    # {u-boot_2024.07.bbappend,trusted-firmware-a_%.bbappend,
+    # bptool-native.bbappend}); audio-init/v4l2-init are not in the
+    # active build path. The u-boot_2024.07.bb cosmetic whitespace
+    # warning is tolerated as parser noise.
+
+  # --- Yocto upstream layers (SHA-pinned to the wrynose 6.0 baseline) ---
+  openembedded-core:
+    url: https://git.openembedded.org/openembedded-core
+    # yocto-6.0 tag
+    commit: 42fa856a00ac16b2a7a83d7ecfa60a5be192b16c
+    layers:
+      meta:
+
+  bitbake:
+    url: https://git.openembedded.org/bitbake
+    # yocto-6.0 tag
+    commit: 33581c84f3a85008239acbd940501a35de48dc91
+    layers:
+      bitbake: disabled
+
+  meta-yocto:
+    url: https://git.yoctoproject.org/meta-yocto
+    # yocto-6.0 tag
+    commit: 904846ae078ee20de073040ebb77c86e19250f56
+    layers:
+      meta-poky:
+
+  meta-arm:
+    url: https://git.yoctoproject.org/meta-arm
+    # wrynose HEAD at baseline
+    commit: 052c2cf333ecf16fc2ded4c5d09749ebaff8c0c5
+    layers:
+      meta-arm-toolchain:
+      meta-arm:
+
+  meta-openembedded:
+    url: https://git.openembedded.org/meta-openembedded
+    # wrynose HEAD at baseline
+    commit: 420222862f5a6d95023b8f5f3b7e1808b2264ef9
+    # All meta-oe sublayers any edge image might need are activated here.
+    # meta-networking + meta-filesystems are parse-only for edge-image-base
+    # (no packagegroup pulls from them); edge-image-dev consumes them via
+    # packagegroup-edge-netdiag + packagegroup-edge-storage. LAYERDEPENDS
+    # ordering: meta-networking needs meta-python; meta-filesystems needs
+    # meta-networking. bitbake validates the chain at parse.
+    layers:
+      meta-oe:
+      meta-python:
+      meta-networking:
+      meta-filesystems:
+
+  # --- RAUC OTA framework (wrynose branch, pinned) ---
+  # meta-rauc-community is NOT a layer we use — the per-board helper
+  # bits (system.conf, bundle hooks, slot udev rules) live in
+  # meta-edge-bsp in-tree. Reconsider only if upstream meta-rauc-community
+  # grows a generic helper layer we want to consume.
+  meta-rauc:
+    url: https://github.com/rauc/meta-rauc.git
+    branch: wrynose
+    commit: 38da0e5866a953e664001ba90b5edad68d68cd5d
+    # meta-rauc.git has the layer at the repo root, not in a subdir.
+    layers:
+      .:
+
+  # --- Project-local layers ---
+  # No url/path: this entry references the repo where this config file
+  # lives (edge-ai-yocto itself). Layer paths under `layers:` are
+  # relative to that repo root. Avoids the `path:`-vs-KAS_WORK_DIR
+  # interaction: with KAS_WORK_DIR=.kas/, a bare `path: meta-edge-bsp`
+  # resolves to .kas/meta-edge-bsp (wrong); the implicit-current-repo
+  # form sidesteps that entirely.
+  edge-ai-yocto:
+    layers:
+      meta-edge-bsp:
+      meta-edge-distro:
+
+  # Slot reserved for the future meta-edge-ai sibling repo (DRP-AI
+  # runtime, model packaging, AI-SBOM). Not yet built; uncomment when
+  # that repo lands.
+  #
+  # meta-edge-ai:
+  #   url: https://github.com/umair-as/meta-edge-ai
+  #   branch: main
+  #   commit: <pin>
+  #   layers:
+  #     meta-edge-ai:
+
+# Base local.conf header. Disk-monitor thresholds halt the build when
+# TMPDIR / DL_DIR / SSTATE_DIR run low so partial-write artifacts don't
+# corrupt sstate; rpm packaging matches the CIP-aligned distro intent;
+# BB_GENERATE_MIRROR_TARBALLS lets DL_DIR double as a reproducible
+# offline mirror.
+local_conf_header:
+  standard: |
+    CONF_VERSION = "2"
+    BB_DISKMON_DIRS ?= " \
+        STOPTASKS,${TMPDIR},1G,100K \
+        STOPTASKS,${DL_DIR},1G,100K \
+        STOPTASKS,${SSTATE_DIR},1G,100K \
+        STOPTASKS,/tmp,100M,100K \
+        HALT,${TMPDIR},100M,1K \
+        HALT,${DL_DIR},100M,1K \
+        HALT,${SSTATE_DIR},100M,1K \
+        HALT,/tmp,10M,1K \
+    "
+    PACKAGE_CLASSES ?= "package_rpm"
+    BB_GENERATE_MIRROR_TARBALLS = "1"
+
+  bbmask_deferred_scarthgap_skew: |
+    # DEFERRED: scarthgap→wrynose version skew — revisit in the
+    # multimedia step. These meta-renesas bbappends pin scarthgap-era
+    # upstream versions (weston 13.0.1, gstreamer 1.22.12); wrynose
+    # ships different versions, so the bbappends have no recipe to
+    # attach to and parse fails with "No recipes in default available".
+    # Park them with BBMASK so parse stays green while the kernel
+    # provider switch lands. Re-derive against wrynose versions or
+    # drop in the multimedia decision.
+    BBMASK += "meta-rz-distro/recipes-graphics/wayland/weston_13.0.1\.bbappend"
+    BBMASK += "meta-rz-distro/recipes-multimedia/gstreamer/gstreamer1\.0_1\.22\.12\.bbappend"
+    BBMASK += "meta-rz-distro/recipes-multimedia/gstreamer/gstreamer1\.0-plugins-base_1\.22\.12\.bbappend"
+    BBMASK += "meta-rz-distro/recipes-multimedia/gstreamer/gstreamer1\.0-plugins-good_1\.22\.12\.bbappend"
+    BBMASK += "meta-rz-distro/recipes-multimedia/gstreamer/gstreamer1\.0-plugins-bad_1\.22\.12\.bbappend"
+
+  bbmask_vendor_cruft_unshipped: |
+    # meta-renesas vendor-layer recipes we explicitly don't ship (per
+    # meta-edge-bsp/recipes-support/edge-systemd-presets/files/90-edge.preset
+    # which disables v4l2-init.service as "vendor-layer cruft"). They use
+    # scarthgap-era S = "${WORKDIR}" which wrynose rejects at parse time,
+    # so masking them off the parse path is functionally equivalent to
+    # the previous kas-patch that rewrote them — without the patch.
+    BBMASK += "meta-rz-distro/recipes-extend/audio-init/audio-init\.bb"
+    BBMASK += "meta-rz-distro/recipes-extend/v4l2-init/v4l2-init_1\.0\.bb"
+    # meta-renesas's weston-init bbappend installs weston.sh from
+    # ${WORKDIR} (scarthgap-era path) and adds an idle-time=0 ExecStart
+    # tweak — neither needed in our flow (we already ship our own
+    # weston-init bbappend that handles the multi-user.target deferral).
+    BBMASK += "meta-rz-distro/recipes-graphics/wayland/weston-init\.bbappend"
+
+# meta-renesas wrynose compat amendment moved to
+# meta-edge-bsp/conf/layer.conf — the bitbake LAYERSERIES sanity check
+# runs at layer.conf parse time, before local_conf_header can take
+# effect. See the matching comment there.

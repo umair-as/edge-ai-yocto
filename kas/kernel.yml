@@ -1,0 +1,18 @@
+# Kernel selection for edge-ai-yocto.
+#
+# Recipe: linux-renesas_6.12 (provided by meta-renesas/meta-rz-bsp).
+#   Despite the recipe name, the kernel source is CIP base + Renesas
+#   RZ hardware enablement: github.com/renesas-rz/rz_linux-cip.git on
+#   branch rz-6.12-cip7. CIP/SLTS intent of ADR-0001 is preserved.
+#
+# Provider selection is handled by meta-renesas's rzg2l-family.inc
+# (PREFERRED_PROVIDER_virtual/kernel ?= "linux-renesas"). The version
+# default in that include is "6.1%" (weak); we hard-pin "6.12%" here
+# so it beats the include regardless of override-resolution order.
+
+header:
+  version: 19
+
+local_conf_header:
+  kernel: |
+    PREFERRED_VERSION_linux-renesas = "6.12%"

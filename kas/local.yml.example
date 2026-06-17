@@ -1,0 +1,188 @@
+# Personal kas profile template. Copy to kas/local.yml (gitignored)
+# and customize. Do NOT commit kas/local.yml.
+#
+# This file lets you point shared caches (downloads, sstate) at a
+# faster disk and tune parallelism without editing the tracked KAS
+# composition.
+#
+# Image-agnostic: composes base + machine, NOT an image overlay. The
+# Makefile (or a manual `kas shell -c 'bitbake <target>'`) picks the
+# image at build time. Capability fragments (kas/tpm.yml,
+# kas/virtualization.yml, kas/sbom-cve.yml) are added at invocation,
+# either via Makefile flags (TPM=1, VIRT=1, SBOM_TUNE=1) or by
+# composing them onto the kas command line.
+
+header:
+  version: 19
+  includes:
+    # Default entry for greenfield setups: kas/edge-autofetch.yml is a
+    # self-contained autofetch wrapper that includes base + machine and
+    # sets a default bitbake target. SHA pins still live in kas/base.yml.
+    # See docs/adr/0002-layer-hosting.md.
+    - kas/edge-autofetch.yml
+
+local_conf_header:
+  paths: |
+    # Point downloads + sstate at a shared, fast location. Adjust the
+    # paths to match your host.
+    # DL_DIR     = "${TOPDIR}/../../downloads"
+    # SSTATE_DIR = "${TOPDIR}/../../sstate-cache"
+
+  parallelism: |
+    # Tune for your build host. Defaults shown are a reasonable starting
+    # point for a 16-core desktop — drop them on a smaller machine, raise
+    # them with more cores + RAM headroom.
+    BB_NUMBER_THREADS = "10"
+    PARALLEL_MAKE     = "-j 12"
+
+  workspace: |
+    # Optional: relocate the build tree off the source tree.
+    # TMPDIR = "${TOPDIR}/../tmp"
+
+  edge_credentials: |
+    # REQUIRED. Build fails noisily if EDGE_DEFAULT_PASSWORD_HASH is unset
+    # OR if it doesn't parse as a valid sha512crypt digest. Sets the
+    # password for root + devel (same hash; CRA "one of each device").
+    # Generate the hash with:
+    #     openssl passwd -6 'your-password'
+    # or:
+    #     mkpasswd --method=sha-512 'your-password'
+    # — both emit a $6$-prefixed sha-512 crypt(3) hash. Paste the FULL
+    # output unchanged; the parse-time check catches truncation and
+    # alphabet violations, but cannot detect hand-edited digest bytes
+    # (the hash will parse and the image will boot, but no password will
+    # authenticate — login fails silently).
+    #
+    # IMPORTANT: every `$` in the hash MUST be backslash-escaped as `\$`.
+    # extrausers.bbclass interpolates EXTRA_USERS_PARAMS into a shell
+    # double-quoted assignment; an unescaped `$X` token is consumed by
+    # shell variable expansion and silently disappears from the hash.
+    # The resulting /etc/shadow entry looks plausible but decodes to no
+    # known password — login fails silently after boot.
+    #
+    # The value below is an intentionally-invalid placeholder so the
+    # parse-time validator in edge-users.inc fails loudly until you
+    # generate and paste a real $6$-prefixed hash. Do not "fix" by
+    # making it parse; replace it with the output of `openssl passwd
+    # -6 'your-password'` (with every `$` escaped as `\$`).
+    EDGE_DEFAULT_PASSWORD_HASH = "REPLACE_ME_WITH_OUTPUT_OF_openssl_passwd_-6"
+
+    # OPTIONAL. Path on the build host to your SSH public key (~/.ssh/id_ed25519.pub
+    # or similar). When set, the build bakes the key into devel's
+    # ~/.ssh/authorized_keys so you can pubkey-SSH from first boot.
+    # Leave unset to ssh-copy-id manually after first password-auth login.
+    # EDGE_DEVEL_SSH_PUBKEY_FILE = "/home/your-user/.ssh/id_ed25519.pub"
+
+  rm_work: |
+    # Reclaim build/tmp/work/ after each recipe finishes do_build, EXCEPT
+    # for the boot chain and the kernel — those we keep iterable so we can
+    # `devtool modify`, inspect patched source, study failures, etc. without
+    # paying a `cleansstate` + re-fetch tax.
+    #
+    # Anything not on the exclude list gets its work tree removed after
+    # build. Add more excludes here if a recipe needs frequent inspection.
+    INHERIT += "rm_work"
+    RM_WORK_EXCLUDE += " \
+        linux-renesas \
+        u-boot \
+        trusted-firmware-a \
+        optee-os \
+    "
+
+  rauc_bundle: |
+    # RAUC bundle signing — chain-rooted dev PKI under keys/dev/rauc/
+    # (same pattern as keys/dev/fit/ for FIT). keys/ is gitignored.
+    # First-time setup:
+    #     ./scripts/rauc-init-certs.sh
+    # Generates root CA (rauc-ca.{key,cert.pem}) + leaf with codeSigning EKU
+    # (rauc-signer.{key,cert.pem}). edge-floor.inc points the bundle build
+    # at these by default.
+    #
+    # BUNDLE_IMAGE_NAME defaults to edge-image-dev. For prod bundles:
+    # BUNDLE_IMAGE_NAME = "edge-image-prod"
+    #
+    # Build sequence after a code change:
+    #     make dev VIRT=1                  # builds image + bakes CA into rootfs
+    #     make bundle                       # signs + emits edge-image-*-bundle.raucb
+    #     scp build/tmp/deploy/images/smarc-rzv2l/*.raucb root@<device>:/tmp/
+    #     ssh root@<device> rauc install /tmp/*.raucb
+    # First-time device flash needed once so /etc/rauc/ca.cert.pem matches
+    # the new CA; subsequent updates ride the OTA path.
+
+  rauc_hardening: |
+    # ---- Bundle signing PKI hygiene ----------------------------------------
+    # check-purpose: enforce OpenSSL X.509 purpose on the signer chain.
+    # Our rauc-init-certs.sh emits codeSigning EKU; "codesign" is the default.
+    # Set empty to disable during a migration window with legacy certs.
+    # EDGE_RAUC_CHECK_PURPOSE = "codesign"
+    #
+    # allowed-signer-cns: pin to specific leaf CN (semicolon-separated list).
+    # EDGE_RAUC_ALLOWED_SIGNER_CNS = "edge-ai-rauc-dev-signer"
+    #
+    # Directory-mode keyring: space-separated list of cert files installed
+    # into /etc/rauc/keyring.d/ and rehashed. Empty = single-cert path mode.
+    # EDGE_RAUC_KEYRING_CERTS = ""
+
+    # ---- Bundle encryption (crypt format) ----------------------------------
+    # Opt-in. Requires a key on device (file path or pkcs11: URI) and a
+    # recipients PEM at build time.
+    # EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION = "1"
+    # EDGE_RAUC_ENCRYPTION_KEY = "/etc/rauc/encryption.key"
+    # EDGE_RAUC_BUNDLE_ENCRYPT_RECIPIENTS = "/path/to/recipients.pem"
+
+    # ---- Streaming mTLS key ------------------------------------------------
+    # File mode (default): /etc/ota/device.key (managed by ota-certs).
+    # PKCS#11 mode: device key lives in a PKCS#11 token (OP-TEE, YubiKey,
+    # TPM2). Set both vars below:
+    # EDGE_RAUC_STREAMING_KEY_MODE = "pkcs11"
+    # EDGE_RAUC_PKCS11_TLS_KEY = "pkcs11:token=edge-ota;object=rauc-tls;type=private"
+
+    # ---- ota-certs cert seed -----------------------------------------------
+    # Point at a host-side dev CA dir containing ca.crt + device.crt + device.key
+    # to seed /etc/ota with a working cert chain at image build:
+    # EDGE_OTA_CERT_DIR = "/home/your-user/edge-ota-dev-ca"
+
+  edge_toggles: |
+    # Operator-facing customisation surface. Every EDGE_* knob below is
+    # declared with ?= in meta-edge-distro/conf/distro/include/edge-features.inc
+    # and added to BB_ENV_PASSTHROUGH_ADDITIONS, so you can also set them
+    # in the shell (export EDGE_ENABLE_DISPLAY=0; bitbake ...) instead of
+    # editing this file.
+
+    # --- Tier profile -----------------------------------------------------
+    # "prod" — locked-down image (package-management removed, observability
+    #          off by default). edge-image-base.bb pins this.
+    # "dev"  — bring-up / debug image (observability on by default).
+    #          edge-image-dev.bb pins this.
+    # The pin in the .bb is itself an EDGE_PROFILE = "..." line, so setting
+    # this only matters if you bitbake a downstream image that doesn't pin.
+    # EDGE_PROFILE = "prod"
+
+    # --- OTA backend ------------------------------------------------------
+    # The distro requires conf/distro/include/edge-ota-${EDGE_OTA_BACKEND}.inc;
+    # an unknown value fails parse with a clear "Could not include..." error.
+    # Currently the only shipped backend is "rauc".
+    # EDGE_OTA_BACKEND = "rauc"
+
+    # --- Display stack ----------------------------------------------------
+    # 1 (default) — wayland + opengl in DISTRO_FEATURES; weston in image.
+    # 0           — headless. Drops wayland/opengl/weston wholesale.
+    # EDGE_ENABLE_DISPLAY = "1"
+
+    # --- Container userspace ---------------------------------------------
+    # 0 (default) — kernel cgroup/overlay/netns support is on (kernel
+    #               fragments wire it), userspace runtime is not pulled.
+    # 1           — adds packagegroup-edge-containers to the image. (Recipe
+    #               lands when the runtime choice is committed.)
+    # EDGE_ENABLE_CONTAINERS = "0"
+
+    # --- Observability ---------------------------------------------------
+    # Profile-derived default: prod=0, dev=1. Override explicitly for a
+    # prod-debug image:
+    # EDGE_ENABLE_OBSERVABILITY = "1"
+
+    # --- Dev netboot -----------------------------------------------------
+    # 1 — u-boot-env-config installs a `netboot` macro into U-Boot env
+    #     defaults. Operator-typed (`run netboot` at the prompt); bootcmd
+    #     is unchanged. Prod images carry no netboot env at all.
+    # EDGE_DEV_NETBOOT = "0"

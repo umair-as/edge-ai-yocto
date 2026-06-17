@@ -1,0 +1,36 @@
+# Capability fragment: dev-only TFTP/NFS netboot wiring.
+#
+# Self-contained: pure additive overlay. No `includes:`. Compose with
+# the base+machine stack at invocation time:
+#   kas build kas/base.yml:kas/machines/<board>.yml:kas/dev-netboot.yml
+#   make dev NETBOOT=1                            # via Makefile flag
+#
+# Sets EDGE_DEV_NETBOOT=1 in local.conf so:
+#   - u-boot-env-config_1.0.bb appends a `netboot` macro to
+#     /etc/rauc-uboot-env.defaults and /etc/u-boot-initial-env
+#   - prod builds composed without this fragment carry zero netboot bytes
+#
+# The NetworkManager eth0-unmanaged drop-in is NOT gated by this
+# fragment any more — edge-network-profiles ships it unconditionally
+# and edge-netboot-nm-unmanage.service activates it at boot only when
+# ConditionKernelCommandLine=root=/dev/nfs matches. Same image works
+# correctly whether netbooted (NFS-root) or flashed (MMC).
+#
+# linux-renesas (= rz_linux-cip, CIP-based) ships CONFIG_NFS_FS, CONFIG_NFS_V4,
+# CONFIG_ROOT_NFS, CONFIG_IP_PNP_DHCP, CONFIG_RAVB, CONFIG_MICREL_PHY all
+# built-in — no kernel fragment required. NFS-root works out of the box
+# once the netboot env macro is in place.
+#
+# Host-side setup (TFTP + NFS server, exports, sync workflow) is
+# documented in docs/dev/netboot-setup.md and automated by
+# scripts/dev/sync-nfs-rootfs.sh — not part of the image.
+#
+# The default bootcmd (signed FIT from mmc) is unchanged. `run netboot`
+# is operator-typed at the U-Boot prompt; power-cycle = signed mmc boot.
+
+header:
+  version: 19
+
+local_conf_header:
+  dev_netboot: |
+    EDGE_DEV_NETBOOT = "1"
