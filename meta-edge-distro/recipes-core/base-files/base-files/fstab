@@ -1,0 +1,27 @@
+# EDGE AI OS fstab.
+#
+# Layout per meta-edge-bsp/recipes-core/images/files/wic/edge-image-rzv2l.wks:
+#   /dev/mmcblk0p1  LABEL=boot   ext4   shared boot assets (fitImage, DTB)
+#   /dev/mmcblk0p2  rootfs A     ext4   RAUC slot A
+#   /dev/mmcblk0p3  rootfs B     ext4   RAUC slot B
+#   /dev/mmcblk0p4  LABEL=data   ext4   persistent state, grown on first boot
+#
+# Active root slot comes via U-Boot (/dev/root). LABEL-based mounts on /boot
+# and /data so the same fstab works on both RAUC slots without slot-aware
+# rewriting. The /data ext4 options match rpi5-iot-gw and the SD-card
+# write-amplification profile: commit=60 batches 60s of dirty pages,
+# noatime/nodiratime cut metadata churn.
+
+# `nofail` on /boot and /data: if either fails to mount the system still
+# boots, so an operator can SSH in and recover instead of being locked out
+# by an unmountable persistent partition. Pattern is from renesas-rz-v2l.
+# Pass 0 0 (no fsck) — journaled ext4 with `commit=60` plus an unmounted
+# /data on failed boot makes the boot-time fsck cost not worth its delay
+# on an SD card.
+/dev/root            /                    auto       defaults              1  1
+LABEL=boot           /boot                ext4       noatime,nodiratime,nofail    0  0
+LABEL=data           /data                ext4       defaults,noatime,nodiratime,commit=60,nofail    0  0
+proc                 /proc                proc       defaults              0  0
+devpts               /dev/pts             devpts     mode=0620,ptmxmode=0666,gid=5    0  0
+tmpfs                /run                 tmpfs      mode=0755,nodev,nosuid,strictatime    0  0
+tmpfs                /var/volatile        tmpfs      defaults              0  0

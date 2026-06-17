@@ -1,0 +1,45 @@
+# Static GIDs for the edge distro.
+#
+# Consumed by useradd-staticids.bbclass via USERADD_GID_TABLES in
+# conf/distro/edge.conf. See files/passwd for the policy notes — the
+# same guarantees apply to groups.
+#
+# Format: groupname:password:gid:members
+#
+# Range policy:
+#  - 0-99:    base-passwd (root, tty, disk, wheel=80, …) — do not touch
+#  - 600-619: primary groups for edge-managed system users
+#             (UID == GID by convention; see files/passwd)
+#  - 620-699: standalone groups created by recipes (no matching user)
+#  - 1000+:   regular-user primary groups (devel — extrausers)
+
+# Primary groups for the system users in files/passwd
+weston:*:600:
+messagebus:*:601:
+sshd:*:602:
+teesuppl:*:603:
+systemd-resolve:*:604:
+systemd-timesync:*:605:
+systemd-network:*:606:
+ota:*:607:
+
+# Standalone groups (no associated system user). Recipe sources:
+#   tee, teepriv          — optee-client / optee-os
+#   seat                  — libseat (weston supplementary)
+#   weston-launch         — libweston
+#   wayland, render       — weston-init / udev supplementary
+#   systemd-journal       — journal read access
+#   empower               — systemd hostnamed PolicyKit
+#   tracing               — systemtap
+tee:*:620:
+teepriv:*:621:teesuppl
+seat:*:622:weston
+weston-launch:*:623:
+wayland:*:624:weston
+render:*:625:weston
+systemd-journal:*:626:
+empower:*:627:
+tracing:*:628:
+
+# Regular-user primary group (see files/passwd for the matching uid).
+devel:*:1000:
