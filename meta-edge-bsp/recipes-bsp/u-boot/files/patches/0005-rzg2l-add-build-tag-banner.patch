@@ -1,0 +1,32 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+Date: Fri, 17 Apr 2026 21:20:00 +0200
+Subject: [PATCH] rzg2l: print BUILD_TAG banner in ft_board_setup
+
+When BUILD_TAG is defined at compile time, print a single marker line so
+serial logs can be mapped to the exact Yocto build profile quickly during
+boot-chain bring-up.
+
+Upstream-Status: Inappropriate [local build identification only]
+
+Signed-off-by: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+---
+ board/renesas/rcar-common/common.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/board/renesas/rcar-common/common.c b/board/renesas/rcar-common/common.c
+index 1111111..2222222 100644
+--- a/board/renesas/rcar-common/common.c
++++ b/board/renesas/rcar-common/common.c
+@@ -249,6 +249,11 @@ int ft_board_setup(void *blob, struct bd_info *bd)
+ 	u64 seed;
+ 	u8 mac[6];
+ 	int i;
++#ifdef BUILD_TAG
++	printf("[rzv2l] build-tag: " BUILD_TAG "\n");
++#else
++	printf("[rzv2l] build-tag: <unset>\n");
++#endif
+ 
+ 	apply_atf_overlay(blob);
+ 	scrub_duplicate_memory(blob);

@@ -1,0 +1,37 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+Date: Wed, 25 Mar 2026 10:20:00 +0000
+Subject: [PATCH] smarc-rzv2l: dts: add OP-TEE firmware node for U-Boot
+
+Upstream-Status: Inappropriate [board-specific boot chain integration]
+
+Expose OP-TEE in the U-Boot DT so OP-TEE backed DM drivers can probe
+during board setup. This is required for CONFIG_RNG_OPTEE to bind a
+device and provide KASLR seed material in ft_board_setup().
+
+Signed-off-by: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+---
+ arch/arm/dts/smarc-rzv2l.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/arch/arm/dts/smarc-rzv2l.dts b/arch/arm/dts/smarc-rzv2l.dts
+index d669d90f2d..44d9ce6d8e 100644
+--- a/arch/arm/dts/smarc-rzv2l.dts
++++ b/arch/arm/dts/smarc-rzv2l.dts
+@@ -33,6 +33,13 @@
+ 		reg = <0 0x48000000 0 0x78000000>;
+ 	};
+ 
++	firmware {
++		optee {
++			compatible = "linaro,optee-tz";
++			method = "smc";
++		};
++	};
++
+ };
+ 
+ &pinctrl {
+-- 
+2.43.0
+

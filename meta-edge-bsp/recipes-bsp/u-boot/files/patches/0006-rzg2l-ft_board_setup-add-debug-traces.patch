@@ -1,0 +1,70 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+Date: Sat, 14 Jun 2026 22:00:00 +0200
+Subject: [PATCH] rzg2l: add ft_board_setup debug traces for RNG/FDT fixup
+
+Upstream-Status: Inappropriate [board-specific debug instrumentation]
+
+Add temporary serial traces in ft_board_setup() to verify:
+- board setup hook execution
+- ethernet FDT fixup execution
+- RNG device availability and read status
+- kaslr-seed FDT property write status
+
+These traces are intended for boot-chain bring-up and can be removed once
+runtime behavior is confirmed on hardware (target: drop after the
+optee-os CFG_HWRNG_PTA=y rebuild proves the RNG is reachable and
+kaslr-seed lands in /chosen).
+
+Signed-off-by: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+---
+ board/renesas/rcar-common/common.c | 23 +++++++++++++++++++----
+ 1 file changed, 19 insertions(+), 4 deletions(-)
+
+--- a/board/renesas/rcar-common/common.c
++++ b/board/renesas/rcar-common/common.c
+@@ -245,6 +245,7 @@
+
+ int ft_board_setup(void *blob, struct bd_info *bd)
+ {
++	int ret;
+ 	struct udevice *dev;
+ 	u64 seed;
+ 	u8 mac[6];
+@@ -255,6 +256,8 @@
+ 	printf("[rzv2l] build-tag: <unset>\n");
+ #endif
+
++	printf("[rzv2l] ft_board_setup: begin\n");
++
+ 	apply_atf_overlay(blob);
+ 	scrub_duplicate_memory(blob);
+ 	update_rpc_status(blob);
+@@ -276,12 +279,21 @@
+
+ 	/* Patch local-mac-address in DT from U-Boot ethaddr/eth1addr env */
+ 	fdt_fixup_ethernet(blob);
++	printf("[rzv2l] ft_board_setup: fdt_fixup_ethernet done\n");
+
+ 	/* Write /chosen/kaslr-seed from OP-TEE RNG for kernel ASLR */
+-	if (!uclass_get_device(UCLASS_RNG, 0, &dev) &&
+-	    !dm_rng_read(dev, &seed, sizeof(seed)))
+-		fdt_setprop(blob, fdt_path_offset(blob, "/chosen"),
+-			    "kaslr-seed", &seed, sizeof(seed));
++	ret = uclass_get_device(UCLASS_RNG, 0, &dev);
++	if (ret) {
++		printf("[rzv2l] ft_board_setup: RNG device unavailable (%d)\n", ret);
++	} else if (dm_rng_read(dev, &seed, sizeof(seed))) {
++		printf("[rzv2l] ft_board_setup: RNG read failed\n");
++	} else {
++		ret = fdt_setprop(blob, fdt_path_offset(blob, "/chosen"),
++				  "kaslr-seed", &seed, sizeof(seed));
++		printf("[rzv2l] ft_board_setup: kaslr-seed set ret=%d\n", ret);
++	}
++
++	printf("[rzv2l] ft_board_setup: end\n");
+
+ 	return 0;
+ }
+--
+2.43.0

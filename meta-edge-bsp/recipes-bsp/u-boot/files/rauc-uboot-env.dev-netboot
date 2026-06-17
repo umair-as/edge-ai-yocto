@@ -1,0 +1,39 @@
+# Dev-only U-Boot env macro for network boot. Appended to
+# /etc/rauc-uboot-env.defaults (and /etc/u-boot-initial-env) at
+# image-build time only when EDGE_DEV_NETBOOT=1. Prod images carry
+# zero netboot surface.
+#
+# Operator workflow (one-time per board, at the U-Boot prompt):
+#   setenv ipaddr 192.168.x.y                      # board's static IP
+#   setenv serverip 192.168.x.10                   # TFTP/NFS host
+#   setenv netmask 255.255.255.0
+#   setenv nfs_export /srv/nfs/edge-image-dev
+#   saveenv
+# Then, at every dev iteration:
+#   run netboot
+#
+# Power-cycle without typing `run netboot` runs the default signed mmc
+# bootcmd unchanged. TFTP-fetch failure also falls through to bootcmd —
+# no silent downgrade of the trust posture. bootm still runs FIT
+# signature verification regardless of byte source.
+#
+# No `dhcp` at U-Boot stage. Earlier macro stashed/restored serverip
+# around dhcp to defend against next-server clobber; in practice the
+# restore path was fragile under hush corner cases and a single failed
+# iteration mid-macro can land a bad serverip in saveenv (RAUC fallback
+# runs saveenv on bootcount reset). Use static IP + serverip from saved
+# env instead — they're set once per board and don't change.
+#
+# Bootargs use ip=dhcp for the kernel side: U-Boot has the file; the
+# kernel still negotiates its own IP for the NFS mount. earlycon stays.
+#
+# TFTP tuning: conservative defaults to harden against transient packet
+# loss on first-attempt boots (cold ARP cache, switch port still settling
+# after link-up). Steady-state loads are ~13 MiB/s either way; these only
+# kick in when something on the wire flakes. tftpwindowsize=1 disables
+# RFC 7440 windowed bursts; tftpblocksize=1024 keeps each datagram below
+# typical MTU; tftptimeout=10000 gives 10 s/packet headroom.
+tftpblocksize=1024
+tftpwindowsize=1
+tftptimeout=10000
+netboot=setenv autoload no; if tftp ${loadaddr} ${serverip}:edge-fit-dev/fitImage; then setenv bootargs "root=/dev/nfs rw nfsroot=${serverip}:${nfs_export},vers=3,nolock,tcp ip=dhcp earlycon"; bootm ${loadaddr}; else echo "[netboot] tftp from ${serverip}:edge-fit-dev/fitImage failed; falling back to signed mmc boot"; run bootcmd; fi

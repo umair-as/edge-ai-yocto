@@ -1,0 +1,94 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+Date: Sun, 15 Mar 2026 17:19:58 +0100
+Subject: [PATCH] rzg2l: ft_board_setup: add ethernet FDT fixup and KASLR seed
+
+Upstream-Status: Inappropriate [board-specific configuration]
+
+Enable CONFIG_OF_BOARD_SETUP so ft_board_setup() is actually called by
+the FIT image loading path. Implement the board-setup hooks:
+
+ - Auto-derive eth1addr from ethaddr (carry-safe +1) if eth1addr is not
+   set in U-Boot env. Done before fdt_fixup_ethernet() so both interfaces
+   get a stable MAC on every boot, including fresh WIC-flashed boards.
+
+ - fdt_fixup_ethernet(): patches local-mac-address in the kernel DT
+   from U-Boot's ethaddr/eth1addr env variables, eliminating the ravb
+   'no valid MAC address' warnings.
+
+ - KASLR seed injection: reads 8 bytes from the OP-TEE RNG driver
+   (CONFIG_DM_RNG + CONFIG_RNG_OPTEE) and writes them to
+   /chosen/kaslr-seed so the kernel can enable ASLR at boot.
+
+Signed-off-by: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+---
+ board/renesas/rcar-common/common.c | 39 +++++++++++++++++++++++++++++++++++++
+ configs/smarc-rzv2l_defconfig      |  3 +++
+ 2 files changed, 42 insertions(+)
+
+diff --git a/board/renesas/rcar-common/common.c b/board/renesas/rcar-common/common.c
+--- a/board/renesas/rcar-common/common.c
++++ b/board/renesas/rcar-common/common.c
+@@ -15,6 +15,9 @@
+ #include <asm/io.h>
+ #include <dm/uclass-internal.h>
+ #include <asm/arch/renesas.h>
++#include <env.h>
++#include <net.h>
++#include <rng.h>
+ #include <linux/libfdt.h>
+ 
+ #ifdef CONFIG_RCAR_64
+@@ -242,10 +245,39 @@
+ 
+ int ft_board_setup(void *blob, struct bd_info *bd)
+ {
++	struct udevice *dev;
++	u64 seed;
++	u8 mac[6];
++	int i;
++
+ 	apply_atf_overlay(blob);
+ 	scrub_duplicate_memory(blob);
+ 	update_rpc_status(blob);
+ 
++	/* Derive eth1addr from ethaddr if not set, before fdt_fixup_ethernet()
++	 * so both interfaces get patched in this boot.
++	 */
++	if (!env_get("eth1addr") && eth_env_get_enetaddr("ethaddr", mac)) {
++		for (i = 5; i >= 0; i--) {
++			if (mac[i] < 0xff) {
++				mac[i]++;
++				break;
++			}
++			mac[i] = 0;
++		}
++		eth_env_set_enetaddr("eth1addr", mac);
++		env_save();
++	}
++
++	/* Patch local-mac-address in DT from U-Boot ethaddr/eth1addr env */
++	fdt_fixup_ethernet(blob);
++
++	/* Write /chosen/kaslr-seed from OP-TEE RNG for kernel ASLR */
++	if (!uclass_get_device(UCLASS_RNG, 0, &dev) &&
++	    !dm_rng_read(dev, &seed, sizeof(seed)))
++		fdt_setprop(blob, fdt_path_offset(blob, "/chosen"),
++			    "kaslr-seed", &seed, sizeof(seed));
++
+ 	return 0;
+ }
+ #endif
+diff --git a/configs/smarc-rzv2l_defconfig b/configs/smarc-rzv2l_defconfig
+--- a/configs/smarc-rzv2l_defconfig
++++ b/configs/smarc-rzv2l_defconfig
+@@ -78,6 +78,9 @@
+ CONFIG_SCIF_CONSOLE=y
+ CONFIG_TEE=y
+ CONFIG_OPTEE=y
++CONFIG_OF_BOARD_SETUP=y
++CONFIG_DM_RNG=y
++CONFIG_RNG_OPTEE=y
+ CONFIG_USB=y
+ CONFIG_DM_USB=y
+ CONFIG_USB_XHCI_HCD=y

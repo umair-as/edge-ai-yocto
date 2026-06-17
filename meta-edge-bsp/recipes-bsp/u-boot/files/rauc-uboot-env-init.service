@@ -1,0 +1,15 @@
+[Unit]
+Description=Initialize U-Boot environment for RAUC bootchooser
+DefaultDependencies=no
+After=boot.mount
+Requires=boot.mount
+ConditionPathExists=/etc/fw_env.config
+ConditionPathExists=!/boot/.rauc-uboot-env-initialized-v3-fit-only
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/rauc-uboot-env-init.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
