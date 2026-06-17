@@ -1,0 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+Date: Sun, 15 Mar 2026 15:20:28 +0100
+Subject: [PATCH] arm64: dts: rzg2l-smarc: add watchdog channel/id bindings
+
+Upstream-Status: Inappropriate [board-specific configuration]
+
+---
+ arch/arm64/boot/dts/renesas/rzg2l-smarc-som.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/renesas/rzg2l-smarc-som.dtsi b/arch/arm64/boot/dts/renesas/rzg2l-smarc-som.dtsi
+index 09aa738234b4..20b4c212b9b1 100644
+--- a/arch/arm64/boot/dts/renesas/rzg2l-smarc-som.dtsi
++++ b/arch/arm64/boot/dts/renesas/rzg2l-smarc-som.dtsi
+@@ -429,9 +429,13 @@ &sdhi0 {
+ &wdt0 {
+ 	status = "okay";
+ 	timeout-sec = <60>;
++	channel,id = <0>;
++	renesas,syscon-cpg-wdtovf-rst = <&cpg>;
+ };
+ 
+ &wdt1 {
+ 	status = "okay";
+ 	timeout-sec = <60>;
++	channel,id = <1>;
++	renesas,syscon-cpg-wdtovf-rst = <&cpg>;
+ };

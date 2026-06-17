@@ -1,0 +1,46 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+Date: Thu, 12 Jun 2026 00:00:00 +0000
+Subject: [PATCH] arm64: dts: rzg2l-smarc-som: pin mmc aliases for deterministic
+ mmcblk numbering
+
+The kernel mmc core registers SDHI controllers in async-probe order.
+On the RZ/V2L SMARC SoM both sdhi0 (mmc@11c00000, the boot-side SD/eMMC
+slot) and sdhi1 (mmc@11c10000) are status="okay", so whichever finishes
+probe first gets mmcblk0. The result is that a bare
+"root=/dev/mmcblk0p${rootpartnum}" bootarg works by luck — across
+reflashes the same physical card can come up as mmcblk0 OR mmcblk1, and
+the kernel hangs in "Waiting for root device" when the race goes the
+"wrong" way.
+
+Setting "aliases { mmc0 = &sdhi0; mmc1 = &sdhi1; }" forces the mmc core
+to honour the alias when allocating the mmcblk index (of_alias_get_id
+in drivers/mmc/core/host.c), making numbering deterministic regardless
+of probe-completion order:
+  mmcblk0 ↔ sdhi0 ↔ 0x11c00000 (boot SDHI per the SMARC SoM design)
+  mmcblk1 ↔ sdhi1 ↔ 0x11c10000
+
+U-Boot's "mmc 0" view, the slot-udev rules (KERNEL=="mmcblk0pN"), the
+RAUC system.conf slot devices, and the rauc_set_bootargs macro all line
+up with the same enumeration after this patch — they had been
+implicitly assuming this alignment.
+
+Upstream-Status: Inappropriate [board-policy: SoM-specific mmc routing]
+Signed-off-by: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+---
+ arch/arm64/boot/dts/renesas/rzg2l-smarc-som.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/renesas/rzg2l-smarc-som.dtsi b/arch/arm64/boot/dts/renesas/rzg2l-smarc-som.dtsi
+--- a/arch/arm64/boot/dts/renesas/rzg2l-smarc-som.dtsi
++++ b/arch/arm64/boot/dts/renesas/rzg2l-smarc-som.dtsi
+@@ -22,6 +22,8 @@
+ / {
+ 	aliases {
+ 		ethernet0 = &eth0;
+ 		ethernet1 = &eth1;
++		mmc0 = &sdhi0;
++		mmc1 = &sdhi1;
+ 	};
+
+ 	chosen {

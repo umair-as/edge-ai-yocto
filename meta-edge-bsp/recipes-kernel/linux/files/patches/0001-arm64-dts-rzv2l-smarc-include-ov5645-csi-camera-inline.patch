@@ -1,0 +1,31 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+Date: Sun, 15 Mar 2026 15:42:16 +0100
+Subject: [PATCH] arm64: dts: rzv2l-smarc: include OV5645 CSI camera inline
+
+Upstream-Status: Inappropriate [board-specific configuration]
+
+---
+ arch/arm64/boot/dts/renesas/r9a07g054l2-smarc.dts | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/renesas/r9a07g054l2-smarc.dts b/arch/arm64/boot/dts/renesas/r9a07g054l2-smarc.dts
+index b3e6016880dd..86f35805fe93 100644
+--- a/arch/arm64/boot/dts/renesas/r9a07g054l2-smarc.dts
++++ b/arch/arm64/boot/dts/renesas/r9a07g054l2-smarc.dts
+@@ -32,6 +32,15 @@
+ #include "rz-smarc-common.dtsi"
+ #include "rzg2l-smarc.dtsi"
+ 
++/* OV5645 CSI camera - included inline (6.12 upstream uses dtso overlay). */
++#define OV5645_PARENT_I2C i2c0
++#include "rz-smarc-cru-csi-ov5645.dtsi"
++
++&ov5645 {
++	enable-gpios = <&pinctrl RZG2L_GPIO(2, 0) GPIO_ACTIVE_HIGH>;
++	reset-gpios = <&pinctrl RZG2L_GPIO(40, 2) GPIO_ACTIVE_LOW>;
++};
++
+ / {
+ 	model = "Renesas SMARC EVK based on r9a07g054l2";
+ 	compatible = "renesas,smarc-evk", "renesas,r9a07g054l2", "renesas,r9a07g054";

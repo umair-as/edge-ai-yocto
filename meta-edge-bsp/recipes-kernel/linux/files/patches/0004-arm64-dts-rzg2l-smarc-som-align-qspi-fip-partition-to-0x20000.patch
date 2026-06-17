@@ -1,0 +1,44 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+Date: Fri, 17 Apr 2026 21:00:00 +0100
+Subject: [PATCH] arm64: dts: rzg2l-smarc-som: align QSPI fip partition to 0x20000
+
+TF-A reads the FIP from the SPI ROM XIP window at:
+  RZG2L_SPIROM_FIP_BASE = SPIROM_BASE + 0x20000 = flash byte 0x20000
+
+The previous fip MTD partition started at 0x1D000, so flashcp /dev/mtd1
+wrote the FIP at flash 0x1D000 while BL2 looked at 0x20000 — a 12KB
+misalignment causing:
+  ERROR: BL2: Failed to load image id 3 (-2)
+
+Note: eSD FIP (RZG2L_SD_FIP_BASE = 0x20000) was always correct; only
+QSPI was affected.
+
+Fix: extend bl2 partition to 128KB (0x20000) — well above the 60KB
+bl2_bp_spi.bin — and start fip at 0x20000.  After this change
+flashcp /dev/mtd1 lands the FIP at the address TF-A expects.
+
+Upstream-Status: Inappropriate [board-specific fixup for RZ/V2L QSPI boot]
+
+---
+ arch/arm64/boot/dts/renesas/rzg2l-smarc-som.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/renesas/rzg2l-smarc-som.dtsi b/arch/arm64/boot/dts/renesas/rzg2l-smarc-som.dtsi
+--- a/arch/arm64/boot/dts/renesas/rzg2l-smarc-som.dtsi
++++ b/arch/arm64/boot/dts/renesas/rzg2l-smarc-som.dtsi
+@@ -382,11 +382,11 @@
+ 			partition@0 {
+ 				label = "bl2";
+-				reg = <0x00000000 0x0001d000>;
++				reg = <0x00000000 0x00020000>;
+ 			};
+
+-			partition@1d000 { /* fip is at offset 0x200 */
++			partition@20000 {
+ 				label = "fip";
+-				reg = <0x0001d000 0x1fe3000>;
++				reg = <0x00020000 0x1fe0000>;
+ 			};
+
+ 			partition@2000000 {

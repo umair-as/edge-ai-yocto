@@ -1,0 +1,47 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+Date: Mon, 16 Jun 2026 00:00:00 +0000
+Subject: [PATCH] arm64: dts: rzg2l-smarc-som: add ramoops reserved-memory
+ region
+
+Reserve 256 KB at the top of RAM (0xBFFC0000) for the kernel's
+pstore_ram backend. U-Boot doesn't zero RAM on warm reset, so the
+contents survive into the next boot under /sys/fs/pstore/ where
+operations can read the last oops/panic + console + pmsg.
+
+Layout inside the 256 KB:
+  - 4 x 16 KB kmsg records (panic/oops dumps)
+  - 64 KB console buffer
+  - 64 KB userspace pmsg buffer
+  - 16 byte ECC per region
+
+`no-map` prevents the kernel's page allocator from touching the area,
+which would otherwise clobber the contents shortly after boot.
+
+Upstream-Status: Inappropriate [board-specific configuration]
+Signed-off-by: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+---
+ arch/arm64/boot/dts/renesas/rzg2l-smarc-som.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/renesas/rzg2l-smarc-som.dtsi b/arch/arm64/boot/dts/renesas/rzg2l-smarc-som.dtsi
+--- a/arch/arm64/boot/dts/renesas/rzg2l-smarc-som.dtsi
++++ b/arch/arm64/boot/dts/renesas/rzg2l-smarc-som.dtsi
+@@ -55,6 +55,15 @@
+ 			reg = <0x0 0x68000000 0x0 0x8000000>;
+ 		};
+
++		ramoops@bffc0000 {
++			compatible = "ramoops";
++			reg = <0x0 0xbffc0000 0x0 0x40000>;
++			record-size = <0x4000>;
++			console-size = <0x10000>;
++			pmsg-size = <0x10000>;
++			ecc-size = <16>;
++			no-map;
++		};
+ 	};
+
+ 	mmngr {
+--
+2.43.0
