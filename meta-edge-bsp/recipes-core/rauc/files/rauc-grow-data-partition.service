@@ -1,0 +1,18 @@
+[Unit]
+Description=Grow /data partition to fill SD card
+DefaultDependencies=no
+After=systemd-udev-trigger.service boot.mount
+Before=data.mount local-fs.target
+RequiresMountsFor=/boot
+ConditionPathExists=!/boot/.rauc-grow-done
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/grow-data-partition.sh
+StandardOutput=journal
+StandardError=journal
+TimeoutSec=2min
+RemainAfterExit=yes
+
+[Install]
+WantedBy=local-fs.target
