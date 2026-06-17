@@ -1,0 +1,45 @@
+# short-description: edge-ai-yocto A/B image layout for smarc-rzv2l
+# long-description: BL2 + FIP at fixed offsets (RZ/V2L eSD boot
+# requirement), shared /boot, two rootfs slots for RAUC OTA, and a /data
+# partition for persistent state.
+#
+# Partition map (mmcblk0):
+#   raw:  BL2_BP + FIP at fixed offsets (no partition table entries)
+#   p1:   /boot   (ext4, shared boot assets — fitImage, DTB, splash)
+#   p2:   rootfsA (ext4, RAUC slot A, active at first boot)
+#   p3:   rootfsB (ext4, RAUC slot B, inactive — first OTA target)
+#   p4:   /data   (ext4, persistent state, grown to fill SD on first boot)
+
+# RZ/V2L eSD boot expects the bootloader at SoC-ROM-fixed raw offsets,
+# outside any partition:
+#   - BL2 (3584-byte boot parameter block + BL2 image) at sector 0 (LBA 0).
+#   - FIP at FIP_WIC_OFFSET = "--offset 256s" (sector 256 = 0x20000 bytes
+#     = 128 KB). This is the offset the mask ROM reads for eSD boot.
+# --no-table keeps WIC from emitting GPT/MBR entries for these regions;
+# they sit before any partition. FIP_WIC_OFFSET is enrolled in WICVARS
+# (edge-image-common.inc) so WIC's WKS preprocessor expands it instead
+# of passing it through as a literal string.
+#
+# bl2_bp_esd-${MACHINE}_pmic.bin + fip-${MACHINE}_pmic.bin are produced
+# by meta-renesas's firmware-pack.bb when PMIC_SUPPORT=1 (bptool esd mode
+# + BL2_pmic concat for the former; fip-pmic.bin copy for the latter),
+# deployed to DEPLOY_DIR_IMAGE. PMIC variant is required for the SMARC
+# RZ/V2L EVK DDR4 carrier (RAA215300 PMIC) — see kas/machines/rzv2l.yml.
+part --source rawcopy --sourceparams="file=bl2_bp_esd-${MACHINE}_pmic.bin" --no-table
+part --source rawcopy --sourceparams="file=fip-${MACHINE}_pmic.bin"        --no-table ${FIP_WIC_OFFSET} --align 64
+
+# /boot at 4 MB alignment. The fw_env.config relies on this: U-Boot env
+# lives in raw MMC at 0x1F0000–0x230000 (primary + redundant copies),
+# which must end BEFORE the first partition. 4 MB alignment guarantees that.
+part /boot --source bootimg-partition --fstype=ext4 --label boot    --ondisk mmcblk0 --align 4096 --size 500  --no-fstab-update
+
+# RAUC A/B rootfs slots. Both --label entries are explicit and
+# enforced by edge-wic-label-check.bbclass; WIC does not reliably set the
+# ext4 label on the first --source rootfs partition, and bundle-hooks.sh
+# re-labels post-install as the runtime safety net.
+part /     --source rootfs --fstype=ext4 --label rootfsA --ondisk mmcblk0 --align 1024 --fixed-size 4096
+part /     --source rootfs --fstype=ext4 --label rootfsB --ondisk mmcblk0 --align 1024 --fixed-size 4096
+
+# /data preformatted in-image so first boot only needs resize, not mkfs.
+# rauc-grow-data-partition.service grows this to fill the SD on first boot.
+part /data                 --fstype=ext4 --label data    --ondisk mmcblk0 --align 1024 --fixed-size 1024 --no-fstab-update
