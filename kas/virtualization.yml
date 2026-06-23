@@ -43,13 +43,6 @@ repos:
     layers:
       .:
 
-  meta-rust-bin:
-    url: https://github.com/rust-embedded/meta-rust-bin.git
-    branch: master
-    commit: eae842ee3de3c80dcb1c054a34178ecd610db1fd
-    layers:
-      .:
-
 local_conf_header:
   virtualization: |
     DISTRO_FEATURES:append              = " virtualization"
@@ -58,8 +51,3 @@ local_conf_header:
     VIRTUAL-RUNTIME_container_dns        = "aardvark-dns"
     PODMAN_FEATURES:pn-podman            = ""
     EDGE_ENABLE_CONTAINERS               = "1"
-    PREFERRED_VERSION_rust-native        = "1.94.%"
-    PREFERRED_VERSION_rust-cross-aarch64 = "1.94.%"
-    PREFERRED_VERSION_cargo-native       = "1.94.%"
-    PREFERRED_VERSION_libstd-rs          = "1.94.%"
-    LAYERSERIES_COMPAT_rust-bin-layer:append = " wrynose"

@@ -1,4 +1,4 @@
-.PHONY: help base dev bundle parse layers shell info clean-lock netboot-sync lock verify-pins purge
+.PHONY: help base dev prod bundle parse layers shell info clean-lock netboot-sync lock verify-pins purge
 
 KAS ?= kas
 
@@ -82,6 +82,28 @@ CAP_CHAIN := $(if $(CAPABILITY_YMLS),:$(subst $(space),:,$(CAPABILITY_YMLS)))
 
 STACK = $(BASE)$(CAP_CHAIN)
 
+# === Boot target (on-disk layout) ===
+#
+#   make dev EDGE_BOOT_TARGET=emmc   # GPT user area + systemd-repart (eMMC boot)
+#
+# Unset → recipe default "esd" (MBR, eSD boot — unchanged behaviour). Passed
+# as a bitbake env var, not a kas layer; the recipe selects the matching
+# WKS_FILE and growth mechanism.
+BOOT_TARGET_ENV := $(if $(EDGE_BOOT_TARGET),EDGE_BOOT_TARGET=$(EDGE_BOOT_TARGET) ,)
+
+# === Build tier (EDGE_PROFILE) ===
+#
+# Tier is resolved at INVOCATION, not pinned in an image recipe (an image
+# recipe parses after the distro conf's `require edge-profile-${EDGE_PROFILE}`
+# already ran). EDGE_PROFILE must be whitelisted in BB_ENV_PASSTHROUGH_ADDITIONS
+# *in the shell env* — bitbake filters the inherited environment at startup,
+# before any conf is parsed, so the `.=` in edge-features.inc is too late to
+# rescue the startup import. Set both on the bitbake command line together.
+# $(1) = profile (dev|prod), $(2) = image target.
+define edge_build
+	$(KAS) shell -c 'BB_ENV_PASSTHROUGH_ADDITIONS="$$BB_ENV_PASSTHROUGH_ADDITIONS EDGE_PROFILE EDGE_OTA_BACKEND EDGE_BOOT_TARGET" EDGE_PROFILE=$(1) $(BOOT_TARGET_ENV)bitbake $(2)' $(STACK)
+endef
+
 # kas refuses to run if KAS_WORK_DIR is set to a non-existent dir
 # (kas/context.py: os.path.abspath but no mkdir). Order-only prereq so
 # every kas-invoking target finds .kas/ already created on a fresh tree.
@@ -92,16 +114,19 @@ help:
 	@echo "edge-ai-yocto build system"
 	@echo "=========================="
 	@echo ""
-	@echo "Image targets:"
-	@echo "  make base                    Build edge-image-base (v0 wired tier)"
-	@echo "  make dev                     Build edge-image-dev  (base + debug/profile/stress tools)"
-	@echo "  make bundle                  Build edge-bundle (.raucb) for OTA install"
+	@echo "Image targets (tier = EDGE_PROFILE, set per target):"
+	@echo "  make base                    Build edge-image-base (dev tier; v0 wired baseline)"
+	@echo "  make dev                     Build edge-image-dev  (dev tier; + debug/profile/stress tools)"
+	@echo "  make prod                    Build edge-image-prod (prod tier; hardened, no package-mgmt)"
+	@echo "  make bundle                  Build edge-bundle (.raucb) for OTA install (dev tier)"
+	@echo "  make bundle EDGE_PROFILE=prod  Bundle a prod image (set BUNDLE_IMAGE_NAME=edge-image-prod)"
 	@echo ""
 	@echo "Capability flags (composable; combine freely):"
 	@echo "  TPM=1                        + meta-secure-core (TPM2 + IMA/EVM userspace)"
 	@echo "  VIRT=1                       + meta-virtualization (Podman/runc/crun)"
 	@echo "  SBOM_TUNE=1                  + kas/sbom-cve.yml tuning knobs"
 	@echo "  NETBOOT=1                    + U-Boot 'netboot' env macro (TFTP/NFS dev workflow)"
+	@echo "  EDGE_BOOT_TARGET=emmc        GPT user area + systemd-repart (eMMC boot; default esd)"
 	@echo ""
 	@echo "  Example: make dev NETBOOT=1"
 	@echo "           sudo ./scripts/dev/sync-nfs-rootfs.sh   # after each rebuild"
@@ -126,25 +151,34 @@ help:
 	@echo "See AGENTS.md for the full orientation."
 
 base: | $(KAS_WORK_DIR)
-	@echo "==> Building edge-image-base [$(STACK)]"
-	$(KAS) shell -c 'bitbake edge-image-base' $(STACK)
+	@echo "==> Building edge-image-base (dev tier) [$(STACK)]"
+	$(call edge_build,dev,edge-image-base)
 
 dev: | $(KAS_WORK_DIR)
 	@echo "==> Building edge-image-dev [$(STACK)]"
-	$(KAS) shell -c 'bitbake edge-image-dev' $(STACK)
+	$(call edge_build,dev,edge-image-dev)
+
+prod: | $(KAS_WORK_DIR)
+	@echo "==> Building edge-image-prod [$(STACK)]"
+	$(call edge_build,prod,edge-image-prod)
 
 # RAUC bundle. Signs with the chain at keys/dev/rauc/ (run
-# scripts/rauc-init-certs.sh first if absent). Default BUNDLE_IMAGE_NAME
-# is edge-image-base; override in kas/local.yml for dev OTA iteration:
-#     BUNDLE_IMAGE_NAME = "edge-image-dev"
+# scripts/rauc-init-certs.sh first if absent). BUNDLE_IMAGE_NAME selects the
+# image to bundle (default edge-image-dev; set in kas/local.yml). EDGE_PROFILE
+# must match that image's tier — defaults to dev; for a prod bundle:
+#     make bundle EDGE_PROFILE=prod        # with BUNDLE_IMAGE_NAME=edge-image-prod
+# EDGE_BOOT_TARGET must match the booted board: an emmc board needs
+#     make bundle EDGE_BOOT_TARGET=emmc    # else the slot rootfs ships the
+# esd grow path, which fails on the GPT layout.
+EDGE_PROFILE ?= dev
 bundle: | $(KAS_WORK_DIR)
 	@if [ ! -f keys/dev/rauc/rauc-signer.key ]; then \
 		echo "RAUC signing keys missing at keys/dev/rauc/."; \
 		echo "Run: ./scripts/rauc-init-certs.sh"; \
 		exit 1; \
 	fi
-	@echo "==> Building edge-bundle [$(STACK)]"
-	$(KAS) shell -c 'bitbake edge-bundle' $(STACK)
+	@echo "==> Building edge-bundle (EDGE_PROFILE=$(EDGE_PROFILE)) [$(STACK)]"
+	$(KAS) shell -c 'BB_ENV_PASSTHROUGH_ADDITIONS="$$BB_ENV_PASSTHROUGH_ADDITIONS EDGE_PROFILE EDGE_OTA_BACKEND BUNDLE_IMAGE_NAME EDGE_BOOT_TARGET" EDGE_PROFILE=$(EDGE_PROFILE) $(BOOT_TARGET_ENV)bitbake edge-bundle' $(STACK)
 	@echo "==> Bundle artefacts:"
 	@find build/tmp/deploy/images -name '*.raucb' -printf '    %p\n'
 

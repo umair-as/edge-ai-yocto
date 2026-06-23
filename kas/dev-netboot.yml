@@ -6,7 +6,7 @@
 #   make dev NETBOOT=1                            # via Makefile flag
 #
 # Sets EDGE_DEV_NETBOOT=1 in local.conf so:
-#   - u-boot-env-config_1.0.bb appends a `netboot` macro to
+#   - rauc-uboot-env_1.0.bb appends a `netboot` macro to
 #     /etc/rauc-uboot-env.defaults and /etc/u-boot-initial-env
 #   - prod builds composed without this fragment carry zero netboot bytes
 #

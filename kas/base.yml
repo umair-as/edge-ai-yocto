@@ -28,6 +28,13 @@ header:
 
 distro: edge-ai
 
+# Default bitbake target when invoked outside the Makefile (e.g.
+# `kas build kas/base.yml:kas/machines/<board>.yml`). The make targets
+# (`make base|dev|prod`) override this by passing an explicit bitbake
+# argument; this value only steers `kas build` / `kas shell` invocations
+# and the post-checkout banner ("To start the default build, run: ...").
+target: edge-image-base
+
 repos:
   # --- Renesas vendor BSP (meta-renesas: meta-rz-bsp + meta-rz-distro) ---
   # No wrynose branch upstream — newest Yocto branch is scarthgap/rz
@@ -112,6 +119,22 @@ repos:
     branch: wrynose
     commit: 38da0e5866a953e664001ba90b5edad68d68cd5d
     # meta-rauc.git has the layer at the repo root, not in a subdir.
+    layers:
+      .:
+
+  # --- SELinux (MAC) ---
+  # Provides libselinux/libsemanage/libsepol, policycoreutils, refpolicy
+  # variants, packagegroup-core-selinux, and selinux-image.bbclass. Layer
+  # deps (openembedded-core, meta-python) are already pulled above. The
+  # systemd recipe in oe-core flips PACKAGECONFIG[selinux] automatically
+  # when DISTRO_FEATURES contains "selinux"; 25 other oe-core/meta-oe
+  # recipes link libselinux conditionally on the same bit. See
+  # edge-floor.inc for the distro-features wiring and
+  # security-hardening.cfg for the kernel-side LSM symbols.
+  meta-selinux:
+    url: https://git.yoctoproject.org/meta-selinux
+    branch: wrynose
+    commit: 1c3a699f363167571ab39fecb0fe6f56691a4e20
     layers:
       .:
 

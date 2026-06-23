@@ -72,6 +72,19 @@ else
     systemctl --failed --no-legend | sed 's/^/        /'
 fi
 
+# Lockdown LSM and module signing are intrinsically coupled — both integrity
+# and confidentiality bands include LOCKDOWN_MODULE_SIGNATURE, so any
+# lockdown level blocks unsigned modules. The two valid end-states are:
+#   TARGET — modules signed + lockdown=integrity activated via cmdline
+#   INTERIM — FORCE_NONE in kernel cfg, no lockdown= on cmdline; LSM dormant
+# A "lockdown blocking unsigned modules" message at runtime means the build
+# state drifted (e.g. FORCE_CONFIDENTIALITY=y crept back in or cmdline got
+# a stray lockdown=integrity without signing the out-of-tree modules).
+lockdown_count=$(sudo -n dmesg 2>/dev/null | grep -ciE 'lockdown.*unsigned module|lockdown.*restricted')
+if [ "${lockdown_count}" -gt 0 ]; then
+    warn "kernel lockdown blocking unsigned modules (${lockdown_count} dmesg hits) — build state drifted from interim FORCE_NONE; see docs/security/uboot-hardening.md (target: sign mmngr/vspm + lockdown=integrity; interim: FORCE_NONE, no lockdown=)"
+fi
+
 uptime_s=$(awk '{print int($1)}' /proc/uptime)
 info "uptime: ${uptime_s}s, kernel: $(uname -r)"
 
@@ -90,6 +103,40 @@ if findmnt /boot >/dev/null 2>&1; then
     pass "/boot is mounted ($(findmnt -no SOURCE /boot))"
 else
     warn "/boot is not mounted (bundle-hook may have unmounted post-install)"
+fi
+
+# WIC fstab dup-trap: WIC's update_fstab() used to append /dev/mmcblk0pN
+# entries on top of our base-files fstab, causing systemd-fstab-generator
+# "already exists. Duplicate entry?" errors. Fix is the imager-level
+# WIC_CREATE_EXTRA_ARGS:append = " --no-fstab-update" in edge-image.bbclass.
+fstab_dups=$(awk '!/^\s*(#|$)/ {print $2}' /etc/fstab | sort | uniq -d)
+if [ -z "${fstab_dups}" ]; then
+    pass "/etc/fstab has no duplicate mountpoints"
+else
+    fail "/etc/fstab has duplicate mountpoint(s): ${fstab_dups}"
+fi
+if ! journalctl -b 0 -u systemd-fstab-generator --no-pager 2>/dev/null \
+       | grep -qi 'duplicate entry'; then
+    pass "systemd-fstab-generator has no 'Duplicate entry' errors this boot"
+else
+    fail "systemd-fstab-generator logged 'Duplicate entry' — WIC dup-fstab trap struck"
+fi
+
+# /data reserve-blocks: grow script now runs `tune2fs -m 0` after resize2fs
+# (reclaims ~5% of partition). Confirm the superblock has 0% reserve.
+if command -v dumpe2fs >/dev/null 2>&1; then
+    data_src=$(findmnt -no SOURCE /data 2>/dev/null || true)
+    if [ -b "${data_src}" ]; then
+        reserve=$(sudo -n dumpe2fs -h "${data_src}" 2>/dev/null \
+            | awk -F: '/Reserved block count/ {gsub(/ /, "", $2); print $2; exit}')
+        if [ "${reserve}" = "0" ]; then
+            pass "/data reserved-blocks = 0 (tune2fs -m 0 ran)"
+        elif [ -n "${reserve}" ]; then
+            warn "/data reserved-blocks = ${reserve} (tune2fs -m 0 not yet applied)"
+        else
+            warn "could not read /data reserved-blocks (sudo dumpe2fs returned nothing)"
+        fi
+    fi
 fi
 
 # ---------------- 3. persistence binds ----------------
@@ -216,8 +263,26 @@ if command -v podman >/dev/null 2>&1; then
     pass "podman: $(podman version --format '{{.Client.Version}}' 2>/dev/null || echo unknown)"
     runtime=$(podman info --format '{{.Host.OCIRuntime.Name}} {{.Host.OCIRuntime.Version}}' 2>/dev/null || true)
     graphroot=$(podman info --format '{{.Store.GraphRoot}}' 2>/dev/null || true)
-    info "OCI runtime: ${runtime:-unknown}"
-    info "graphRoot:   ${graphroot:-unknown}"
+    netbackend=$(podman info --format '{{.Host.NetworkBackend}}' 2>/dev/null || true)
+    netpkg=$(podman info --format '{{.Host.NetworkBackendInfo.Package}}' 2>/dev/null || true)
+    dnspkg=$(podman info --format '{{.Host.NetworkBackendInfo.DNS.Package}}' 2>/dev/null || true)
+    info "OCI runtime:    ${runtime:-unknown}"
+    info "graphRoot:      ${graphroot:-unknown}"
+    info "network/dns:    ${netpkg:-unknown} + ${dnspkg:-unknown}"
+
+    case "${netbackend}" in
+        netavark) pass "podman network backend = netavark" ;;
+        cni)      fail "podman network backend = cni (legacy; should be netavark)" ;;
+        *)        warn "podman network backend = ${netbackend:-unknown}" ;;
+    esac
+
+    # pasta is the podman 5.x default rootless network mode. Without it, every
+    # rootless `podman run` errors at "could not find pasta".
+    if command -v pasta >/dev/null 2>&1; then
+        pass "pasta available at $(command -v pasta)"
+    else
+        fail "pasta not installed — rootless networking falls back to slirp4netns"
+    fi
 
     # podman storage should resolve via the bind to /data/containers
     if [ -d /data/containers/storage ]; then
@@ -227,10 +292,15 @@ if command -v podman >/dev/null 2>&1; then
         info "no podman storage yet (no images pulled)"
     fi
 
-    if sudo podman run --rm docker.io/library/alpine:3 echo "container-ok" >/dev/null 2>&1; then
+    # Run-with-pull. Captures stderr so a real failure (vs. transient first-boot
+    # DNS not-yet-settled) is visible. Smoke test runs at uptime ~2-4 min;
+    # NetworkManager may not have a DNS server resolvable yet.
+    podman_run_err=$(sudo podman run --rm docker.io/library/alpine:3 echo "container-ok" 2>&1 >/dev/null)
+    if [ $? -eq 0 ]; then
         pass "podman run alpine:3 — OK (pulled + executed)"
     else
-        warn "podman run alpine:3 failed (network or registry issue)"
+        warn "podman run alpine:3 failed — likely transient first-boot DNS"
+        printf '        %s\n' "${podman_run_err}" | head -3 | sed 's/^/        /'
     fi
 else
     fail "podman not installed"
@@ -314,6 +384,75 @@ for opt in init_on_alloc=1 init_on_free=1 randomize_kstack_offset=on vsyscall=no
         *)          warn "kernel cmdline: ${opt} not set" ;;
     esac
 done
+
+# SELinux state. EXTRA_KERNEL_ARGS in U-Boot env should append `security=selinux`
+# (no `enforcing=0` — refpolicy /etc/selinux/config now drives the mode).
+case "${cmdline}" in
+    *security=selinux*) pass "kernel cmdline: security=selinux" ;;
+    *selinux=0*)        warn "kernel cmdline: selinux=0 (recovery override; expected security=selinux)" ;;
+    *)                  warn "kernel cmdline: no SELinux flag (LSM may not be active)" ;;
+esac
+case "${cmdline}" in
+    *enforcing=0*) warn "kernel cmdline: enforcing=0 still present (should come from /etc/selinux/config now)" ;;
+esac
+
+if command -v getenforce >/dev/null 2>&1; then
+    enforce=$(getenforce 2>/dev/null || true)
+    case "${enforce}" in
+        Permissive) pass "SELinux state: Permissive (refpolicy DEFAULT_ENFORCING=permissive)" ;;
+        Enforcing)  info "SELinux state: Enforcing (post-validation flip; not the v0 default)" ;;
+        Disabled)   warn "SELinux state: Disabled (kernel built it out OR selinux=0 escape)" ;;
+        *)          warn "SELinux state: unknown ('${enforce}')" ;;
+    esac
+    # Confirm the file system is labeled — /bin/sh should NOT be unlabeled_t.
+    # stat -c %C is the canonical way to read the SELinux context for one file
+    # (avoids the ls -lZ column-order trap on different coreutils versions).
+    if [ "${enforce}" != "Disabled" ]; then
+        sh_ctx=$(stat -c '%C' /bin/sh 2>/dev/null || true)
+        case "${sh_ctx}" in
+            *unlabeled_t*) fail "/bin/sh has SELinux context ${sh_ctx} — rootfs not labeled" ;;
+            *bin_t*|*shell_exec_t*) pass "/bin/sh SELinux context: ${sh_ctx}" ;;
+            "?"|"") info "/bin/sh label not displayable (selinux=0 boot)" ;;
+            *) info "/bin/sh SELinux context: ${sh_ctx}" ;;
+        esac
+    fi
+fi
+
+# Refpolicy config — Permissive is the v0 default; ADR-0005 follow-up flips
+# to Enforcing once policy coverage is audit-clean.
+if [ -f /etc/selinux/config ]; then
+    sel_mode=$(awk -F= '/^SELINUX=/ {print $2; exit}' /etc/selinux/config)
+    sel_type=$(awk -F= '/^SELINUXTYPE=/ {print $2; exit}' /etc/selinux/config)
+    info "/etc/selinux/config: SELINUX=${sel_mode}, SELINUXTYPE=${sel_type}"
+fi
+
+# ---------------- 11. bring-up tooling ----------------
+
+section "Bring-up tooling (dev image)"
+
+# Tools added across the SELinux / podman / image-class refactor this cycle:
+#   dtc, fdtdump, fdtget        — device tree inspection (hwtools)
+#   tune2fs, e2label             — ext4 metadata (hwtools + grow-data RDEPENDS)
+#   pasta                        — already checked in section 7
+for tool in dtc fdtdump fdtget tune2fs e2label; do
+    if command -v "${tool}" >/dev/null 2>&1; then
+        pass "${tool} available at $(command -v "${tool}")"
+    else
+        warn "${tool} not on PATH"
+    fi
+done
+
+# /data growth is one unified oneshot for both layouts: edge-grow-data.service
+# dispatches systemd-repart (GPT/eMMC) or parted (MBR/eSD) plus a shared
+# resize2fs + tune2fs tail. Gated by /boot/.edge-data-grown, so it runs once on
+# the first boot of a fresh flash — look across all boots for that run.
+if journalctl -u edge-grow-data.service --no-pager 2>/dev/null | grep -qiE '✓|▶|⏭|growth complete'; then
+    pass "edge-grow-data.service ran (/data growth logged)"
+elif [ "$(systemctl is-active edge-grow-data.service 2>/dev/null)" = "active" ]; then
+    pass "edge-grow-data.service active (exited) — /data growth"
+else
+    warn "edge-grow-data.service log absent or unparsed"
+fi
 
 # ---------------- summary ----------------
 

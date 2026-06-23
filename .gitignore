@@ -26,6 +26,13 @@ meta-edge-bsp/recipes-security/libsecureip/files/*.tar.gz
 # Never commit them; treat as ephemeral dev material.
 /keys/dev/
 
+# === Security tooling (CRA spike) ===
+# Pinned scanner binaries: installed by scripts/install-scanners.sh, never
+# committed. The script is the version manifest; the binaries are ephemeral.
+.tooling/
+# uv-managed Python venv for the analysis scripts (pyproject.toml).
+.venv/
+
 # === Editor / scratch / logs ===
 *.pyc
 *.pyo
