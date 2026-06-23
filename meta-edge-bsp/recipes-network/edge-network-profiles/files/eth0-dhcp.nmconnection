@@ -1,8 +1,11 @@
 [connection]
-id=eth0-dhcp
+id=edge-wired-dhcp
 uuid=a1b2c3d4-e5f6-4a7b-8c9d-000000000001
 type=ethernet
-interface-name=eth0
+# Glob match attaches to any onboard ethernet jack (eth0, eth1, ...).
+# Either SOM-side or carrier-side cable picks up this profile instead of
+# NM's auto-default "Wired connection N".
+interface-name=eth*
 autoconnect=true
 autoconnect-priority=100
 autoconnect-retries=0
