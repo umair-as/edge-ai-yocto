@@ -1,15 +1,9 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/weston-init:"
 
-# Defer weston off the boot critical chain. See edge-defer.conf for the
-# rationale; SYSTEMD_DEFAULT_TARGET = "multi-user.target" in
-# meta-edge-distro/conf/distro/edge-ai.conf is the paired policy knob.
-#
-# Upstream weston.service has [Install] WantedBy=graphical.target only.
-# graphical.target is not the default (SYSTEMD_DEFAULT_TARGET = multi-user.target);
-# upstream Install link is never activated. Add multi-user.target.wants symlink so
-# weston still auto-starts. The drop-in then adds After=multi-user.target
-# so the compositor starts AFTER multi-user is active — boot-complete is
-# measured against multi-user.target, weston runs in parallel with login.
+# Upstream [Install] WantedBy=graphical.target is dormant since
+# SYSTEMD_DEFAULT_TARGET=multi-user.target (edge-floor.inc). Symlink under
+# multi-user.target.wants/ keeps auto-start; edge-defer.conf handles
+# deferral, DRM probe gating, and the pam_systemd bypass.
 
 SRC_URI:append = " \
     file://edge-defer.conf \
