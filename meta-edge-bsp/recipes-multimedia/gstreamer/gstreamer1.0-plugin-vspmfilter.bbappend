@@ -1,0 +1,5 @@
+# Scarthgap→wrynose port: S = "${WORKDIR}/git" → ${UNPACKDIR}/${BP};
+# patch-status demoted (vendor patches without Upstream-Status header).
+# See kernel-module-mmngr.bbappend for the full rationale.
+S = "${UNPACKDIR}/${BP}"
+ERROR_QA:remove = "patch-status"
