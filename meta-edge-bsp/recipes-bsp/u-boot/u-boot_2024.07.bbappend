@@ -18,6 +18,24 @@ SRC_URI:append = " \
     file://patches/0006-rzg2l-ft_board_setup-add-debug-traces.patch \
 "
 
+# U-Boot surface reduction. Three composable features:
+#   surface_reduce — universal disables (stack canary on, USB host stack
+#                    off, kermit/s-record load off). Safe in dev and prod.
+#   net_off        — disable network commands. EDGE_DEV_NETBOOT=1 builds
+#                    re-enable them implicitly by skipping this fragment.
+#   fit_enforce    — regression-guard against legacy uImage re-enablement.
+EDGE_UBOOT_FEATURES ?= "surface_reduce net_off fit_enforce"
+
+SRC_URI:append = "${@' file://edge-uboot-hardening.cfg' \
+    if 'surface_reduce' in (d.getVar('EDGE_UBOOT_FEATURES') or '') else ''}"
+
+SRC_URI:append = "${@' file://edge-uboot-net-off.cfg' \
+    if 'net_off' in (d.getVar('EDGE_UBOOT_FEATURES') or '') \
+    and d.getVar('EDGE_DEV_NETBOOT') != '1' else ''}"
+
+SRC_URI:append = "${@' file://edge-uboot-fit-enforce.cfg' \
+    if 'fit_enforce' in (d.getVar('EDGE_UBOOT_FEATURES') or '') else ''}"
+
 # Shared serial-visible build marker.
 EDGE_BUILD_PROFILE ?= "local"
 EDGE_BUILD_TAG     ?= "edge-${EDGE_BUILD_PROFILE}"
