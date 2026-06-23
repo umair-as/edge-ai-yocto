@@ -1,0 +1,23 @@
+# Grow /data to fill the storage device on first boot, before it is mounted.
+# One unit for both boot targets; edge-grow-data.sh dispatches on the partition
+# table (GPT -> systemd-repart, MBR -> parted) and shares the resize2fs/tune2fs
+# tail. Idempotent and gated by the /boot/.edge-data-grown stamp.
+
+[Unit]
+Description=Grow /data to fill the storage device on first boot
+DefaultDependencies=no
+After=systemd-udev-trigger.service boot.mount
+Before=data.mount local-fs.target
+RequiresMountsFor=/boot
+ConditionPathExists=!/boot/.edge-data-grown
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/edge-grow-data.sh
+StandardOutput=journal
+StandardError=journal
+TimeoutSec=2min
+RemainAfterExit=yes
+
+[Install]
+WantedBy=local-fs.target
