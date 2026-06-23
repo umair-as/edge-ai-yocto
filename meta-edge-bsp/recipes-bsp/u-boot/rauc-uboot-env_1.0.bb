@@ -1,11 +1,19 @@
-SUMMARY = "U-Boot fw_env tools config + RAUC first-boot env initializer"
+SUMMARY = "U-Boot env init for RAUC's A/B slot state machine"
 DESCRIPTION = "Installs /etc/fw_env.config (locating the env in MMC raw area), \
 the RAUC-aware env-init oneshot service, the managed env defaults file, and \
 /etc/u-boot-initial-env (libubootenv's defenv fallback — without this file, \
 fw_setenv against an uninitialized env area returns -EACCES and the env-init \
 script bails on first boot, never writing the FIT-aware bootcmd to MMC)."
+HOMEPAGE = "https://github.com/umair-as/edge-ai-yocto"
+SECTION = "bootloaders"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
+
+# Runtime virtual provider — packagegroup-edge-base RDEPENDS on the
+# virtual, not on this PN directly, so a mender-uboot-env recipe (when
+# it ever lands) supplies the same shape via PREFERRED_RPROVIDER in
+# edge-ota-mender.inc. See ADR-0005.
+RPROVIDES:${PN} = "virtual-ota-uboot-env"
 
 inherit allarch systemd
 

@@ -1,0 +1,74 @@
+# short-description: edge-ai-yocto A/B image layout for smarc-rzv2l
+# long-description: BL2 + FIP at fixed offsets (RZ/V2L eSD boot
+# requirement), shared /boot, two rootfs slots, and a /data partition
+# for persistent state. Slot labels and sizes come from the bbclass via
+# bitbake-time .wks.in expansion; the .in suffix means full bitbake
+# variable substitution, no WICVARS enrolment needed for these.
+#
+# On-disk layout (mmcblk0):
+#
+#   ┌─────────────────────────────────────────────┐ byte offset
+#   │ BL2 boot parameter block + BL2 image        │ 0x00000000  (sector 0)
+#   │  raw — no partition table entry             │
+#   ├─────────────────────────────────────────────┤ 0x00020000  (sector 256,
+#   │ FIP: BL31 + OP-TEE + U-Boot                 │              = FIP_WIC_OFFSET)
+#   │  raw — no partition table entry             │
+#   ├─────────────────────────────────────────────┤ 0x001F0000
+#   │ U-Boot environment (primary + redundant)    │
+#   │  raw MMC area — /etc/fw_env.config points   │
+#   │  fw_setenv at these offsets                 │
+#   ├─────────────────────────────────────────────┤ 0x00230000
+#   │  ── gap to 4 MB alignment ──                │
+#   ├─────────────────────────────────────────────┤ 0x00400000   p1
+#   │ /boot              ext4, 500 MB             │
+#   │  fitImage + ${EDGE_BOOT_DTB} + splash.bmp   │
+#   ├─────────────────────────────────────────────┤              p2
+#   │ ${EDGE_SLOT_A_LABEL}  ext4, ${EDGE_SLOT_SIZE_MB} MB
+#   │  RAUC slot A — active at first boot         │
+#   ├─────────────────────────────────────────────┤              p3
+#   │ ${EDGE_SLOT_B_LABEL}  ext4, ${EDGE_SLOT_SIZE_MB} MB
+#   │  RAUC slot B — inactive, first OTA target   │
+#   ├─────────────────────────────────────────────┤              p4
+#   │ /data              ext4, ${EDGE_DATA_SIZE_MB} MB seed
+#   │  grown to fill SD on first boot by          │
+#   │  edge-grow-data.service                     │
+#   └─────────────────────────────────────────────┘
+
+# RZ/V2L eSD boot expects the bootloader at SoC-ROM-fixed raw offsets,
+# outside any partition:
+#   - BL2 (3584-byte boot parameter block + BL2 image) at sector 0 (LBA 0).
+#   - FIP at FIP_WIC_OFFSET = "--offset 256s" (sector 256 = 0x20000 bytes
+#     = 128 KB). This is the offset the mask ROM reads for eSD boot.
+# --no-table keeps WIC from emitting GPT/MBR entries for these regions;
+# they sit before any partition. FIP_WIC_OFFSET is enrolled in WICVARS
+# (kas/machines/rzv2l.yml) so WIC's WKS preprocessor expands it instead
+# of passing it through as a literal string.
+#
+# bl2_bp_esd-${MACHINE}_pmic.bin + fip-${MACHINE}_pmic.bin are produced
+# by meta-renesas's firmware-pack.bb when PMIC_SUPPORT=1 (bptool esd mode
+# + BL2_pmic concat for the former; fip-pmic.bin copy for the latter),
+# deployed to DEPLOY_DIR_IMAGE. PMIC variant is required for the SMARC
+# RZ/V2L EVK DDR4 carrier (RAA215300 PMIC) — see kas/machines/rzv2l.yml.
+part --source rawcopy --sourceparams="file=bl2_bp_esd-${MACHINE}_pmic.bin" --no-table
+part --source rawcopy --sourceparams="file=fip-${MACHINE}_pmic.bin"        --no-table ${FIP_WIC_OFFSET} --align 64
+
+# /boot at 4 MB alignment. The fw_env.config relies on this: U-Boot env
+# lives in raw MMC at 0x1F0000–0x230000 (primary + redundant copies),
+# which must end BEFORE the first partition. 4 MB alignment guarantees that.
+part /boot --source bootimg-partition --fstype=ext4 --label boot --ondisk mmcblk0 --align 4096 --size 500 --no-fstab-update
+
+# A/B rootfs slots. Labels driven by ${EDGE_SLOT_{A,B}_LABEL} (default
+# rootfsA/rootfsB; OTA-backend-specific values come from the backend
+# include). Both --label entries are also enforced by
+# edge-wic-label-check.bbclass; WIC does not reliably set the ext4 label
+# on the first --source rootfs partition, and the OTA install hooks
+# re-label post-install as the runtime safety net.
+part / --source rootfs --fstype=ext4 --label ${EDGE_SLOT_A_LABEL} --ondisk mmcblk0 --align 1024 --fixed-size ${EDGE_SLOT_SIZE_MB}
+part / --source rootfs --fstype=ext4 --label ${EDGE_SLOT_B_LABEL} --ondisk mmcblk0 --align 1024 --fixed-size ${EDGE_SLOT_SIZE_MB}
+
+# /data preformatted in-image so first boot only needs resize, not mkfs.
+# edge-grow-data.service grows this to fill the SD on first boot (parted on this
+# MBR layout; systemd-repart on the eMMC/GPT variant). EDGE_DATA_SIZE_MB pins
+# the seed size — keep small so the image stays portable across card sizes;
+# first-boot grow fills the rest.
+part /data --fstype=ext4 --label data --ondisk mmcblk0 --align 1024 --fixed-size ${EDGE_DATA_SIZE_MB} --no-fstab-update

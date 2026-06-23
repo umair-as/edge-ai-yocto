@@ -6,11 +6,24 @@ HOMEPAGE   = "https://github.com/umair-as/edge-ai-yocto"
 SECTION    = "base"
 LICENSE    = "MIT"
 
-require recipes-core/images/edge-image-common.inc
+inherit edge-ab-image
 
-# Dev tier. Pulls edge-profile-dev.inc via the distro's require chain
-# (OVERRIDES picks up :dev, observability defaults on).
-EDGE_PROFILE = "dev"
+WKS_SEARCH_PATH = "${THISDIR}/files/wic"
+
+# Dev tier. EDGE_PROFILE is resolved at distro-parse from the environment
+# (make dev exports it); setting it here would be too late to steer the
+# distro's `require edge-profile-${EDGE_PROFILE}.inc`. Read it and self-skip
+# on a tier/image mismatch. SkipRecipe, not bb.fatal: the anonymous python
+# runs for every parsed recipe, so a hard fatal here would abort unrelated
+# builds (e.g. edge-image-prod aborting a dev build). Skipping just makes
+# this image unbuildable under the wrong tier, with the reason shown.
+python () {
+    p = d.getVar('EDGE_PROFILE')
+    if p != 'dev':
+        raise bb.parse.SkipRecipe(
+            "requires EDGE_PROFILE=dev (got '%s'); build with 'make dev' "
+            "or set EDGE_PROFILE=dev" % p)
+}
 
 # Pull in the standard oe-core debug + profile feature buckets. They drag
 # in gdb/gdbserver/strace/ltrace/tcpdump (tools-debug) and perf/lttng-tools
@@ -25,7 +38,7 @@ IMAGE_FEATURES:append = " \
 # observability, hwtools, netdiag, storage, and media. New dev userspace
 # is added by editing a packagegroup recipe in
 # meta-edge-bsp/recipes-core/packagegroups/, not this file. Ad-hoc tools:
-# `dnf install` at runtime (package-management is on via edge-image-common.inc).
+# `dnf install` at runtime (package-management is on via edge-image.bbclass).
 IMAGE_INSTALL:append = " packagegroup-edge-dev edge-sudoers-nopasswd"
 # edge-sudoers-nopasswd is the bench-tier sub-package of edge-sudoers; it
 # ships 15-edge-wheel-nopasswd which lexically overrides 10-edge-wheel

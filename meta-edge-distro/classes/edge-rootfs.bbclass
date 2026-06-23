@@ -1,7 +1,7 @@
 # EDGE OS rootfs post-process: write /etc/buildinfo.
 #
-# Inherited by every edge image via meta-edge-bsp/recipes-core/images/
-# edge-image-common.inc. Single ROOTFS_POSTPROCESS_COMMAND hook —
+# Inherited by every edge image via edge-image.bbclass (which inherits
+# this class). Single ROOTFS_POSTPROCESS_COMMAND hook —
 # writes a KEY=VALUE manifest of the image build identity to
 # /etc/buildinfo so operators (and RAUC, and provenance tooling) can
 # answer "which image is this exactly" without parsing /etc/os-release

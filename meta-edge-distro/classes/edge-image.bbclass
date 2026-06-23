@@ -1,15 +1,18 @@
-# Shared scaffolding for the edge-* image tiers (base, dev, future prod).
-# Each tier (.bb) requires this .inc and layers tier-specific additions
-# on top.
-
-SUMMARY = "Edge AI Yocto common image base"
-LICENSE = "MIT"
+# Cross-cutting image policy for every edge-* image tier.
+#
+# Floor that holds true regardless of storage layout. A/B-slot semantics
+# (shared /boot, EDGE_BOOT_* contract, OTA-backend parse gate) live in
+# edge-ab-image.bbclass which inherits this. See ADR-0005.
 
 inherit core-image
 # edge-rootfs writes /etc/buildinfo at do_rootfs postprocess so every
 # image carries an identity manifest. Lives in meta-edge-distro/classes/
 # (distro-owned, not BSP-owned).
 inherit edge-rootfs
+# Labels the rootfs via setfiles at image-time and drops /.autorelabel
+# for first-boot fallback. Self-gates on DISTRO_FEATURES contains
+# "selinux"; no-op on distros without it.
+inherit selinux-image
 
 # Custom WICVARS appends live per-machine in kas/machines/<board>.yml,
 # alongside the variables they expose (e.g. RZ/V2L's FIP_WIC_OFFSET).
@@ -50,40 +53,12 @@ IMAGE_FSTYPES = "wic.zst wic.bmap ext4 tar.gz"
 # wic.gz and tar.bz2 are built unnecessarily (~1.5-2.5 min each).
 IMAGE_FSTYPES:remove = "wic.gz tar.bz2"
 
-# A/B-slot WKS layout for RAUC verity bundle install. The .wks itself
-# is per-board (different SoC boot ROMs require different partition
-# layouts and offsets); each kas/machines/<board>.yml sets WKS_FILE.
-WKS_SEARCH_PATH = "${THISDIR}/files/wic"
-
-# Per-machine boot artifacts. Each kas/machines/<board>.yml supplies
-# the values:
-#
-#   EDGE_BOOT_DTB         — flat DTB filename staged into /boot. WIC's
-#                           IMAGE_BOOT_FILES handler strips paths, so
-#                           use the basename even if KERNEL_DEVICETREE
-#                           is a nested path like renesas/foo.dtb.
-#   EDGE_BOOT_EXTRA       — extra files /boot needs beyond fitImage + DTB.
-#                           RZ/V2L uses U-Boot splashload → adds splash.bmp.
-#                           Boards that don't do pre-kernel splash leave
-#                           this empty.
-#   EDGE_BOOT_DEPLOY_DEPS — task-deps that publish bootloader / FIT /
-#                           splash artifacts into DEPLOY_DIR_IMAGE before
-#                           WIC runs. RZ/V2L's three:
-#                             edge-splash-assets:do_deploy
-#                             trusted-firmware-a:do_deploy
-#                             edge-kernel-fit:do_deploy
-#                           A board that doesn't use TF-A or a separate
-#                           FIT recipe leaves those out.
-#
-# Empty defaults so a non-overriding machine parses cleanly (it just
-# produces a /boot with only fitImage and no extra deps — which is
-# exactly what a minimal aarch64 board should get out of the box).
-EDGE_BOOT_DTB         ?= ""
-EDGE_BOOT_EXTRA       ?= ""
-EDGE_BOOT_DEPLOY_DEPS ?= ""
-
-IMAGE_BOOT_FILES = "fitImage ${EDGE_BOOT_DTB} ${EDGE_BOOT_EXTRA}"
-do_image_wic[depends] += "${EDGE_BOOT_DEPLOY_DEPS}"
+# WIC's imager-level update_fstab() appends one /dev/mmcblk0pN line per WKS
+# partition to /etc/fstab even when partitions carry --no-fstab-update (that
+# flag is per-partition install-time, not merge-time). systemd-fstab-generator
+# then fails on the duplicates with "already exists. Duplicate entry in
+# '/etc/fstab'?". The CLI flag is what skips update_fstab() entirely.
+WIC_CREATE_EXTRA_ARGS:append = " --no-fstab-update"
 
 # Common runtime — universal across every edge image tier. The full list
 # (edge-banner, edge-systemd-presets, slot udev, u-boot env tooling)

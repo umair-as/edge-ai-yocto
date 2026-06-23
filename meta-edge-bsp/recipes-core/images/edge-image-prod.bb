@@ -6,9 +6,20 @@ HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "base"
 LICENSE     = "MIT"
 
-require recipes-core/images/edge-image-common.inc
+inherit edge-ab-image
 
-# Prod tier. Pulls edge-profile-prod.inc via the distro's require chain
-# (OVERRIDES picks up :prod, package-management is removed, observability
-# defaults off).
-EDGE_PROFILE = "prod"
+WKS_SEARCH_PATH = "${THISDIR}/files/wic"
+
+# Prod tier. EDGE_PROFILE is resolved at distro-parse from the environment
+# (make prod exports it); setting it here would be too late to steer the
+# distro's `require edge-profile-${EDGE_PROFILE}.inc`. Read it and self-skip
+# on a tier/image mismatch (SkipRecipe, not bb.fatal — see edge-image-dev.bb).
+# This guards against a bare `bitbake edge-image-prod` building under the dev
+# default: the recipe becomes unbuildable with the reason shown.
+python () {
+    p = d.getVar('EDGE_PROFILE')
+    if p != 'prod':
+        raise bb.parse.SkipRecipe(
+            "requires EDGE_PROFILE=prod (got '%s'); build with 'make prod' "
+            "or set EDGE_PROFILE=prod" % p)
+}

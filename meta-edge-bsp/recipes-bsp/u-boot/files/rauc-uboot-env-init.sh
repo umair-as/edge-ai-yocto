@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # Versioned idempotency marker so env migrations can be rolled out safely.
-STAMP="/boot/.rauc-uboot-env-initialized-v3-fit-only"
+STAMP="/boot/.rauc-uboot-env-initialized-v7-khc-wave3-no-lockdown"
 ENV_DEFAULTS="/etc/rauc-uboot-env.defaults"
 
 log() { echo "[rauc-uboot-env-init] $*"; }
