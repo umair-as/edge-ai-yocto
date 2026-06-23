@@ -27,7 +27,7 @@ local_conf_header:
 
     # Make FIP_WIC_OFFSET visible to WIC's WKS preprocessor. WIC only
     # expands ${VAR} inside .wks files for variables listed in WICVARS;
-    # without this append, ${FIP_WIC_OFFSET} in edge-image-rzv2l.wks
+    # without this append, ${FIP_WIC_OFFSET} in edge-rzv2l.wks.in
     # would pass through as a literal string → argparse consumes it as
     # a positional mountpoint → the --offset argument is silently absent
     # → the FIP partition lands at byte 0x10000 instead of the SoC ROM's
@@ -37,7 +37,7 @@ local_conf_header:
     WICVARS:append = " FIP_WIC_OFFSET"
 
   boot: |
-    # Per-board boot artifacts. edge-image-common.inc consumes these.
+    # Per-board boot artifacts. edge-image.bbclass consumes these.
     # See the comment block on EDGE_BOOT_* in that file for contract.
     #
     # The DTB filename is the flat basename — WIC's IMAGE_BOOT_FILES
@@ -48,16 +48,17 @@ local_conf_header:
     EDGE_BOOT_EXTRA       = "splash.bmp"
     EDGE_BOOT_DEPLOY_DEPS = "edge-splash-assets:do_deploy trusted-firmware-a:do_deploy edge-kernel-fit:do_deploy"
 
-    # WIC layout — RZ/V2L's eSD SD-boot partitioning (BL2 at sector 0,
-    # FIP at sector 256, raw env area, /boot, A/B rootfs slots). SoC-ROM
-    # specific; named for the board so a sibling board adds its own .wks.
+    # WIC layout — selected by EDGE_BOOT_TARGET (edge-ab-image.bbclass):
+    #   esd  → edge-rzv2l.wks.in       (MBR, BL2 at sector 0, raw env, A/B)
+    #   emmc → edge-rzv2l-emmc.wks.in  (GPT user area, BL2 in mmcblk0boot0)
+    # Both are RZ/V2L SoC-ROM specific; a sibling board adds its own .wks.
     #
     # Override-form (:smarc-rzv2l) is load-bearing: bitbake's parse order
     # is local.conf → distro.conf → machine.conf, so a plain `WKS_FILE =`
     # in local_conf_header gets overwritten by smarc-rzv2l.conf:44's
     # conditional. The machine override takes priority over plain `=`
     # regardless of parse order.
-    WKS_FILE:smarc-rzv2l = "edge-image-rzv2l.wks"
+    WKS_FILE:smarc-rzv2l = "${@oe.utils.conditional('EDGE_BOOT_TARGET', 'emmc', 'edge-rzv2l-emmc.wks.in', 'edge-rzv2l.wks.in', d)}"
 
     # FIT runtime addresses. RZ/V2L: 0x48080000 matches the SoC's
     # kernel text base and the U-Boot bootcmd's loadaddr. Consumed by

@@ -20,6 +20,10 @@ python do_edge_wic_label_check() {
     # Labels that every RAUC image WKS must define on --source rootfs lines.
     REQUIRED_ROOTFS_LABELS = ("rootfsA", "rootfsB")
 
+    # WKS filename patterns. Files are per-board .wks.in templates
+    # (edge-rzv2l.wks.in, edge-rzv2l-emmc.wks.in); .wks covers any plain file.
+    WKS_GLOBS = ("edge-*.wks", "edge-*.wks.in")
+
     def collect_rootfs_labels(wks_path):
         """Return list of (label, lineno) for every --source rootfs line."""
         found = []
@@ -29,7 +33,9 @@ python do_edge_wic_label_check() {
                 if stripped.startswith("#") or "--source rootfs" not in stripped:
                     continue
                 m = re.search(r"--label\s+(\S+)", stripped)
-                label = m.group(1) if m else None
+                # Labels are templated (--label ${EDGE_SLOT_A_LABEL}); expand to
+                # the concrete slot name before validating.
+                label = d.expand(m.group(1)) if m else None
                 found.append((label, lineno))
         return found
 
@@ -44,9 +50,10 @@ python do_edge_wic_label_check() {
         base = base.strip()
         if not base:
             continue
-        for candidate in sorted(glob.glob(os.path.join(base, "edge-image-*.wks"))):
-            if candidate not in wks_paths:
-                wks_paths.append(candidate)
+        for pat in WKS_GLOBS:
+            for candidate in sorted(glob.glob(os.path.join(base, pat))):
+                if candidate not in wks_paths:
+                    wks_paths.append(candidate)
 
     if not wks_paths:
         # BBPATH fallback: <layer>/recipes-core/images/files/wic/ or
@@ -56,13 +63,14 @@ python do_edge_wic_label_check() {
             if not base:
                 continue
             for sub in ("recipes-core/images/files/wic", "wic"):
-                for candidate in sorted(glob.glob(os.path.join(base, sub, "edge-image-*.wks"))):
-                    if candidate not in wks_paths:
-                        wks_paths.append(candidate)
+                for pat in WKS_GLOBS:
+                    for candidate in sorted(glob.glob(os.path.join(base, sub, pat))):
+                        if candidate not in wks_paths:
+                            wks_paths.append(candidate)
 
     if not wks_paths:
         bb.fatal(
-            "edge-wic-label-check: could not find any edge-image-*.wks files. "
+            "edge-wic-label-check: could not find any edge-*.wks(.in) files. "
             "Checked WKS_SEARCH_PATH (%s) and BBPATH fallbacks." % wks_search_path
         )
 

@@ -1,0 +1,42 @@
+# short-description: edge-ai-yocto A/B image for smarc-rzv2l, eMMC boot (GPT)
+# long-description: GPT user-area layout for RZ/V2L eMMC boot. Selected by
+# EDGE_BOOT_TARGET=emmc. BL2 and FIP both live in the eMMC hardware boot
+# partition (mmcblk0boot0) — written at provisioning, not by WIC — so the
+# user area is a clean GPT with no raw bootloader regions. The user area is
+# GPT so systemd-repart can grow /data on first boot.
+#
+# Per the RZ/V2L Linux Start-up Guide (How to boot from eMMC):
+#   BL2 (bl2_bp_mmc) -> mmcblk0boot0, sector 1
+#   FIP (fip)        -> mmcblk0boot0, sector 256  (RZG2L_EMMC_FIP_BASE=0x20000,
+#                       in the boot partition — NOT the user area)
+# The mask ROM loads BL2 from boot0; BL2 loads FIP from boot0. The user area
+# carries only the GPT and filesystems.
+#
+# On-disk layout (mmcblk0 user area):
+#
+#   LBA 0-33     protective MBR + GPT primary header + partition entries
+#   0x001F0000   U-Boot environment (raw, primary + redundant) — same as eSD,
+#                in the gap below /boot; fw_setenv writes raw offsets
+#   0x00400000   p1 /boot     ext4, 500 MB  (4 MiB aligned)
+#                p2 rootfsA   ext4, RAUC slot A
+#                p3 rootfsB   ext4, RAUC slot B
+#                p4 /data     ext4, seed size; grown by edge-grow-data.service
+
+bootloader --ptable gpt
+
+# /boot at 4 MiB so the raw U-Boot env at 0x1F0000-0x230000 stays in the gap
+# before p1. fw_setenv writes raw MMC offsets regardless of GPT/MBR, so the
+# eSD fw_env.config applies unchanged (CONFIG_SYS_MMC_ENV_PART=0, user area).
+part /boot --source bootimg-partition --fstype=ext4 --label boot --part-name boot --ondisk mmcblk0 --align 4096 --size 500 --no-fstab-update
+
+# A/B rootfs slots. Keep the ext4 --label (fstab LABEL=, /dev/disk/by-label,
+# bundle-hooks e2label, edge-wic-label-check all key off it) AND add the GPT
+# --part-name so udev by-partlabel slot rules work under GPT.
+part / --source rootfs --fstype=ext4 --label ${EDGE_SLOT_A_LABEL} --part-name ${EDGE_SLOT_A_LABEL} --ondisk mmcblk0 --align 1024 --fixed-size ${EDGE_SLOT_SIZE_MB}
+part / --source rootfs --fstype=ext4 --label ${EDGE_SLOT_B_LABEL} --part-name ${EDGE_SLOT_B_LABEL} --ondisk mmcblk0 --align 1024 --fixed-size ${EDGE_SLOT_SIZE_MB}
+
+# /data: last partition, seeded small, grown on first boot by edge-grow-data
+# (systemd-repart grows the partition, resize2fs the ext4). The distinct
+# --part-type GUID makes /data the only partition repart matches; it must equal
+# Type= in edge-grow-data's 50-data.conf.
+part /data --fstype=ext4 --label data --part-name data --part-type 00FB7005-AB51-4206-9D4A-11B68E508D3A --ondisk mmcblk0 --align 1024 --fixed-size ${EDGE_DATA_SIZE_MB} --no-fstab-update

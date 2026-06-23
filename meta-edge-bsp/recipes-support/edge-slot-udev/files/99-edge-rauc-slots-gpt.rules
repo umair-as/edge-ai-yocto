@@ -1,0 +1,9 @@
+# RAUC slot aliases for the GPT layout (EDGE_BOOT_TARGET=emmc), keyed on the
+# GPT partition name (PARTLABEL, set via --part-name in edge-rzv2l-emmc.wks.in).
+# GPT partition numbers can shift, so identity comes from the name, not mmcblk0pN
+# or the ext4 label (which changes during OTA writes).
+
+SUBSYSTEM=="block", ENV{ID_PART_ENTRY_NAME}=="boot",    SYMLINK+="disk/by-rauc-slot/boot"
+SUBSYSTEM=="block", ENV{ID_PART_ENTRY_NAME}=="rootfsA", SYMLINK+="disk/by-rauc-slot/rootfsA"
+SUBSYSTEM=="block", ENV{ID_PART_ENTRY_NAME}=="rootfsB", SYMLINK+="disk/by-rauc-slot/rootfsB"
+SUBSYSTEM=="block", ENV{ID_PART_ENTRY_NAME}=="data",    SYMLINK+="disk/by-rauc-slot/data"
