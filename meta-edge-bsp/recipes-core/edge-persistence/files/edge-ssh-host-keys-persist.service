@@ -1,9 +1,10 @@
-# Capture-or-restore sshd host keys before sshdgenkeys generates new ones.
-# Wants= (not Requires=) on data.mount so a broken /data does not cascade
-# into a no-SSH device — the nofail fstab + this unit keep ssh recoverable.
+# Generate-or-restore sshd host keys with /data as the source of truth, before
+# sshdgenkeys runs. Wants= (not Requires=) on data.mount so a broken /data does
+# not cascade into a no-SSH device — the nofail fstab + this unit keep ssh
+# recoverable.
 
 [Unit]
-Description=Capture or restore sshd host keys from /data
+Description=Generate or restore sshd host keys from /data
 DefaultDependencies=no
 ConditionPathIsMountPoint=/data
 Wants=data.mount

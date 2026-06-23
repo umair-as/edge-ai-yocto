@@ -76,3 +76,6 @@ FILES:${PN} = " \
     ${sbindir}/edge-ssh-host-keys-persist \
     ${libdir}/tmpfiles.d/edge-persistence.conf \
 "
+
+# edge-ssh-host-keys-persist generates host keys on first boot.
+RDEPENDS:${PN} = "openssh-keygen"
