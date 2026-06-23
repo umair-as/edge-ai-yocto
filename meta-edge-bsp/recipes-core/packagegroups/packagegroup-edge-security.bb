@@ -1,8 +1,9 @@
-SUMMARY     = "Security baseline: audit, pwquality, sudo, caps, sftp, crypt, sshd policy"
+SUMMARY     = "Security baseline: audit, SELinux, pwquality, sudo, caps, sftp, crypt, sshd policy"
 DESCRIPTION = "Universal security userspace pulled into every edge tier: \
 audit/auditd, libpwquality (PAM), libcap (getcap/setcap), ca-certificates, \
-openssh-sftp-server, cryptsetup (veritysetup + LUKS), sudo, and the sshd \
-hardening drop-in (edge-sshd-hardening)."
+openssh-sftp-server, cryptsetup (veritysetup + LUKS), sudo, the sshd \
+hardening drop-in (edge-sshd-hardening), and the SELinux stack \
+(packagegroup-core-selinux, refpolicy-mcs, selinux-autorelabel)."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "base"
 LICENSE     = "MIT"
@@ -23,4 +24,7 @@ RDEPENDS:${PN} = " \
     cryptsetup \
     sudo \
     edge-sshd-hardening \
+    packagegroup-core-selinux \
+    refpolicy-mcs \
+    selinux-autorelabel \
 "

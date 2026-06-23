@@ -19,6 +19,13 @@ SYSTEMD_DEFAULT_TARGET = "multi-user.target"
 VIRTUAL-RUNTIME_base-utils-syslog = ""
 BAD_RECOMMENDATIONS:append        = " busybox-syslog"
 
+# networkmanager-daemon RRECOMMENDS dnsmasq (for NM's optional dnsmasq DNS
+# plugin). NM owns DNS via its default plugin; dnsmasq ships unconfigured
+# with /etc/dnsmasq.d/ empty, but its preset auto-enables dnsmasq.service.
+# Letting it install pulls network.target onto multi-user.target's
+# activation chain via the service's After=network.target.
+BAD_RECOMMENDATIONS:append        = " dnsmasq"
+
 # ----- Network management -------------------------------------------------
 
 # Drop networkd + resolved from systemd so they don't race NM on link
@@ -78,11 +85,27 @@ DISTRO_FEATURES = "\
     ext2 \
     seccomp \
     security \
+    selinux \
 "
 
 # Toggle-driven additions.
 DISTRO_FEATURES += "${@bb.utils.contains('EDGE_ENABLE_DISPLAY', '1', 'wayland opengl', '', d)}"
 DISTRO_FEATURES += "${@bb.utils.contains('EDGE_OTA_BACKEND',    'rauc', 'rauc',           '', d)}"
+
+# ----- MAC (SELinux) ------------------------------------------------------
+
+# MCS refpolicy variant — full module set plus the single non-hierarchical
+# sensitivity dimension. The container runtime (podman/netavark/container-
+# selinux) relabels with 4-field :s0 contexts; a non-MCS policy rejects those
+# at lsetxattr() (EINVAL), breaking rootless bridge/host networking.
+PREFERRED_PROVIDER_virtual/refpolicy = "refpolicy-mcs"
+
+# Refpolicy ships /etc/selinux/config with SELINUX=${DEFAULT_ENFORCING}.
+# Permissive is the floor: AVC denials log to audit, no domain transition
+# is blocked. Flip to "enforcing" only after policy coverage has been
+# validated against the full image surface. Recovery escape remains the
+# selinux=0 kernel param via fw_setenv EXTRA_KERNEL_ARGS.
+DEFAULT_ENFORCING = "permissive"
 
 # ----- Packaging ----------------------------------------------------------
 
@@ -102,6 +125,9 @@ PACKAGE_CLASSES ?= "package_rpm"
 RM_WORK_EXCLUDE += "edge-image-base edge-image-dev edge-image-prod"
 
 # Empty default: a recipe that needs a license flag fails noisily, not silently.
+# Capability-scoped accepts (e.g. `commercial` for the GPL/patent-encumbered
+# gstreamer decoder set) live in the include that ships the capability —
+# currently edge-profile-dev.inc.
 LICENSE_FLAGS_ACCEPTED ?= ""
 
 # ----- SBOM (SPDX 3.0) + CVE check ---------------------------------------
