@@ -1,6 +1,6 @@
-SUMMARY     = "podman + skopeo + overlay graph drivers + CNI plugins + rootless support"
+SUMMARY     = "podman + skopeo + native overlay + netavark networking + rootless"
 DESCRIPTION = "OCI container userspace: podman engine, skopeo image tooling, \
-native overlay and fuse-overlayfs graph drivers, CNI networking plugins, \
+native overlay graph driver, netavark + aardvark-dns networking, pasta + \
 slirp4netns for rootless container networking, and edge runtime config."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "console/utils"
@@ -13,10 +13,13 @@ inherit packagegroup
 
 RDEPENDS:${PN} = " \
     podman \
-    skopeo \
-    fuse-overlayfs \
-    cni \
+    conmon \
+    crun \
+    netavark \
+    aardvark-dns \
+    passt \
     slirp4netns \
-    shadow-suid \
+    catatonit \
+    skopeo \
     edge-containers-config \
 "

@@ -1,7 +1,7 @@
 SUMMARY     = "Runtime config for the edge container stack"
 DESCRIPTION = "Installs sysctl user-namespace allowance (rootless podman), \
-CNI network backend selection in containers.conf, subuid/subgid ranges for \
-the devel user, Quadlet drop directories for systemd-managed containers, \
+netavark network backend selection in containers.conf, subuid/subgid ranges \
+for the devel user, Quadlet drop directories for systemd-managed containers, \
 and a tmpfiles.d entry to pre-create the rootless Quadlet path at boot."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "console/utils"
@@ -38,13 +38,19 @@ do_install() {
     install -m 0644 ${UNPACKDIR}/podman-quadlet-devel.conf \
         ${D}${nonarch_libdir}/tmpfiles.d/podman-quadlet-devel.conf
 
-    # Subordinate UID/GID ranges for the devel user — required for rootless
-    # podman. 65536 IDs starting at 100000; avoids system (0-999) and the
-    # devel primary UID (1000). newuidmap/newgidmap (shadow-suid) enforce
-    # that only IDs within these ranges can be mapped by devel.
-    install -d ${D}${sysconfdir}
-    printf 'devel:100000:65536\n' >> ${D}${sysconfdir}/subuid
-    printf 'devel:100000:65536\n' >> ${D}${sysconfdir}/subgid
+}
+
+# Subordinate UID/GID ranges for the devel user — required for rootless
+# podman. 65536 IDs from 100000; avoids system (0-999) and devel's UID
+# (1000). /etc/sub{u,g}id are owned by the shadow package, so append in
+# postinst rather than shipping the files (a shipped copy collides with
+# shadow's at do_rootfs). newuidmap/newgidmap come from the base shadow
+# package.
+pkg_postinst:${PN}() {
+    for f in subuid subgid; do
+        grep -q '^devel:100000:' $D${sysconfdir}/$f 2>/dev/null || \
+            echo 'devel:100000:65536' >> $D${sysconfdir}/$f
+    done
 }
 
 FILES:${PN} = " \
@@ -52,6 +58,4 @@ FILES:${PN} = " \
     ${sysconfdir}/containers/containers.conf.d/10-edge-network.conf \
     ${sysconfdir}/containers/systemd \
     ${nonarch_libdir}/tmpfiles.d/podman-quadlet-devel.conf \
-    ${sysconfdir}/subuid \
-    ${sysconfdir}/subgid \
 "
