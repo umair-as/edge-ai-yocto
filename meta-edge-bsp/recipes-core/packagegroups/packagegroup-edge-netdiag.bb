@@ -1,7 +1,7 @@
-SUMMARY     = "Network diagnosis: tcpdump, iperf3, ethtool, socat"
-DESCRIPTION = "tcpdump (capture), iperf3 (throughput), ethtool (link/PHY), \
-socat (socket bridging). nmap-ncat omitted on NPSL grounds; busybox `nc` \
-covers quick TCP probes."
+SUMMARY     = "Network diagnosis: ss/tc/bridge, tcpdump, iperf3, ethtool, socat"
+DESCRIPTION = "iproute2-{ss,tc,bridge,nstat}, tcpdump, iperf3, ethtool, socat. \
+OE-Core ships ss/tc/bridge as separate sub-packages — main iproute2 only \
+pulls iproute2-ip, so they must be explicit RDEPENDS."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "base"
 LICENSE     = "MIT"
@@ -11,6 +11,10 @@ PACKAGE_ARCH = "${MACHINE_ARCH}"
 
 inherit packagegroup
 RDEPENDS:${PN} = " \
+    iproute2-ss \
+    iproute2-tc \
+    iproute2-bridge \
+    iproute2-nstat \
     tcpdump \
     iperf3 \
     socat \

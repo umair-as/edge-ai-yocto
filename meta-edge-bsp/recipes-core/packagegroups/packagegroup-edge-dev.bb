@@ -11,7 +11,7 @@ PACKAGE_ARCH = "${MACHINE_ARCH}"
 
 inherit packagegroup
 # Observability is gated by EDGE_ENABLE_OBSERVABILITY at the image level
-# (edge-image-common.inc), not pinned here. Profile :dev defaults the
+# (edge-image.bbclass), not pinned here. Profile :dev defaults the
 # toggle on, so a default dev build still ships it.
 RDEPENDS:${PN} = " \
     packagegroup-edge-shell \

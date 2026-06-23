@@ -25,6 +25,6 @@ RDEPENDS:${PN} = " \
     packagegroup-edge-security \
     networkmanager \
     edge-network-profiles \
-    u-boot-env-config \
+    virtual-ota-uboot-env \
     u-boot-fw-utils \
 "
