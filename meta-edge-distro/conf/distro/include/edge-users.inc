@@ -1,4 +1,4 @@
-# Default users for every image tier that inherits edge-image-common.inc.
+# Default users for every image tier that inherits edge-image.bbclass.
 #
 # Two users:
 #   root  (UID 0)  — shell login allowed; SSH login DENIED in sshd config.

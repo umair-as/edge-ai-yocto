@@ -7,7 +7,11 @@
 # ----- Choice variables (string-valued) ------------------------------------
 
 # Image tier. Drives OVERRIDES (:prod / :dev) and the profile include.
-EDGE_PROFILE ?= "prod"
+# Resolved at distro-parse — set it in the environment (Makefile targets
+# export it via BB_ENV_PASSTHROUGH_ADDITIONS) or kas/local.yml, not in an
+# image recipe (an image-recipe assignment is too late for the require below
+# in edge-ai.conf). Default is dev; prod is an explicit opt-in for release.
+EDGE_PROFILE ?= "dev"
 
 # OTA backend. Drives the ota-${EDGE_OTA_BACKEND}.inc include and the
 # matching DISTRO_FEATURE / image install set. An unknown value fails
@@ -25,11 +29,12 @@ EDGE_ENABLE_DISPLAY ?= "1"
 EDGE_ENABLE_CONTAINERS ?= "0"
 
 # Profiling / observability tooling (htop, sysstat, trace-cmd, ...).
-# Profile-keyed default: prod off, dev on.
-EDGE_ENABLE_OBSERVABILITY ?= "0"
-EDGE_ENABLE_OBSERVABILITY:dev = "1"
+# Tier default lives in edge-profile-{dev,prod}.inc (the correctly-selected
+# include). Not defaulted here: a ?= in this file is parsed before the profile
+# include, so it would pre-empt the profile inc's ?= and force the old strong
+# :dev override. Operator env/local.yml still wins over the profile default.
 
-# Dev-only netboot. When 1, u-boot-env-config installs a `netboot` macro
+# Dev-only netboot. When 1, rauc-uboot-env installs a `netboot` macro
 # in the managed U-Boot env defaults; bootcmd is unchanged.
 EDGE_DEV_NETBOOT ?= "0"
 
