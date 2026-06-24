@@ -1,0 +1,12 @@
+# edge-ctr container-runtime principal: home + rootless container storage live
+# on /data so they survive RAUC slot swaps. Created after data.mount; ownership
+# by the static uid/gid 608.
+d /data/edge-ctr 0700 608 608 -
+
+# Linger enabled by design: the marker makes systemd-logind start edge-ctr's
+# user manager (and /run/user/608) at boot with no login session — fixes the
+# rootless XDG_RUNTIME_DIR gap at its root. /var/lib/systemd binds to
+# /data/systemd, so this persists across slot swaps without a post-boot
+# loginctl step.
+d /var/lib/systemd/linger 0755 root root -
+f /var/lib/systemd/linger/edge-ctr 0644 root root -

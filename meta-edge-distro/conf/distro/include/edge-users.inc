@@ -108,6 +108,13 @@ EXTRA_USERS_PARAMS = " \
             -m -s /bin/bash \
             -p '${EDGE_DEFAULT_PASSWORD_HASH}' devel; \
 "
+
+# AI images: the dedicated edge-ctr container principal (created by the
+# edge-ctr-user recipe via packagegroup-edge-ai) needs render-group membership
+# to pass /dev/drpai0 + /dev/udmabuf0 into its rootless container (keep-groups).
+# Added at image assembly, not in the recipe useradd: render is created by
+# another recipe and a recipe-level --groups render could race its creation.
+EXTRA_USERS_PARAMS:append = "${@bb.utils.contains('EDGE_ENABLE_AI', '1', ' usermod -aG render edge-ctr;', '', d)}"
 # Supplementary group choice for devel:
 #   wheel            sudo escalation (paired with edge-sudoers)
 #   systemd-journal  journalctl -f / read all messages without -q
