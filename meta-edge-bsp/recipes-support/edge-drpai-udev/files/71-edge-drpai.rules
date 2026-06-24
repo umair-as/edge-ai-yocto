@@ -1,0 +1,4 @@
+# render-group + 0660 so rootless containers (--group-add keep-groups) can open
+# the DRP-AI accelerator and its udmabuf dma-buf. Nodes default to 0600 root.
+KERNEL=="drpai0",   GROUP="render", MODE="0660"
+KERNEL=="udmabuf0", GROUP="render", MODE="0660"
