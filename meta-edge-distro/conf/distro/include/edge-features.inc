@@ -28,6 +28,11 @@ EDGE_ENABLE_DISPLAY ?= "1"
 # already on via kernel fragments; this toggle gates the userspace runtime.
 EDGE_ENABLE_CONTAINERS ?= "0"
 
+# DRP-AI accelerator stack (RZ/V2L only). Gates packagegroup-edge-ai: the
+# drpai kernel driver + u-dma-buf. Kernel-side CMA/DMABUF is already on via
+# ai-compute.cfg; the drpai DT node + reserved memory come from the BSP.
+EDGE_ENABLE_AI ?= "0"
+
 # Profiling / observability tooling (htop, sysstat, trace-cmd, ...).
 # Tier default lives in edge-profile-{dev,prod}.inc (the correctly-selected
 # include). Not defaulted here: a ?= in this file is parsed before the profile
@@ -46,7 +51,7 @@ EDGE_DEV_NETBOOT ?= "0"
 # ----- Passthrough so operators can flip from the environment --------------
 
 BB_ENV_PASSTHROUGH_ADDITIONS .= " EDGE_PROFILE EDGE_OTA_BACKEND"
-BB_ENV_PASSTHROUGH_ADDITIONS .= " EDGE_ENABLE_DISPLAY EDGE_ENABLE_CONTAINERS EDGE_ENABLE_OBSERVABILITY"
+BB_ENV_PASSTHROUGH_ADDITIONS .= " EDGE_ENABLE_DISPLAY EDGE_ENABLE_CONTAINERS EDGE_ENABLE_OBSERVABILITY EDGE_ENABLE_AI"
 BB_ENV_PASSTHROUGH_ADDITIONS .= " EDGE_DEV_NETBOOT EDGE_DEV_DBG_PKGS EDGE_KERNEL_DEV_FRAGMENTS"
 
 # RAUC / OTA knobs — declared in their respective recipes (rauc-conf-edge,

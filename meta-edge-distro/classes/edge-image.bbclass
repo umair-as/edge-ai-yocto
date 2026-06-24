@@ -74,6 +74,9 @@ CORE_IMAGE_EXTRA_INSTALL += "${@bb.utils.contains('EDGE_ENABLE_OBSERVABILITY', '
 # the toggle is flipped (current consumers: dev images that opt in).
 CORE_IMAGE_EXTRA_INSTALL += "${@bb.utils.contains('EDGE_ENABLE_CONTAINERS', '1', ' packagegroup-edge-containers', '', d)}"
 
+# DRP-AI accelerator stack (drpai + u-dma-buf). Default off; RZ/V2L only.
+CORE_IMAGE_EXTRA_INSTALL += "${@bb.utils.contains('EDGE_ENABLE_AI', '1', ' packagegroup-edge-ai', '', d)}"
+
 # OP-TEE userspace (libteec + tee-supplicant + optee-examples) is bundled by
 # packagegroup-edge-optee. The packagegroup declares COMPATIBLE_MACHINE on
 # itself, but BitBake does NOT fail-soft on a COMPATIBLE_MACHINE-incompatible
