@@ -9,9 +9,9 @@ LIC_FILES_CHKSUM = "file://COPYING;md5=6bc538ed5bd9a7fc9398086aedcd7e46"
 
 inherit module
 
-# Renesas GPL-2.0 driver, repackaged out-of-tree and forward-ported for the
-# 6.4+ class_create() arity change. DRP-AI is RZ/V2L-only SoC IP; the drpai DT
-# node + drp_reserved CMA region are wired in the linux-renesas bbappend DTS.
+# Renesas GPL-2.0 driver, repackaged out-of-tree and forward-ported to
+# linux-cip 6.12. DRP-AI is RZ/V2L-only SoC IP; the drpai DT node +
+# drp_reserved carveout are wired in the linux-renesas bbappend DTS.
 SRC_URI = "git://github.com/umair-as/rzv2l-drpai-driver.git;protocol=https;branch=main"
 SRCREV  = "bfb9f19a265f87c5c29721a3fbde6e61f8d68002"
 
