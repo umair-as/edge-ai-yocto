@@ -20,6 +20,7 @@ SRC_URI = " \
     file://edge-machine-id-persist.sh \
     file://edge-ssh-host-keys-persist.service \
     file://edge-ssh-host-keys-persist.sh \
+    file://systemd-logind-after-data.conf \
 "
 
 S = "${UNPACKDIR}"
@@ -60,6 +61,11 @@ do_install() {
 
     install -d ${D}${libdir}/tmpfiles.d
     install -m 0644 ${UNPACKDIR}/edge-persistence.tmpfiles ${D}${libdir}/tmpfiles.d/edge-persistence.conf
+
+    # Order logind after the /var/lib/systemd bind so it sees linger markers.
+    install -d ${D}${systemd_system_unitdir}/systemd-logind.service.d
+    install -m 0644 ${UNPACKDIR}/systemd-logind-after-data.conf \
+        ${D}${systemd_system_unitdir}/systemd-logind.service.d/10-edge-linger-after-data.conf
 }
 
 FILES:${PN} = " \
@@ -75,6 +81,7 @@ FILES:${PN} = " \
     ${sbindir}/edge-machine-id-persist \
     ${sbindir}/edge-ssh-host-keys-persist \
     ${libdir}/tmpfiles.d/edge-persistence.conf \
+    ${systemd_system_unitdir}/systemd-logind.service.d/10-edge-linger-after-data.conf \
 "
 
 # edge-ssh-host-keys-persist generates host keys on first boot.
