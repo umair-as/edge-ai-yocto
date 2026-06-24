@@ -1,0 +1,31 @@
+[Unit]
+Description=DRP-AI ResNet18 inference (rootless, edge-ctr)
+# Inference bundle (app + runtime libs + compiled model) lives on /data.
+After=data.mount
+ConditionPathExists=/data/drpai/bin/drpai-tutorial-app
+
+[Container]
+# Base must meet the app's floor: glibc>=2.38 + GLIBCXX_3.4.32 (gcc-13).
+Image=docker.io/library/debian:trixie-slim
+Pull=missing
+
+# DRP-AI accelerator + zero-copy input buffer. keep-groups carries edge-ctr's
+# render membership into the container so the 0660 render nodes are openable.
+AddDevice=/dev/drpai0
+AddDevice=/dev/udmabuf0
+GroupAdd=keep-groups
+
+# Inference payload from /data (off the A/B rootfs, survives slot swaps).
+Volume=/data/drpai:/drpai:ro
+WorkingDir=/drpai
+Environment=LD_LIBRARY_PATH=/drpai/lib
+Exec=/drpai/bin/drpai-tutorial-app
+
+# Run-once inference; no sd_notify from the app.
+Notify=false
+
+[Service]
+Type=oneshot
+
+[Install]
+WantedBy=default.target
