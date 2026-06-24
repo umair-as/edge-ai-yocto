@@ -1,0 +1,84 @@
+From 87d58802f30bd717ce4a39e072b83d173e4875e5 Mon Sep 17 00:00:00 2001
+From: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+Date: Tue, 23 Jun 2026 00:00:00 +0200
+Subject: [PATCH] arm64: dts: rzv2l-smarc: add DRP-AI, udmabuf, reserved memory
+
+Wire the RZ/V2L DRP-AI accelerator and its buffer path:
+
+  - drpai@12c00000: DRP + AI-MAC register banks, the five STPAI clocks,
+    reset, sysctrl, and four GIC SPIs (440-443). Bound by the
+    kernel-module-drpai out-of-tree module, which creates /dev/drpai0.
+  - drp_reserved: 512 MiB reusable region for DRP-AI inference tensors.
+  - image_buf0: 64 MiB shared-dma-pool for camera frames.
+  - udmabuf0: zero-copy dma-buf over image_buf0 (kernel-module-udmabuf,
+    ikwzm), the V4L2 -> DRP-AI path consumed by rootless containers.
+
+Carveouts sit in the free 0x70000000-0xbfff0000 gap, clear of global_cma
+(0x58000000), the mmngr region (0x68000000) and ramoops (0xbffc0000).
+
+Upstream-Status: Inappropriate [board-specific configuration]
+Signed-off-by: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+---
+ .../boot/dts/renesas/r9a07g054l2-smarc.dts    | 49 +++++++++++++++++++
+ 1 file changed, 49 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/renesas/r9a07g054l2-smarc.dts b/arch/arm64/boot/dts/renesas/r9a07g054l2-smarc.dts
+index 86f3580..bbd3e78 100644
+--- a/arch/arm64/boot/dts/renesas/r9a07g054l2-smarc.dts
++++ b/arch/arm64/boot/dts/renesas/r9a07g054l2-smarc.dts
+@@ -45,3 +45,52 @@
+ 	model = "Renesas SMARC EVK based on r9a07g054l2";
+ 	compatible = "renesas,smarc-evk", "renesas,r9a07g054l2", "renesas,r9a07g054";
+ };
++
++&soc {
++	drpai0: drpai@12c00000 {
++		compatible = "renesas,rzv2l-drpai";
++		reg = <0 0x13000000 0 0x1000000>,
++		      <0 0x12c00000 0 0x400000>;
++		clocks = <&cpg CPG_MOD R9A07G054_STPAI_INITCLK>,
++			 <&cpg CPG_MOD R9A07G054_STPAI_ACLK>,
++			 <&cpg CPG_MOD R9A07G054_STPAI_MCLK>,
++			 <&cpg CPG_MOD R9A07G054_STPAI_DCLKIN>,
++			 <&cpg CPG_MOD R9A07G054_STPAI_ACLK_DRP>;
++		clock-names = "intclk", "aclk_drp", "mclk", "dclkin", "aclk";
++		resets = <&cpg R9A07G054_STPAI_ARESETN>;
++		power-domains = <&cpg>;
++		sysctrl = <&sysc>;
++		interrupts = <GIC_SPI 440 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 441 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 442 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 443 IRQ_TYPE_LEVEL_HIGH>;
++		memory-region = <&drp_reserved>;
++		linux-memory-region = <&{/memory@48000000}>;
++		status = "okay";
++	};
++};
++
++&{/reserved-memory} {
++	drp_reserved: drp-ai@80000000 {
++		reusable;
++		reg = <0x0 0x80000000 0x0 0x20000000>;
++	};
++
++	image_buf0: image-buf@b0000000 {
++		compatible = "shared-dma-pool";
++		reusable;
++		reg = <0x0 0xb0000000 0x0 0x04000000>;
++		label = "image_buf0";
++	};
++};
++
++/ {
++	udmabuf@0 {
++		compatible = "ikwzm,u-dma-buf";
++		device-name = "udmabuf0";
++		minor-number = <0>;
++		size = <0x4000000>;
++		dma-coherent;
++		memory-region = <&image_buf0>;
++	};
++};
+-- 
+2.43.0
+

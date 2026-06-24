@@ -1,0 +1,42 @@
+From fe0b7b3d0008367a42d29cd2907f1ad1fe615b0b Mon Sep 17 00:00:00 2001
+From: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+Date: Tue, 23 Jun 2026 00:00:00 +0200
+Subject: [PATCH] arm64: export dcache_{clean_inval,inval}_poc for the DRP-AI
+ module
+
+The out-of-tree RZ/V2L DRP-AI driver (kernel-module-drpai) does explicit
+point-of-coherency cache maintenance on the CMA / udmabuf / descriptor
+buffers it shares with the accelerator. These PoC ops are unexported (the
+in-tree driver Renesas ships reaches them directly from vmlinux); export
+them GPL so the module links. Exported alongside the existing arm64 asm
+exports (see memcpy.S).
+
+Upstream-Status: Inappropriate [enables an out-of-tree board accelerator module]
+Signed-off-by: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+---
+ arch/arm64/mm/cache.S | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+index 503567c..f542275 100644
+--- a/arch/arm64/mm/cache.S
++++ b/arch/arm64/mm/cache.S
+@@ -113,6 +113,7 @@ SYM_FUNC_START(__pi_dcache_clean_inval_poc)
+ 	ret
+ SYM_FUNC_END(__pi_dcache_clean_inval_poc)
+ SYM_FUNC_ALIAS(dcache_clean_inval_poc, __pi_dcache_clean_inval_poc)
++EXPORT_SYMBOL_GPL(dcache_clean_inval_poc)
+ 
+ /*
+  *	dcache_clean_pou(start, end)
+@@ -162,6 +163,7 @@ SYM_FUNC_START(__pi_dcache_inval_poc)
+ 	ret
+ SYM_FUNC_END(__pi_dcache_inval_poc)
+ SYM_FUNC_ALIAS(dcache_inval_poc, __pi_dcache_inval_poc)
++EXPORT_SYMBOL_GPL(dcache_inval_poc)
+ 
+ /*
+  *	dcache_clean_poc(start, end)
+-- 
+2.43.0
+
