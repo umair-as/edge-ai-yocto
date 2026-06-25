@@ -38,7 +38,7 @@ target: edge-image-base
 repos:
   # --- Renesas vendor BSP (meta-renesas: meta-rz-bsp + meta-rz-distro) ---
   # No wrynose branch upstream — newest Yocto branch is scarthgap/rz
-  # (Yocto 5.0). We pin the scarthgap/rz HEAD and carry the
+  # (Yocto 5.0). Pin the scarthgap/rz HEAD and carry the
   # scarthgap→wrynose port locally (override syntax, debug-tweaks
   # split, DISTRO_FEATURES_DEFAULTS, LAYERSERIES_COMPAT, ...).
   # meta-rz-bsp: machine conf for smarc-rzv2l, bptool/firmware-pack,
@@ -110,10 +110,10 @@ repos:
       meta-filesystems:
 
   # --- RAUC OTA framework (wrynose branch, pinned) ---
-  # meta-rauc-community is NOT a layer we use — the per-board helper
+  # meta-rauc-community is NOT used here — the per-board helper
   # bits (system.conf, bundle hooks, slot udev rules) live in
   # meta-edge-bsp in-tree. Reconsider only if upstream meta-rauc-community
-  # grows a generic helper layer we want to consume.
+  # grows a generic, consumable helper layer.
   meta-rauc:
     url: https://github.com/rauc/meta-rauc.git
     branch: wrynose
@@ -150,9 +150,10 @@ repos:
       meta-edge-bsp:
       meta-edge-distro:
 
-  # Slot reserved for the future meta-edge-ai sibling repo (DRP-AI
-  # runtime, model packaging, AI-SBOM). Not yet built; uncomment when
-  # that repo lands.
+  # Slot reserved for a future meta-edge-ai sibling repo (model
+  # packaging, AI-SBOM, multi-board AI layers). DRP-AI runtime recipes
+  # landed in-tree under meta-edge-bsp; uncomment if a separate AI
+  # layer is introduced.
   #
   # meta-edge-ai:
   #   url: https://github.com/umair-as/meta-edge-ai
@@ -198,7 +199,7 @@ local_conf_header:
     BBMASK += "meta-rz-distro/recipes-multimedia/gstreamer/gstreamer1\.0-plugins-bad_1\.22\.12\.bbappend"
 
   bbmask_vendor_cruft_unshipped: |
-    # meta-renesas vendor-layer recipes we explicitly don't ship (per
+    # meta-renesas vendor-layer recipes explicitly not shipped (per
     # meta-edge-bsp/recipes-support/edge-systemd-presets/files/90-edge.preset
     # which disables v4l2-init.service as "vendor-layer cruft"). They use
     # scarthgap-era S = "${WORKDIR}" which wrynose rejects at parse time,
@@ -208,7 +209,7 @@ local_conf_header:
     BBMASK += "meta-rz-distro/recipes-extend/v4l2-init/v4l2-init_1\.0\.bb"
     # meta-renesas's weston-init bbappend installs weston.sh from
     # ${WORKDIR} (scarthgap-era path) and adds an idle-time=0 ExecStart
-    # tweak — neither needed in our flow (we already ship our own
+    # tweak — neither needed here (meta-edge-bsp already ships its own
     # weston-init bbappend that handles the multi-user.target deferral).
     BBMASK += "meta-rz-distro/recipes-graphics/wayland/weston-init\.bbappend"
 

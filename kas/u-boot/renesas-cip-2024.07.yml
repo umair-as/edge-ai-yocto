@@ -5,7 +5,7 @@
 # downstream-only artifacts — they are not in denx mainline at any tag.
 # Mainline upstreamed the board as renesas_rzg2l_smarc_defconfig with
 # different paths. The in-tree patch series targets the fork's naming,
-# so we follow the fork. See meta-edge-bsp/recipes-bsp/u-boot/u-boot_2024.07.bb
+# so this overlay follows the fork. See meta-edge-bsp/recipes-bsp/u-boot/u-boot_2024.07.bb
 # for the SRCREV pin and the full rationale.
 #
 # TF-A also stays on a Renesas-CIP fork (the rzg_trusted-firmware-a
@@ -15,8 +15,8 @@
 # meta-edge-bsp/recipes-security/optee/.
 #
 # meta-renesas's meta-rz-bsp ships u-boot_2021.10, _2023.10, _2024.07
-# for rzg2l-family. The 2024.07 line is the one that carries the
-# RAUC A/B bootcmd parsing we need; we pin to that here.
+# for rzg2l-family. The 2024.07 line carries the required RAUC A/B
+# bootcmd parsing; pinned to that here.
 #
 # Future direction: sibling kas/u-boot/<variant>.yml files can add a
 # version-selection family without changing kas/base.yml. A future

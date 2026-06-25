@@ -10,11 +10,11 @@
 #     /etc/rauc-uboot-env.defaults and /etc/u-boot-initial-env
 #   - prod builds composed without this fragment carry zero netboot bytes
 #
-# The NetworkManager eth0-unmanaged drop-in is NOT gated by this
-# fragment any more — edge-network-profiles ships it unconditionally
-# and edge-netboot-nm-unmanage.service activates it at boot only when
-# ConditionKernelCommandLine=root=/dev/nfs matches. Same image works
-# correctly whether netbooted (NFS-root) or flashed (MMC).
+# eth0 is left unmanaged by systemd-networkd (edge-network-units ships
+# 10-eth0.network with Unmanaged=yes), so the kernel's ip=dhcp NFS-root
+# path on eth0 is not disrupted. eth1 is the DHCP uplink. The same image
+# works netbooted (NFS-root on eth0) or flashed (eth1 uplink), with no
+# netboot-specific network gating.
 #
 # linux-renesas (= rz_linux-cip, CIP-based) ships CONFIG_NFS_FS, CONFIG_NFS_V4,
 # CONFIG_ROOT_NFS, CONFIG_IP_PNP_DHCP, CONFIG_RAVB, CONFIG_MICREL_PHY all

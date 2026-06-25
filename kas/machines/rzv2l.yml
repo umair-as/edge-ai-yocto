@@ -77,7 +77,7 @@ local_conf_header:
     # The QA bridging — meta-renesas's :rzg2l-family installs _pmic
     # variants at the legacy /firmware/ path; meta-arm's FIRMWARE_DIR is
     # /firmware/${PN}/, so the files would be installed-but-not-shipped
-    # AND missing from sysroot (firmware-pack reads from sysroot/PN). Our
+    # AND missing from sysroot (firmware-pack reads from sysroot/PN). The
     # trusted-firmware-a_%.bbappend mirrors the _pmic files into
     # FIRMWARE_DIR so SYSROOT_DIRS picks them up, and claims the legacy
     # /firmware/ copies in FILES:${PN} so QA passes. Originals stay where

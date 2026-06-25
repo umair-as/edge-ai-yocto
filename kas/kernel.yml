@@ -7,7 +7,7 @@
 #
 # Provider selection is handled by meta-renesas's rzg2l-family.inc
 # (PREFERRED_PROVIDER_virtual/kernel ?= "linux-renesas"). The version
-# default in that include is "6.1%" (weak); we hard-pin "6.12%" here
+# default in that include is "6.1%" (weak); hard-pin "6.12%" here
 # so it beats the include regardless of override-resolution order.
 
 header:

@@ -21,7 +21,7 @@
 #   - DNS backend: aardvark-dns (Rust). Pairs with netavark; gives
 #     containers per-network DNS so they resolve each other by name.
 #   - PODMAN_FEATURES = ""  drops the `docker` shim binary that podman
-#     installs by default — we deploy OCI images directly, no docker
+#     installs by default — the edge flow deploys OCI images directly, no docker
 #     CLI emulation needed (and it RCONFLICTS with real docker, which
 #     is awkward if anything downstream pulls docker in).
 #

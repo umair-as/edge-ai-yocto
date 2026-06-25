@@ -8,7 +8,7 @@
 # The edge-ai distro ships SBOM + CVE always-on with sensible defaults
 # (see meta-edge-distro/conf/distro/edge-ai.conf). NOTHING is enabled by
 # composing this fragment alone — every knob below is commented;
-# uncomment what you need for the specific build.
+# uncomment the knobs a given build needs.
 #
 # Knobs come from:
 #   openembedded-core/meta/classes/create-spdx-3.0.bbclass
@@ -35,7 +35,7 @@ local_conf_header:
     # SPDX_PROFILES — which SPDX 3.0 profile sections appear in each doc.
     # Defaults: "core build software simpleLicensing security"
     #
-    # Drop "build" if you only care about software composition + licensing +
+    # Drop "build" to limit the SBOM to software composition + licensing +
     # CVE (skips the build-environment fingerprinting; smaller docs, ~10%
     # faster do_create_spdx).
     #
@@ -52,8 +52,8 @@ local_conf_header:
 
   spdx_timestamps: |
     # SPDX_INCLUDE_TIMESTAMPS — include real wall-clock timestamps in SPDX
-    # docs. Default 0 (reproducible builds). Flip to 1 only when you want
-    # an audit-grade dated artifact and don't care about reproducibility.
+    # docs. Default 0 (reproducible builds). Flip to 1 for an audit-grade
+    # dated artifact when reproducibility is not required.
     #
     # SPDX_INCLUDE_TIMESTAMPS = "1"
 
@@ -78,7 +78,7 @@ local_conf_header:
 
   fail_on_critical_cve: |
     # Wrynose dropped the scarthgap-era CVE_ERROR_PHRASES knob. To fail
-    # the build on CVEs above a threshold you need a post-task hook that
+    # the build on CVEs above a threshold, add a post-task hook that
     # parses the SBOM. Sketch (uncomment + adapt the script path):
     #
     # IMAGE_POSTPROCESS_COMMAND:append = " edge_fail_on_critical_cve;"
