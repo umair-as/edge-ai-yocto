@@ -1,0 +1,34 @@
+# pre-commit configuration — edge-ai-yocto
+#
+# Enforces Conventional Commit subjects so the git-cliff release-notes pipeline
+# (cliff.toml + .github/workflows/release-notes.yml) has clean, parseable input.
+# Changelog quality is only as good as commit hygiene; this hook is the gate.
+#
+# This is a commit-MSG hook, so a plain `pre-commit install` is not enough.
+# Enable it once per clone:
+#
+#     pip install pre-commit            # or: pipx install pre-commit
+#     pre-commit install --hook-type commit-msg
+#
+# Pinned to conventional-pre-commit v4.4.0 (latest at setup). Bump deliberately.
+
+repos:
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        # Allowed types — the set this repo's history actually uses, plus the
+        # standard remainder. Must stay in sync with commit_parsers in cliff.toml.
+        args:
+          - feat
+          - fix
+          - docs
+          - build
+          - chore
+          - ci
+          - style
+          - perf
+          - refactor
+          - test
+          - revert

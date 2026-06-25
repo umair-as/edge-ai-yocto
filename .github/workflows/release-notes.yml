@@ -1,0 +1,60 @@
+name: Release notes
+
+# Triggered on release tags only (v-prefixed semver, optional -rc/-pre suffix).
+# Mirrors tag_pattern in cliff.toml.
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
+
+# Scoped to creating/updating the GitHub Release. No new secret required — the
+# built-in GITHUB_TOKEN carries contents:write. CHANGELOG.md is NOT committed
+# back, so no branch write beyond the release object itself.
+permissions:
+  contents: write
+
+# A second tag pushed before the first finishes must not race the release edit.
+concurrency:
+  group: release-notes-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release-notes:
+    runs-on: ubuntu-latest
+    steps:
+      # fetch-depth: 0 is REQUIRED — git-cliff walks the full tag/commit graph.
+      # A shallow clone yields an empty or truncated changelog.
+      - name: Checkout (full history + tags)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Render only the section for the tag that triggered this run.
+      # --strip header drops the "# Changelog" preamble so the release notes
+      # start at the version heading. GITHUB_REPO enables commit/compare links.
+      - name: Generate release notes (--latest)
+        uses: orhun/git-cliff-action@v4
+        id: release_notes
+        with:
+          version: 2.13.1
+          config: cliff.toml
+          args: --latest --strip header
+        env:
+          OUTPUT: RELEASE_NOTES.md
+          GITHUB_REPO: ${{ github.repository }}
+
+      # Create the Release, or update its body if the tag was re-pushed.
+      # Uses the preinstalled gh CLI (no third-party action to trust/pin) and the
+      # built-in GITHUB_TOKEN.
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release edit "${TAG}" --notes-file RELEASE_NOTES.md
+          else
+            gh release create "${TAG}" --title "${TAG}" --notes-file RELEASE_NOTES.md
+          fi
