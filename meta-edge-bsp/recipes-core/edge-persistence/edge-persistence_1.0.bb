@@ -1,5 +1,5 @@
 SUMMARY     = "Bind /var/log, /var/lib state, and /home from /data"
-DESCRIPTION = "Five .mount units bind /data/{log,containers,systemd,nm,home} \
+DESCRIPTION = "Four .mount units bind /data/{log,containers,systemd,home} \
 over the matching paths; two oneshot services capture-or-restore \
 /etc/machine-id and the sshd host keys across RAUC slot swaps."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
@@ -11,7 +11,6 @@ SRC_URI = " \
     file://var-log.mount \
     file://var-lib-containers.mount \
     file://var-lib-systemd.mount \
-    file://var-lib-NetworkManager.mount \
     file://home.mount \
     file://edge-persistence.tmpfiles \
     file://edge-data-seed.service \
@@ -35,7 +34,6 @@ SYSTEMD_SERVICE:${PN} = " \
     var-log.mount \
     var-lib-containers.mount \
     var-lib-systemd.mount \
-    var-lib-NetworkManager.mount \
     home.mount \
     edge-data-seed.service \
     edge-machine-id-persist.service \
@@ -48,7 +46,6 @@ do_install() {
     install -m 0644 ${UNPACKDIR}/var-log.mount                  ${D}${systemd_system_unitdir}/
     install -m 0644 ${UNPACKDIR}/var-lib-containers.mount       ${D}${systemd_system_unitdir}/
     install -m 0644 ${UNPACKDIR}/var-lib-systemd.mount          ${D}${systemd_system_unitdir}/
-    install -m 0644 ${UNPACKDIR}/var-lib-NetworkManager.mount   ${D}${systemd_system_unitdir}/
     install -m 0644 ${UNPACKDIR}/home.mount                     ${D}${systemd_system_unitdir}/
     install -m 0644 ${UNPACKDIR}/edge-data-seed.service         ${D}${systemd_system_unitdir}/
     install -m 0644 ${UNPACKDIR}/edge-machine-id-persist.service    ${D}${systemd_system_unitdir}/
@@ -72,7 +69,6 @@ FILES:${PN} = " \
     ${systemd_system_unitdir}/var-log.mount \
     ${systemd_system_unitdir}/var-lib-containers.mount \
     ${systemd_system_unitdir}/var-lib-systemd.mount \
-    ${systemd_system_unitdir}/var-lib-NetworkManager.mount \
     ${systemd_system_unitdir}/home.mount \
     ${systemd_system_unitdir}/edge-data-seed.service \
     ${systemd_system_unitdir}/edge-machine-id-persist.service \

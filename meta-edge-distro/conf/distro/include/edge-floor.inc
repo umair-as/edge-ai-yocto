@@ -19,19 +19,17 @@ SYSTEMD_DEFAULT_TARGET = "multi-user.target"
 VIRTUAL-RUNTIME_base-utils-syslog = ""
 BAD_RECOMMENDATIONS:append        = " busybox-syslog"
 
-# networkmanager-daemon RRECOMMENDS dnsmasq (for NM's optional dnsmasq DNS
-# plugin). NM owns DNS via its default plugin; dnsmasq ships unconfigured
-# with /etc/dnsmasq.d/ empty, but its preset auto-enables dnsmasq.service.
-# Letting it install pulls network.target onto multi-user.target's
-# activation chain via the service's After=network.target.
+# dnsmasq excluded: nothing in the image RRECOMMENDS it, but guard against
+# a future weak-dep pull. Its preset auto-enables dnsmasq.service which
+# pulls network.target onto multi-user.target unnecessarily.
 BAD_RECOMMENDATIONS:append        = " dnsmasq"
 
 # ----- Network management -------------------------------------------------
 
-# Drop networkd + resolved from systemd so they don't race NM on link
-# bring-up; NM owns DHCP and DNS.
-PACKAGECONFIG:remove:pn-systemd = "networkd resolved nss-resolve"
-VIRTUAL-RUNTIME_net_manager = "networkmanager"
+# resolved + nss-resolve excluded: networkd's built-in DHCP client writes
+# /etc/resolv.conf directly (UseDNS=yes default in .network [DHCP] section).
+PACKAGECONFIG:remove:pn-systemd = "resolved nss-resolve"
+VIRTUAL-RUNTIME_net_manager = "systemd-networkd"
 
 # ----- Users / static IDs -------------------------------------------------
 

@@ -23,8 +23,8 @@ RDEPENDS:${PN} = " \
     edge-pstore-persist \
     edge-audit \
     packagegroup-edge-security \
-    networkmanager \
-    edge-network-profiles \
+    systemd-networkd \
+    edge-network-units \
     virtual-ota-uboot-env \
     u-boot-fw-utils \
 "
