@@ -21,7 +21,7 @@ EU Cyber Resilience Act, Annex I (essential cybersecurity requirements). This ta
 |---|---|---|
 | 1.a — Minimum attack surface (no unnecessary services) | ✅ | Base image is minimal Weston; dev image opt-in via packagegroups. `tools-debug` / `tools-profile` only in `edge-image-dev`. No demo / sample daemons. |
 | 1.b — Hardened build flags | ✅ | `security_flags.bbclass` auto-inherited. `SECURITY_CFLAGS` = `-fstack-protector-strong -O2 -D_FORTIFY_SOURCE=2 -Wformat -Wformat-security -Werror=format-security`. Userspace built PIE. |
-| 1.c — Kernel hardening | ✅ | `security-hardening.cfg` fragment + `rauc_set_bootargs` tokens (init_on_alloc, slab_nomerge, page_alloc.shuffle, randomize_kstack_offset, vsyscall=none). |
+| 1.c — Kernel hardening | ✅ | `security-hardening.cfg` fragment + `rauc_set_bootargs` tokens (init_on_alloc, slab_nomerge, page_alloc.shuffle, randomize_kstack_offset, vsyscall=none). LSM stack `CONFIG_LSM="lockdown,yama,bpf,landlock,selinux"` — lockdown (early, `SECURITY_LOCKDOWN_LSM_EARLY=y`) + landlock compiled in. |
 | 1.d — Sysctl baseline | ✅ | `edge-sysctl-hardening` — CIS L1. |
 | 1.e — Read-only rootfs | 📅 | Prod tier — separate `edge-image-prod.bb` (not in this iteration). |
 
@@ -40,17 +40,18 @@ EU Cyber Resilience Act, Annex I (essential cybersecurity requirements). This ta
 |---|---|---|
 | 3.a — No committed credentials | ✅ | `EDGE_DEFAULT_PASSWORD_HASH` lives in operator-private `kas/local.yml`. Build fails if unset. |
 | 3.b — Two-account separation | ✅ | `root` (serial only) + `devel` (SSH-reachable, in wheel). Password hash from operator. |
-| 3.c — SSH login policy | ✅ | `AllowUsers devel`, `PermitRootLogin no`, modern Ciphers/Kex/MACs, `MaxAuthTries 3`. |
+| 3.c — SSH login policy | ✅ | `AllowUsers devel`, `PermitRootLogin no`, modern Ciphers/Kex/MACs, `MaxAuthTries 6`. |
 | 3.d — Sudo via wheel, password required | ✅ | `edge-sudoers` ships `%wheel ALL=(ALL:ALL) ALL` (no NOPASSWD). |
 | 3.e — Pubkey baked at build | ✅ | `EDGE_DEVEL_SSH_PUBKEY_FILE` from `kas/local.yml`. Optional — falls back to password auth. |
-| 3.f — Per-device unique credentials | 📅 | First-boot provisioning service that mints per-device hash from `/etc/machine-id` + writes to `/etc/passwd` + prints to serial. Deferred to a separate iteration with thorough recovery testing. |
+| 3.f — Password-quality enforcement | ✅ | `libpwquality` (PAM) in `packagegroup-edge-security` — strength checks on password set/change. |
+| 3.g — Per-device unique credentials | 📅 | First-boot provisioning service that mints per-device hash from `/etc/machine-id` + writes to `/etc/passwd` + prints to serial. Deferred to a separate iteration with thorough recovery testing. |
 
 ### 4. Confidentiality of data at rest
 
 | Sub-requirement | Status | Implementation |
 |---|---|---|
 | 4.a — DM-VERITY rootfs (immutable) | 🟡 | Kernel symbols on (`CONFIG_DM_VERITY=y`, `DM_VERITY_FEC=y`, `BLK_DEV_DM=y`, `DM_INIT=y`). RAUC bundle format already `verity`. Boot-flow wiring deferred — needs `rauc_set_bootargs` change to construct `root=/dev/dm-0 dm-mod.create=...` from active-slot root hash. |
-| 4.b — `/data` LUKS encryption | ⏸ | `meta-encrypted-storage` loaded via `kas/tpm.yml`. No wiring yet. Needs TPM2 chip on the board (RZ/V2L doesn't have internal TPM) OR PBKDF-derived key from per-device secret. |
+| 4.b — `/data` LUKS encryption | 🟡 | `cryptsetup` (LUKS + `veritysetup`) userspace ships in `packagegroup-edge-security`. No wiring yet. Needs TPM2 chip on the board (RZ/V2L doesn't have internal TPM) OR PBKDF-derived key from per-device secret. |
 | 4.c — Key material protection | ⏸ | TPM-sealed LUKS key. Same blocker as 4.b. |
 
 ### 5. Confidentiality + integrity of data in transit
@@ -58,7 +59,7 @@ EU Cyber Resilience Act, Annex I (essential cybersecurity requirements). This ta
 | Sub-requirement | Status | Implementation |
 |---|---|---|
 | 5.a — TLS client trust store | ✅ | `ca-certificates` (Mozilla bundle) in `packagegroup-edge-security`. |
-| 5.b — Modern SSH ciphers | ✅ | curve25519-sha256, chacha20-poly1305, aes-gcm only (`sshd_config.d/20-edge-hardening.conf`). |
+| 5.b — Modern SSH ciphers | ✅ | curve25519-sha256, chacha20-poly1305, aes-gcm only (`edge-sshd-hardening` → `sshd_config.d/99-edge-hardening.conf`). |
 | 5.c — TLS for OTA bundles | 🟡 | `rauc-conf-edge` uses `bundle-formats=verity` (integrity). Streaming-over-TLS deferred — RAUC streaming section commented in `system.conf`. |
 
 ### 6. Integrity protection
@@ -83,14 +84,14 @@ EU Cyber Resilience Act, Annex I (essential cybersecurity requirements). This ta
 |---|---|---|
 | 8.a — A/B rootfs with rollback | ✅ | RAUC `rootfs.0` + `rootfs.1` + boot-attempts counter in U-Boot env. |
 | 8.b — Watchdog | ✅ | `watchdog@12800800` started in U-Boot + kept by kernel. |
-| 8.c — Bounded log usage | ✅ | journald `SystemMaxUse=500M`, `SystemMaxFileSize=50M`. |
+| 8.c — Bounded log usage | ✅ | journald `SystemMaxUse=200M`, `SystemMaxFileSize=50M`. |
 
 ### 9. Protective measures against DoS
 
 | Sub-requirement | Status | Implementation |
 |---|---|---|
 | 9.a — SYN cookies | ✅ | `net.ipv4.tcp_syncookies=1`. |
-| 9.b — Sshd rate limiting | ✅ | `MaxAuthTries 3`, `LoginGraceTime 30`, `MaxStartups 10:30:60`. |
+| 9.b — Sshd rate limiting | ✅ | `MaxAuthTries 6`, `LoginGraceTime 30`, `MaxStartups 10:30:60`. |
 | 9.c — journald rate limiting | ✅ | 1000 messages / 30s. |
 | 9.d — fail2ban / brute-force lockout | 📅 | `meta-security` provides `fail2ban`. Not yet in `packagegroup-edge-security`. Phase 2. |
 
@@ -99,9 +100,10 @@ EU Cyber Resilience Act, Annex I (essential cybersecurity requirements). This ta
 | Sub-requirement | Status | Implementation |
 |---|---|---|
 | 10.a — Audit trail | ✅ | `edge-audit` — CIS L1 rules, immutable (`-e 2`). |
-| 10.b — Tamper-evident logs | ✅ | journald `Seal=yes` + first-boot key generation via `edge-journald-setup-keys.service`. |
+| 10.b — Tamper-evident logs | 🟡 | Integrity at rest is the journald structural hash chain, validated by `journalctl --verify`. FSS (`Seal=yes`) was upstream-deprecated in systemd 257 and is a no-op on wrynose (systemd 259); a sealed remote aggregator is the planned path. |
 | 10.c — Privilege separation | ✅ | `root` not SSH-reachable; `devel` sudo with password; no NOPASSWD shortcuts. |
-| 10.d — Mandatory access control | 🟡 | AppArmor compiled in; default LSM still capability+yama. Profile set + `DEFAULT_SECURITY_APPARMOR=y` deferred. |
+| 10.d — Mandatory access control | 🟡 | SELinux MCS — `DISTRO_FEATURES += selinux`, `refpolicy-mcs` + `selinux-autorelabel`, `CONFIG_DEFAULT_SECURITY_SELINUX=y`, in the `CONFIG_LSM` stack; AppArmor explicitly off. Permissive baseline; `enforcing=1` validated on-board via controlled reboot, full AVC-clean policy set deferred. |
+| 10.e — Rootless-container isolation | ✅ | DRP-AI inference runs in rootless Podman under a dedicated `edge-ctr` principal (uid 608, per-principal subuid namespace) with SELinux `container_t` — no root, no capability widening. HW-validated, zero AVC denials. |
 
 ### 11. Security-relevant info recording
 
