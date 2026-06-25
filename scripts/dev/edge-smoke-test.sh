@@ -40,7 +40,7 @@ info()    { printf "  ${C_DIM}%s${C_RESET}\n" "$*"; }
 
 # Check a path is bind-mounted from an expected subpath on /data. For bind
 # mounts, findmnt SOURCE is "<device>[<fsroot>]" and FSROOT is the subpath
-# alone. We compare the FSROOT (e.g. "/log") against the suffix of the
+# alone. Compare the FSROOT (e.g. "/log") against the suffix of the
 # expected /data path (e.g. /data/log -> "/log") so the check works
 # regardless of which device backs /data.
 check_bind() {
@@ -106,7 +106,7 @@ else
 fi
 
 # WIC fstab dup-trap: WIC's update_fstab() used to append /dev/mmcblk0pN
-# entries on top of our base-files fstab, causing systemd-fstab-generator
+# entries on top of the base-files fstab, causing systemd-fstab-generator
 # "already exists. Duplicate entry?" errors. Fix is the imager-level
 # WIC_CREATE_EXTRA_ARGS:append = " --no-fstab-update" in edge-image.bbclass.
 fstab_dups=$(awk '!/^\s*(#|$)/ {print $2}' /etc/fstab | sort | uniq -d)
@@ -459,8 +459,8 @@ fi
 section "Lingering user managers (boot auto-start)"
 
 # Linger MARKERS existing is not enough — logind must actually start the user
-# managers at boot. A logind linger-enumeration race (ESRCH; observed on the
-# first boot of a freshly-OTA'd slot, self-heals on reboot) can leave markers
+# managers at boot. A logind linger-enumeration race (ESRCH on the first
+# boot of a freshly-OTA'd slot, self-heals on reboot) can leave markers
 # present but managers dead, so rootless boot services (Podman Quadlets) never
 # run. Under permissive this is NOT the default_t label (denials don't enforce);
 # under enforcing default_t on /var/lib/systemd would additionally block logind_t

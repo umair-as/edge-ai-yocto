@@ -80,7 +80,7 @@ BOOT0_FORCE_RO="/sys/block/${BASE}boot0/force_ro"
 # Safety 2: target must not carry the running rootfs.
 ROOT_SRC="$(findmnt -n -o SOURCE / 2>/dev/null || true)"
 case "$ROOT_SRC" in
-    /dev/${BASE}p*|/dev/${BASE}) die "refusing: $TARGET carries the running rootfs ($ROOT_SRC)" ;;
+    "/dev/${BASE}"p*|"/dev/${BASE}") die "refusing: $TARGET carries the running rootfs ($ROOT_SRC)" ;;
 esac
 
 log "Target eMMC:  $TARGET  (boot partition: $BOOT0)"

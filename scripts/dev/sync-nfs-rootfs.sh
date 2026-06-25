@@ -13,12 +13,12 @@
 # env vars to point at a different host layout.
 #
 # Requires:
-#   - You ran `make dev NETBOOT=1` (or `make base NETBOOT=1`) and the
+#   - `make dev NETBOOT=1` (or `make base NETBOOT=1`) has run and the
 #     deploy dir contains a fresh rootfs tarball + fitImage.
 #   - The host's tftpd-hpa + nfs-kernel-server are configured per the
 #     runbook (one-time setup; setup-tftp-nfs.sh helps).
-#   - You run this script with sudo (or as root). NFS root export
-#     needs root-owned writes for permissions to survive into the rootfs.
+#   - Run with sudo (or as root): the NFS root export needs root-owned
+#     writes for permissions to survive into the rootfs.
 
 set -Eeuo pipefail
 
@@ -34,7 +34,7 @@ note() { echo "[sync-nfs-rootfs] $*"; }
 
 [ -d "$DEPLOY_DIR" ] || die "deploy dir not found: $DEPLOY_DIR (run \`make dev NETBOOT=1\` first)"
 
-# Newest tarball, by mtime — works with the timestamped wic.bz2/tar.gz naming.
+# Newest tarball, by mtime — works with the timestamped wic.zst/tar.gz naming.
 ROOTFS_TAR="$(ls -t "${DEPLOY_DIR}/${IMAGE}-${MACHINE}.rootfs"*.tar.gz 2>/dev/null | head -1 || true)"
 [ -n "$ROOTFS_TAR" ] || die "no ${IMAGE}-${MACHINE}.rootfs-*.tar.gz under $DEPLOY_DIR"
 FITIMAGE="${DEPLOY_DIR}/fitImage"

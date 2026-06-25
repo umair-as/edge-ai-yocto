@@ -60,7 +60,7 @@ mkdir -p "$TFTP_DIR/$TFTP_SUBDIR"
 chown -R tftp:tftp "$TFTP_DIR"
 chmod 0755 "$TFTP_DIR" "$TFTP_DIR/$TFTP_SUBDIR"
 
-# Confirm /etc/default/tftpd-hpa points at the directory we want. Don't
+# Confirm /etc/default/tftpd-hpa points at the expected directory. Don't
 # overwrite a customized config; just warn.
 if [ -f /etc/default/tftpd-hpa ]; then
     cfg_dir="$(. /etc/default/tftpd-hpa && echo "${TFTP_DIRECTORY:-}")"
@@ -98,10 +98,9 @@ mkdir -p "$NFS_ROOT"
 chown root:root "$NFS_ROOT"
 chmod 0755 "$NFS_ROOT"
 
-# Idempotent /etc/exports edit. We match the FULL line including options
+# Idempotent /etc/exports edit. Match the FULL line including options
 # so a re-run with different SUBNET adds a new entry rather than silently
-# leaving a stale one. Operator can hand-prune if they want a single
-# canonical entry.
+# leaving a stale one. Operator can hand-prune for a single canonical entry.
 # Intentional: NO fsid=root. fsid=root makes the export the NFSv4
 # pseudo-root, which means v4 clients see it as `/` and the path
 # `${NFS_ROOT}` passed in `nfsroot=…` hangs the kernel-mode v4 mount
