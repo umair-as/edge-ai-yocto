@@ -1,9 +1,16 @@
 # edge-ai-yocto systemd presets.
 #
-# v0: no masks. Vendor-layer units (v4l2-init, audio-init) from meta-rz-distro
-# are suppressed at parse time via BBMASK in kas/base.yml, not here. Future
-# tiers can add lines like:
+# Ordered before oe-core's 99-default.preset (`disable *`); first match wins.
 #
-#   disable v4l2-init.service
+# Vendor-layer units (v4l2-init, audio-init) from meta-rz-distro are suppressed
+# at parse time via BBMASK in kas/base.yml, not here. Future tiers can add lines
+# like:
+#
 #   disable rpcbind.service
 #   disable rpcbind.socket
+
+# systemd-resolved.service lives in the main systemd package, which oe-core
+# leaves out of SYSTEMD_PACKAGES — so it has no recipe auto-enable and the
+# `disable *` default would ship it off. networkd does addressing but not DNS;
+# without resolved, /etc/resolv.conf has no nameserver. Enable it here.
+enable systemd-resolved.service

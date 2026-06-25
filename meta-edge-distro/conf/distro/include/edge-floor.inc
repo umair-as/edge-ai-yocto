@@ -26,10 +26,16 @@ BAD_RECOMMENDATIONS:append        = " dnsmasq"
 
 # ----- Network management -------------------------------------------------
 
-# resolved + nss-resolve excluded: networkd's built-in DHCP client writes
-# /etc/resolv.conf directly (UseDNS=yes default in .network [DHCP] section).
-PACKAGECONFIG:remove:pn-systemd = "resolved nss-resolve"
+# networkd owns addressing/DHCP but does NOT write /etc/resolv.conf — only
+# systemd-resolved does. resolved + nss-resolve stay in systemd's default
+# PACKAGECONFIG (not removed); resolved is enabled via 90-edge.preset (it has no
+# recipe SYSTEMD_SERVICE, so the `disable *` preset would otherwise leave it off).
 VIRTUAL-RUNTIME_net_manager = "systemd-networkd"
+
+# /etc/resolv.conf -> ../run/systemd/resolve/stub-resolv.conf (resolved's
+# 127.0.0.53 stub). The systemd recipe creates the symlink + tmpfiles when
+# RESOLV_CONF=stub-resolv and resolved is in PACKAGECONFIG.
+RESOLV_CONF = "stub-resolv"
 
 # ----- Users / static IDs -------------------------------------------------
 
