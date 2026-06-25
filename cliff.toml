@@ -65,6 +65,10 @@ commit_preprocessors = [
     { pattern = '\s*Signed-off-by:.*', replace = "" },
 ]
 
+# Commits are expected to be Conventional Commits, enforced at the commit-msg
+# stage by .pre-commit-config.yaml (decision recorded in ADR-0007). Keep the
+# type list below in sync with that hook's allowed types.
+#
 # First match wins. The <!-- N --> prefixes force section ordering (Features
 # before Fixes, etc.) and are stripped from rendered output by `striptags`.
 commit_parsers = [
