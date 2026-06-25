@@ -9,7 +9,10 @@ SECTION     = "base"
 LICENSE     = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 
-SRC_URI = "file://edge-ctr.tmpfiles"
+SRC_URI = " \
+    file://edge-ctr.tmpfiles \
+    file://podman-user-wait-network-online-noop.conf \
+"
 
 inherit useradd
 
@@ -38,6 +41,18 @@ do_install() {
     install -d ${D}${nonarch_libdir}/tmpfiles.d
     install -m 0644 ${UNPACKDIR}/edge-ctr.tmpfiles \
         ${D}${nonarch_libdir}/tmpfiles.d/edge-ctr.conf
+
+    # podman-user-generator makes every rootless Quadlet wait on
+    # podman-user-wait-network-online.service, which polls network-online.target
+    # in user scope (never active) and times out after 90s — delaying inference
+    # by 90s every boot. A no-op ExecStart drop-in in /etc/systemd/user (every
+    # user manager's search path) makes it return immediately. A drop-in, not a
+    # /dev/null mask: a masked user unit fails `systemctl preset-all` at
+    # do_rootfs. edge-ctr's $HOME (/data/edge-ctr) is a runtime mount, so a
+    # ~/.config override is not an option at image build.
+    install -d ${D}${sysconfdir}/systemd/user/podman-user-wait-network-online.service.d
+    install -m 0644 ${UNPACKDIR}/podman-user-wait-network-online-noop.conf \
+        ${D}${sysconfdir}/systemd/user/podman-user-wait-network-online.service.d/10-edge-noop.conf
 }
 
 # Subordinate uid/gid ranges for rootless podman as edge-ctr. Distinct from
@@ -50,4 +65,7 @@ pkg_postinst:${PN}() {
     done
 }
 
-FILES:${PN} = "${nonarch_libdir}/tmpfiles.d/edge-ctr.conf"
+FILES:${PN} = " \
+    ${nonarch_libdir}/tmpfiles.d/edge-ctr.conf \
+    ${sysconfdir}/systemd/user/podman-user-wait-network-online.service.d/10-edge-noop.conf \
+"
