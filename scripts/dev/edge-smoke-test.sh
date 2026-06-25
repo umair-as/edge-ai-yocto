@@ -2,7 +2,7 @@
 # On-device smoke test for the edge-ai distro.
 #
 # Validates the bind-mount persistence architecture (edge-persistence recipe):
-#   - /var/log, /var/lib/{containers,systemd,NetworkManager} and /home are bind
+#   - /var/log, /var/lib/{containers,systemd} and /home are bind
 #     mounted from /data subdirs (not overlays)
 #   - /etc/machine-id and the sshd host keys are captured-or-restored from /data
 #     by oneshot services
@@ -146,7 +146,6 @@ section "Persistence binds (edge-persistence)"
 check_bind /var/log                  /data/log
 check_bind /var/lib/containers       /data/containers
 check_bind /var/lib/systemd          /data/systemd
-check_bind /var/lib/NetworkManager   /data/nm
 check_bind /home                     /data/home
 
 # /var/log must be a real directory in the rootfs (not the volatile-log
@@ -294,7 +293,8 @@ if command -v podman >/dev/null 2>&1; then
 
     # Run-with-pull. Captures stderr so a real failure (vs. transient first-boot
     # DNS not-yet-settled) is visible. Smoke test runs at uptime ~2-4 min;
-    # NetworkManager may not have a DNS server resolvable yet.
+    # networkd-without-resolved may not have written a resolvable DNS server yet
+    # (the Network section reports whether /etc/resolv.conf got populated).
     podman_run_err=$(sudo podman run --rm docker.io/library/alpine:3 echo "container-ok" 2>&1 >/dev/null)
     if [ $? -eq 0 ]; then
         pass "podman run alpine:3 — OK (pulled + executed)"
@@ -452,6 +452,162 @@ elif [ "$(systemctl is-active edge-grow-data.service 2>/dev/null)" = "active" ];
     pass "edge-grow-data.service active (exited) — /data growth"
 else
     warn "edge-grow-data.service log absent or unparsed"
+fi
+
+# ---------------- 12. lingering user managers (boot auto-start) ----------------
+
+section "Lingering user managers (boot auto-start)"
+
+# Linger MARKERS existing is not enough — logind must actually start the user
+# managers at boot. A logind linger-enumeration race (ESRCH; observed on the
+# first boot of a freshly-OTA'd slot, self-heals on reboot) can leave markers
+# present but managers dead, so rootless boot services (Podman Quadlets) never
+# run. Under permissive this is NOT the default_t label (denials don't enforce);
+# under enforcing default_t on /var/lib/systemd would additionally block logind_t
+# search (see roadmap Q4). logind's enumeration log is the definitive boot-time
+# signal — it survives later manual recovery of the session.
+if sudo -n journalctl -b -u systemd-logind --no-pager 2>/dev/null \
+       | grep -qiE 'User enumeration failed|Couldn.t add lingering user'; then
+    fail "systemd-logind failed to enumerate lingering users this boot (ESRCH linger race) — rootless Quadlets won't auto-start; on a fresh-OTA first boot this self-heals on reboot"
+else
+    pass "systemd-logind enumerated lingering users cleanly this boot"
+fi
+
+# Per-user end state. A user with an active session (e.g. devel over SSH) shows
+# active regardless of linger, so the non-login principals (edge-ctr) are the
+# meaningful proof that linger auto-start worked.
+for u in edge-ctr devel; do
+    uid=$(id -u "${u}" 2>/dev/null || true)
+    [ -z "${uid}" ] && { info "${u}: no such user"; continue; }
+    if ! sudo -n test -e "/var/lib/systemd/linger/${u}" 2>/dev/null; then
+        info "${u}: linger not enabled"
+        continue
+    fi
+    if [ -d "/run/user/${uid}" ] && systemctl is-active "user@${uid}.service" >/dev/null 2>&1; then
+        pass "${u} (uid ${uid}): user manager active + /run/user/${uid} present"
+    else
+        fail "${u} (uid ${uid}): linger marker present but user@${uid} inactive / no /run/user/${uid}"
+    fi
+done
+
+# ---------------- 13. DRP-AI accelerator (EDGE_ENABLE_AI images) ----------------
+
+section "DRP-AI accelerator"
+
+drpai_ko=$(find "/lib/modules/$(uname -r)" -name 'drpai.ko*' 2>/dev/null | head -1)
+if [ -z "${drpai_ko}" ]; then
+    info "kernel-module-drpai not installed (image built without EDGE_ENABLE_AI); skipping"
+else
+    # Accelerator + zero-copy buffer nodes. render-group 0660 ownership (from
+    # edge-drpai-udev) is what lets the rootless container open them via
+    # keep-groups; root:root 0600 would break the passthrough.
+    for n in drpai0 udmabuf0; do
+        if [ -e "/dev/${n}" ]; then
+            l=$(ls -l "/dev/${n}")
+            if printf '%s' "${l}" | grep -q 'root render'; then
+                pass "/dev/${n}: $(printf '%s' "${l}" | awk '{print $1, $3":"$4}')"
+            else
+                fail "/dev/${n} not root:render (rootless passthrough breaks): ${l}"
+            fi
+        else
+            fail "/dev/${n} missing — module installed but driver did not bind"
+        fi
+    done
+
+    for m in drpai u_dma_buf; do
+        lsmod | grep -q "^${m} " && pass "module ${m} loaded" || fail "module ${m} not loaded"
+    done
+
+    # drp_reserved is a static 512 MB carveout; usable RAM should be well under
+    # 1.5 GB on this 2 GB board if it applied.
+    memtotal_kb=$(awk '/MemTotal/{print $2}' /proc/meminfo)
+    if [ "${memtotal_kb}" -lt 1500000 ]; then
+        pass "drp_reserved carveout in effect (MemTotal ${memtotal_kb} kB)"
+    else
+        warn "MemTotal ${memtotal_kb} kB — drp_reserved 512 MB carveout may not have applied"
+    fi
+
+    grep -q 'drpa mac_nmlint' /proc/interrupts \
+        && pass "DRP-AI AI-MAC completion interrupt registered" \
+        || warn "DRP-AI AI-MAC interrupt absent in /proc/interrupts"
+
+    if sudo -n test -f /data/drpai/bin/drpai-tutorial-app 2>/dev/null; then
+        payload_present=1
+        pass "/data/drpai inference payload present"
+    else
+        payload_present=0
+        warn "/data/drpai payload missing — fresh /data; place it to enable inference (Quadlet ConditionPathExists skips without it)"
+    fi
+
+    # The 90s podman-user-wait-network-online timeout (podman #22197) is
+    # neutralized by a no-op ExecStart drop-in; without it inference is delayed
+    # ~90s every boot (the wait unit polls a user-scope network-online.target
+    # that never goes active, then times out).
+    if [ -f /etc/systemd/user/podman-user-wait-network-online.service.d/10-edge-noop.conf ]; then
+        pass "podman-user-wait no-op drop-in present (no 90s inference delay)"
+    else
+        warn "podman-user-wait no-op drop-in missing — first inference likely delayed ~90s at boot"
+    fi
+
+    # Inference auto-start: only meaningful if the payload exists — the Quadlet
+    # ConditionPathExists skips cleanly without it (expected on a fresh flash,
+    # where /data carries no payload yet). A manual run also satisfies this.
+    if sudo -n journalctl _UID=608 -b --no-pager 2>/dev/null | grep -qiE 'beagle|AI Processing Time'; then
+        pass "DRP-AI inference ran this boot (result in user-608 journal)"
+    elif [ "${payload_present:-0}" -eq 1 ]; then
+        fail "DRP-AI inference did NOT run this boot despite payload present (Quadlet auto-start)"
+    else
+        info "DRP-AI inference not run — no /data/drpai payload (expected on fresh flash; not a defect)"
+    fi
+fi
+
+# ---------------- 14. network (systemd-networkd) ----------------
+
+section "Network (systemd-networkd)"
+
+# Migrated from NetworkManager this cycle: networkd owns DHCP on eth1; eth0 is
+# left unmanaged for the netboot ip=dhcp path. resolved was dropped, so whether
+# /etc/resolv.conf gets populated is the open question this section answers.
+if systemctl is-active systemd-networkd.service >/dev/null 2>&1; then
+    pass "systemd-networkd active"
+else
+    fail "systemd-networkd inactive — no network manager running (NetworkManager was removed)"
+fi
+
+if command -v networkctl >/dev/null 2>&1; then
+    # Parse `networkctl list` columns (IDX LINK TYPE OPERATIONAL SETUP) — robust
+    # vs. parsing the prose of `networkctl status`.
+    eth1_op=$(networkctl --no-legend list 2>/dev/null | awk '$2=="eth1"{print $4}')
+    if [ "${eth1_op}" = "routable" ]; then
+        pass "eth1 routable"
+    else
+        fail "eth1 not routable (operational='${eth1_op:-absent}') — DHCP uplink down"
+    fi
+    eth0_setup=$(networkctl --no-legend list 2>/dev/null | awk '$2=="eth0"{print $5}')
+    if [ "${eth0_setup}" = "unmanaged" ]; then
+        pass "eth0 unmanaged (as configured for netboot)"
+    else
+        info "eth0 setup: ${eth0_setup:-absent}"
+    fi
+else
+    warn "networkctl absent — cannot inspect link state"
+fi
+
+# IPv4 on eth1 — the SSH path on a flashed (non-netboot) image.
+eth1_v4=$(ip -4 -o addr show eth1 2>/dev/null | awk '{print $4}' | head -1)
+[ -n "${eth1_v4}" ] && pass "eth1 IPv4 ${eth1_v4}" || fail "eth1 has no IPv4 address (DHCP)"
+
+# IPv6 SLAAC on eth1 — migration smoke-test F1: confirm an RA-derived global addr.
+eth1_v6=$(ip -6 -o addr show eth1 scope global 2>/dev/null | awk '{print $4}' | head -1)
+[ -n "${eth1_v6}" ] && pass "eth1 IPv6 SLAAC ${eth1_v6}" \
+    || warn "eth1 no global IPv6 (SLAAC) — F1: if RA expected, drop net.ipv6.conf.all.accept_ra=0"
+
+# DNS without resolved: does networkd populate /etc/resolv.conf?
+ns=$(awk '/^nameserver /{print $2; exit}' /etc/resolv.conf 2>/dev/null)
+if [ -n "${ns}" ]; then
+    pass "/etc/resolv.conf nameserver present (${ns})"
+else
+    warn "/etc/resolv.conf has no nameserver — networkd-without-resolved wrote no DNS; name resolution fails (SSH-by-IP unaffected)"
 fi
 
 # ---------------- summary ----------------
