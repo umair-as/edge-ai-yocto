@@ -1,7 +1,4 @@
-# Bench netboot — TFTP + NFS-root for fast dev iteration
-
-Validated end-to-end on bench 2026-06-12 against `edge-image-dev` over
-NFSv3 on a SMARC RZ/V2L EVK at <board-ip>.
+# Netboot — TFTP + NFS-root for fast dev iteration
 
 After one-time setup, the iteration loop is:
 
@@ -99,7 +96,7 @@ Boot once with the netboot-enabled image flashed to SD:
 
 ```sh
 make dev NETBOOT=1
-# flash build/tmp/deploy/images/smarc-rzv2l/edge-image-dev-smarc-rzv2l.rootfs.wic.bz2
+# flash build/tmp/deploy/images/smarc-rzv2l/edge-image-dev-smarc-rzv2l.wic.zst
 ```
 
 At the `=>` prompt (stop autoboot with `edge` within 3 s):
@@ -209,7 +206,7 @@ To permanently strip the macro from a deployed image, rebuild without
 `NETBOOT=1` — the `EDGE_DEV_NETBOOT` gate goes to `"0"` and the
 macro line isn't appended to `/etc/rauc-uboot-env.defaults`.
 
-## Gotchas (from today's bench)
+## Troubleshooting
 
 - **`Loading: T T T ...` at TFTP**: the `dhcp` command clobbered
   `serverip`. Means your image still has the old un-save/restored
