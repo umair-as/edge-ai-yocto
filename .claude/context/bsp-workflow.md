@@ -35,6 +35,7 @@ Setup --> Customize --> Build --> Sign --> Deploy --> Verify
 4. **Renesas vendor BSP.** Machine configs, kernel (`linux-renesas` → `rz_linux-cip`), U-Boot, and TF-A come from `meta-renesas` (`meta-rz-bsp` + `meta-rz-distro`). Extend/override in `meta-edge-bsp`; never fork the vendor layer.
 5. **No silent secure-boot resurrection.** RZ/V2L hardware secure boot (TBBR, OTP, BL2 cert stitching) stays out of scope. U-Boot-level HSM FIT verification is in scope and is the only trust-root layer this repo enforces.
 6. **CVE-DB needs network at fetch time.** The wrynose `sbom-cve-check` fragment uses AUTOREV for the NVD / CVEList feeds — a build host without network access will fail to fetch.
+7. **DT nodes: validate against primary hardware sources.** Any new device-tree node or peripheral binding must be validated against the SoC hardware manual (register base, interrupts, clocks/resets) **and** an in-tree sibling node before it is trusted — author from the TRM and existing DT, not from inference, memory, or prior context. A node that looks plausible but is wrong fails identically to one that is right-but-unsupported, so a wrong node makes a negative test un-diagnosable. The ISU/VSP enablement (`r01uh0936`, the in-tree G2L sibling) is the cautionary case: register-map validation caught an interrupt off-by-one that would otherwise have shipped as a silent runtime failure.
 
 ## Composition (single source of truth)
 
