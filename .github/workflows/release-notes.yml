@@ -37,7 +37,9 @@ jobs:
         uses: orhun/git-cliff-action@v4
         id: release_notes
         with:
-          version: 2.13.1
+          # git-cliff release tags are v-prefixed (the action fetches
+          # .../releases/tags/<version>); a bare "2.13.1" 404s.
+          version: v2.13.1
           config: cliff.toml
           args: --latest --strip header
         env:
