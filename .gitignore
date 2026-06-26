@@ -49,8 +49,6 @@ __pycache__/
 tio-session-logs/
 scratch/**
 
-# === Parked: pending separate publish-review ===
-.claude/
-CLAUDE.md
-AGENTS.md
-docs/adr/
+# Claude Code per-user local settings — board IP, credentials, personal
+# paths. Never commit. Everything else under .claude/ is tracked.
+.claude/settings.local.json
