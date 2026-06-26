@@ -121,6 +121,9 @@ trailing period, ≤72 chars including the `<type>(<scope>): ` prefix.
 (they are release-noise); the rest are grouped by type. A genuinely
 unconventional commit needs a conscious `git commit --no-verify`.
 
+AI-assisted commits end with a generated-with footer and a `Co-Authored-By:`
+trailer — Claude Code's exact footer is in `CLAUDE.md`.
+
 Do not run git commands without operator confirmation (see `CLAUDE.md`).
 
 ## Branch strategy

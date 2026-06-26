@@ -127,3 +127,11 @@ overwriting another agent's diff is much higher.
   strategy). Do not run `git add`, `git commit`, `git branch`,
   `git tag`, or other state-changing git commands without operator
   confirmation. If a change feels like it warrants a commit, stop and ask.
+- **Commit trailers.** End commit messages with the default Claude Code
+  footer:
+
+  ```
+  🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+  Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+  ```
