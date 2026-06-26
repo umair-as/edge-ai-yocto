@@ -39,6 +39,7 @@ SRC_URI:append:smarc-rzv2l = " \
     file://patches/0005-arm64-dts-rzg2l-smarc-som-add-ramoops-reserved-memory.patch \
     file://patches/0006-arm64-dts-rzv2l-smarc-add-drpai-udmabuf-reserved-memory.patch \
     file://patches/0007-arm64-export-dcache-poc-ops-for-drpai-module.patch \
+    file://patches/0008-arm64-dts-rzv2l-smarc-add-isu-node.patch \
 "
 # QSPI FIP alignment — platform boots via eSD; uncomment if QSPI is wired.
 # SRC_URI:append:smarc-rzv2l = " file://patches/0004-arm64-dts-rzg2l-smarc-som-align-qspi-fip-partition-to-0x20000.patch"

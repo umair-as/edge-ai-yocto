@@ -1,0 +1,60 @@
+From 3f9c1a7be4d2058c6e1f0a93b7d4c5e80a16f2d4 Mon Sep 17 00:00:00 2001
+From: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+Date: Fri, 26 Jun 2026 00:00:00 +0200
+Subject: [PATCH] arm64: dts: rzv2l-smarc: add ISU (Image Scaling Unit) node
+
+The RZ/V2L SoC dtsi (r9a07g054.dtsi) omits the ISU node that the
+otherwise-identical RZ/G2L dtsi (r9a07g044.dtsi) declares; V2L is G2L
+plus DRP-AI and carries the same ISU IP at the same address. Without the
+node the out-of-tree vspm-isu driver (compatible "renesas,isum") binds
+nothing, so the VSPM core has no scaling/CSC channel and vspmfilter -
+the GStreamer VSP mem-to-mem convert/scale element - fails at runtime
+with "Invalid channel use_ch=0xffffffff".
+
+  - isum@10840000: ISU register bank (base H'1084_0000, separate from
+    vsp@10870000 which the mainline vsp1 driver owns for display), the
+    four ISU interrupts (FRE/DESE/STOPE/ERR, SPI 157-160), ISU AXI/APB
+    clocks and resets, one RPF and one WPF, resize unit present.
+
+Node mirrors the r9a07g044 reference with V2L CPG identifiers; the
+interrupt assignment is confirmed against the RZ/V2L hardware manual
+(VSPD=149 and DU=152 anchors match the in-tree dtsi).
+
+Upstream-Status: Inappropriate [board-specific configuration]
+Signed-off-by: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+---
+ .../boot/dts/renesas/r9a07g054l2-smarc.dts    | 22 +++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/renesas/r9a07g054l2-smarc.dts b/arch/arm64/boot/dts/renesas/r9a07g054l2-smarc.dts
+index bbd3e78..c5a1f04 100644
+--- a/arch/arm64/boot/dts/renesas/r9a07g054l2-smarc.dts
++++ b/arch/arm64/boot/dts/renesas/r9a07g054l2-smarc.dts
+@@ -94,3 +94,25 @@
+ 		memory-region = <&image_buf0>;
+ 	};
+ };
++
++&soc {
++	isum@10840000 {
++		compatible = "renesas,isum";
++		reg = <0 0x10840000 0 0x01f4>;
++		interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cpg CPG_MOD R9A07G054_ISU_ACLK>,
++			 <&cpg CPG_MOD R9A07G054_ISU_PCLK>;
++		clock-names = "isu_aclk", "isu_pclk";
++		resets = <&cpg R9A07G054_ISU_ARESETN>,
++			 <&cpg R9A07G054_ISU_PRESETN>;
++		reset-names = "aresetn", "presetn";
++		renesas,#ch = <0>;
++		renesas,#rpf = <1>;
++		renesas,#wpf = <1>;
++		renesas,has-rs;
++		power-domains = <&cpg>;
++	};
++};
+--
+2.43.0
