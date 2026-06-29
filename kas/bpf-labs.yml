@@ -1,0 +1,18 @@
+# Capability fragment: eBPF / libbpf CO-RE labs (kernel BTF + bpftool).
+#
+# Self-contained: pure additive overlay, no `includes:` and no `repos:` (adds
+# no layers, only a local.conf toggle). Compose with the base+machine stack:
+#   kas build kas/base.yml:kas/machines/<board>.yml:kas/bpf-labs.yml
+#   make dev BPF=1                                # via Makefile flag
+#
+# Flips EDGE_ENABLE_BTF_CORE_DEV = 1, which adds btf-core-dev.cfg to
+# linux-renesas (CONFIG_DEBUG_INFO_BTF over un-reduced DWARF4 + pahole-native)
+# and pulls packagegroup-edge-bpf (bpftool) into edge-image-dev. Size-heavy:
+# per-module BTF ships in /lib/modules and grows the OTA bundle, so this is
+# kept off the default build. See docs/dev/jtag-kernel-debugging.md.
+header:
+  version: 19
+
+local_conf_header:
+  bpf_labs: |
+    EDGE_ENABLE_BTF_CORE_DEV = "1"

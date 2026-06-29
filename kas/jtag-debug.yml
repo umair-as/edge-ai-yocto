@@ -1,0 +1,18 @@
+# Capability fragment: JTAG/OpenOCD + kgdb source-level kernel debugging.
+#
+# Self-contained: pure additive overlay, no `includes:` and no `repos:` (adds
+# no layers, only a local.conf toggle). Compose with the base+machine stack:
+#   kas build kas/base.yml:kas/machines/<board>.yml:kas/jtag-debug.yml
+#   make dev JTAG=1                               # via Makefile flag
+#
+# Flips EDGE_ENABLE_JTAG_DEBUG = 1, which adds jtag-debug.cfg to linux-renesas
+# (KASLR off, un-reduced DWARF, -Og, kgdb/kdb, lockup detectors out) and makes
+# edge-image-dev pre-place the watchdog-off + sysctl-relax drop-ins so the image
+# boots debug-safe. Low OTA cost: the debug DWARF stays in the build-tree vmlinux
+# and is stripped from the shipped image. See docs/dev/jtag-kernel-debugging.md.
+header:
+  version: 19
+
+local_conf_header:
+  jtag_debug: |
+    EDGE_ENABLE_JTAG_DEBUG = "1"

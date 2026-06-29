@@ -55,6 +55,8 @@ endif
 #   make dev TPM=1         # add meta-secure-core TPM2 + IMA/EVM stack
 #   make dev VIRT=1        # add meta-virtualization (Podman/runc/crun)
 #   make dev SBOM_TUNE=1   # add SBOM/CVE per-build tuning knobs
+#   make dev JTAG=1        # KASLR off + kgdb + debug-safe (JTAG kernel labs)
+#   make dev BPF=1         # kernel BTF + bpftool (libbpf CO-RE labs; size-heavy)
 #
 # Flags compose: `make dev TPM=1 VIRT=1` adds both. Each fragment is a
 # pure additive overlay with no `includes:` — composition is explicit.
@@ -74,6 +76,12 @@ ifeq ($(SBOM_TUNE),1)
 endif
 ifeq ($(NETBOOT),1)
   CAPABILITY_YMLS += kas/dev-netboot.yml
+endif
+ifeq ($(JTAG),1)
+  CAPABILITY_YMLS += kas/jtag-debug.yml
+endif
+ifeq ($(BPF),1)
+  CAPABILITY_YMLS += kas/bpf-labs.yml
 endif
 
 empty :=
@@ -126,6 +134,8 @@ help:
 	@echo "  VIRT=1                       + meta-virtualization (Podman/runc/crun)"
 	@echo "  SBOM_TUNE=1                  + kas/sbom-cve.yml tuning knobs"
 	@echo "  NETBOOT=1                    + U-Boot 'netboot' env macro (TFTP/NFS dev workflow)"
+	@echo "  JTAG=1                       + KASLR off, kgdb, debug-safe boot (JTAG kernel labs)"
+	@echo "  BPF=1                        + kernel BTF + bpftool (libbpf CO-RE labs; size-heavy)"
 	@echo "  EDGE_BOOT_TARGET=emmc        GPT user area + systemd-repart (eMMC boot; default esd)"
 	@echo ""
 	@echo "  Example: make dev NETBOOT=1"
