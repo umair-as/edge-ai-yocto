@@ -21,6 +21,7 @@ RDEPENDS:${PN} = " \
     edge-persistence \
     edge-journald-hardening \
     edge-pstore-persist \
+    edge-watchdog \
     edge-audit \
     packagegroup-edge-security \
     systemd-networkd \
