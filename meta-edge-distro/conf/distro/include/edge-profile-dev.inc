@@ -11,8 +11,8 @@ EDGE_ENABLE_OBSERVABILITY ?= "1"
 # package-management (dnf/rpm at runtime) stays — it's already in
 # edge-image.bbclass IMAGE_FEATURES; the prod profile removes it.
 
-# Dev tier pulls packagegroup-edge-media (via packagegroup-edge-dev), which
-# brings oe-core's gstreamer1.0-plugins-ugly + gstreamer1.0-libav and their
-# faac/faad2/mpeg2dec/x264 sub-deps — all flagged `commercial`. Accept the
-# flag at the profile level so prod (no media stack) doesn't pre-accept it.
+# Dev tier pulls packagegroup-edge-media (via packagegroup-edge-dev), whose
+# camera slice brings gstreamer1.0-plugins-ugly-x264 (H.264 software encode)
+# — flagged `commercial` (H.264 patents). Accept the flag at the profile
+# level so prod (no media stack) doesn't pre-accept it.
 LICENSE_FLAGS_ACCEPTED:append = " commercial"

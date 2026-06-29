@@ -33,12 +33,19 @@ RDEPENDS:${PN}-camera = "v4l-utils"
 # (the OV5645 → CRU → HDMI demo path) and nothing else.
 # multimedia-libs stays from meta-renesas — it's just the VSPM/mmngr/
 # mmngrbuf userspace that vspmfilter needs at runtime.
+#
+# H.264 software encode path for capture/stream demos: x264enc
+# (plugins-ugly-x264) + h264parse (plugins-bad-videoparsersbad). x264
+# carries the `commercial` LICENSE_FLAG (H.264 patents); accepted at the
+# dev profile in edge-profile-dev.inc, so this stays dev-only.
 RDEPENDS:${PN}-camera:append:smarc-rzv2l = " \
     edge-ov5645-init \
     gstreamer1.0 \
     gstreamer1.0-plugins-base \
     gstreamer1.0-plugins-good \
     gstreamer1.0-plugins-bad-waylandsink \
+    gstreamer1.0-plugins-bad-videoparsersbad \
+    gstreamer1.0-plugins-ugly-x264 \
     gstreamer1.0-plugin-vspmfilter \
     packagegroup-multimedia-libs \
 "
