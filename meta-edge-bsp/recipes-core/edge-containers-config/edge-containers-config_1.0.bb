@@ -9,7 +9,7 @@ LICENSE     = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 
 SRC_URI = " \
-    file://50-edge-containers.conf \
+    file://80-edge-containers.conf \
     file://10-edge-network.conf \
     file://podman-quadlet-devel.conf \
 "
@@ -20,8 +20,8 @@ S = "${UNPACKDIR}"
 
 do_install() {
     install -d ${D}${sysconfdir}/sysctl.d
-    install -m 0644 ${UNPACKDIR}/50-edge-containers.conf \
-        ${D}${sysconfdir}/sysctl.d/50-edge-containers.conf
+    install -m 0644 ${UNPACKDIR}/80-edge-containers.conf \
+        ${D}${sysconfdir}/sysctl.d/80-edge-containers.conf
 
     install -d ${D}${sysconfdir}/containers/containers.conf.d
     install -m 0644 ${UNPACKDIR}/10-edge-network.conf \
@@ -54,7 +54,7 @@ pkg_postinst:${PN}() {
 }
 
 FILES:${PN} = " \
-    ${sysconfdir}/sysctl.d/50-edge-containers.conf \
+    ${sysconfdir}/sysctl.d/80-edge-containers.conf \
     ${sysconfdir}/containers/containers.conf.d/10-edge-network.conf \
     ${sysconfdir}/containers/systemd \
     ${nonarch_libdir}/tmpfiles.d/podman-quadlet-devel.conf \
