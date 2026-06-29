@@ -47,12 +47,17 @@ EDGE_DEV_NETBOOT ?= "0"
 
 # EDGE_DEV_DBG_PKGS         — edge-image-dev: dbg-pkgs IMAGE_FEATURE
 # EDGE_KERNEL_DEV_FRAGMENTS — linux-renesas: observability-dev.cfg fragment
+# EDGE_ENABLE_JTAG_DEBUG    — linux-renesas: jtag-debug.cfg fragment;
+#                             edge-image-dev: ships edge-debug-mode drop-ins
+# EDGE_ENABLE_BTF_CORE_DEV  — linux-renesas: btf-core-dev.cfg + pahole-native;
+#                             edge-image-dev: ships bpftool. OFF by default —
+#                             un-reduced DWARF + module BTF bloat the OTA bundle
 
 # ----- Passthrough so operators can flip from the environment --------------
 
 BB_ENV_PASSTHROUGH_ADDITIONS .= " EDGE_PROFILE EDGE_OTA_BACKEND"
 BB_ENV_PASSTHROUGH_ADDITIONS .= " EDGE_ENABLE_DISPLAY EDGE_ENABLE_CONTAINERS EDGE_ENABLE_OBSERVABILITY EDGE_ENABLE_AI"
-BB_ENV_PASSTHROUGH_ADDITIONS .= " EDGE_DEV_NETBOOT EDGE_DEV_DBG_PKGS EDGE_KERNEL_DEV_FRAGMENTS"
+BB_ENV_PASSTHROUGH_ADDITIONS .= " EDGE_DEV_NETBOOT EDGE_DEV_DBG_PKGS EDGE_KERNEL_DEV_FRAGMENTS EDGE_ENABLE_JTAG_DEBUG EDGE_ENABLE_BTF_CORE_DEV"
 
 # RAUC / OTA knobs — declared in their respective recipes (rauc-conf-edge,
 # edge-bundle-common.inc, ota-certs). Passthrough so operators can flip

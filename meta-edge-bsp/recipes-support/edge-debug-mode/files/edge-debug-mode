@@ -1,0 +1,95 @@
+#!/bin/sh
+# edge-debug-mode {on|off|status} [--bootargs]
+#
+# Toggles a JTAG/kgdb-safe relaxation on top of the hardened baseline,
+# reversibly and without a rebuild. "on" disarms the systemd runtime
+# watchdog (a halted core stops PID 1 pinging /dev/watchdog0 -> reset),
+# relaxes the kptr/perf/dmesg/sysrq sysctl clamps, and quiets the soft/
+# hung-task lockup detectors (a JTAG halt fires them on resume, wedging
+# the SD/eMMC path). "off" removes the drop-ins and reapplies the baseline.
+#
+# --bootargs additionally sets nokaslr + maxcpus=1 in the U-Boot
+# EXTRA_KERNEL_ARGS env (needs a reboot to take effect). On a kernel built
+# with EDGE_ENABLE_JTAG_DEBUG=1, KASLR is already compiled out and lockup
+# detectors are absent, so --bootargs only contributes maxcpus=1.
+set -eu
+
+WD_SRC=/usr/share/edge-debug-mode/20-edge-debug-watchdog.conf
+WD_DST=/etc/systemd/system.conf.d/20-edge-debug-watchdog.conf
+SC_SRC=/usr/share/edge-debug-mode/99-edge-debug.conf
+SC_DST=/etc/sysctl.d/99-edge-debug.conf
+
+DEBUG_BOOTARGS="nokaslr maxcpus=1"
+
+die() { echo "edge-debug-mode: $*" >&2; exit 1; }
+[ "$(id -u)" = "0" ] || die "must run as root"
+
+# Set a sysctl only when the key exists (debug kernel omits the detectors).
+try_sysctl() {
+    key=$1; val=$2
+    if [ -e "/proc/sys/$(echo "$key" | tr . /)" ]; then
+        sysctl -wq "$key=$val" || :
+    fi
+}
+
+bootargs_add() {
+    command -v fw_setenv >/dev/null 2>&1 || die "fw_setenv not found (u-boot-fw-utils)"
+    cur=$(fw_printenv -n EXTRA_KERNEL_ARGS 2>/dev/null || echo "")
+    new=$cur
+    for tok in $DEBUG_BOOTARGS; do
+        case " $new " in *" $tok "*) ;; *) new="$new $tok" ;; esac
+    done
+    new=$(echo "$new" | sed 's/^ *//')
+    [ "$new" = "$cur" ] || fw_setenv EXTRA_KERNEL_ARGS "$new"
+    echo "EXTRA_KERNEL_ARGS=$new  (reboot to apply)"
+}
+
+bootargs_del() {
+    command -v fw_setenv >/dev/null 2>&1 || return 0
+    cur=$(fw_printenv -n EXTRA_KERNEL_ARGS 2>/dev/null || echo "")
+    new=$cur
+    for tok in $DEBUG_BOOTARGS; do
+        new=$(echo " $new " | sed "s/ $(echo "$tok" | sed 's/[].[*\/]/\\&/g') / /g")
+    done
+    new=$(echo "$new" | sed 's/^ *//;s/ *$//;s/  */ /g')
+    [ "$new" = "$cur" ] || fw_setenv EXTRA_KERNEL_ARGS "$new"
+    echo "EXTRA_KERNEL_ARGS=$new  (reboot to apply)"
+}
+
+case "${1:-}" in
+on)
+    install -D -m 0644 "$WD_SRC" "$WD_DST"
+    install -D -m 0644 "$SC_SRC" "$SC_DST"
+    systemctl daemon-reexec
+    # Apply live explicitly — immune to sysctl.d file ordering (systemd's
+    # 50-default.conf would otherwise re-pin kernel.sysrq). The 99- drop-in
+    # carries the same values across reboot.
+    sysctl -wq kernel.kptr_restrict=0 kernel.perf_event_paranoid=-1 \
+               kernel.dmesg_restrict=0 kernel.sysrq=1
+    try_sysctl kernel.watchdog 0
+    try_sysctl kernel.hung_task_timeout_secs 0
+    echo "debug mode ON: watchdog disarmed, sysctl clamps relaxed, detectors quiet"
+    if [ "${2:-}" = "--bootargs" ]; then bootargs_add; fi
+    ;;
+off)
+    rm -f "$WD_DST" "$SC_DST"
+    systemctl daemon-reexec
+    systemctl restart systemd-sysctl
+    try_sysctl kernel.watchdog 1
+    try_sysctl kernel.hung_task_timeout_secs 120
+    echo "debug mode OFF: hardened baseline reapplied"
+    if [ "${2:-}" = "--bootargs" ]; then bootargs_del; fi
+    ;;
+status)
+    echo "RuntimeWatchdog: $(systemctl show -p RuntimeWatchdogUSec --value)"
+    echo "drop-ins:        $([ -e "$WD_DST" ] && echo watchdog-off) $([ -e "$SC_DST" ] && echo sysctl-relax)"
+    for k in kernel.kptr_restrict kernel.perf_event_paranoid kernel.dmesg_restrict \
+             kernel.sysrq kernel.watchdog kernel.hung_task_timeout_secs; do
+        v=$(sysctl -n "$k" 2>/dev/null || echo "n/a")
+        printf '%-32s %s\n' "$k" "$v"
+    done
+    ;;
+*)
+    die "usage: edge-debug-mode {on|off|status} [--bootargs]"
+    ;;
+esac

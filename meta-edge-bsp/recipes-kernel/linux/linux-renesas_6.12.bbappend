@@ -21,6 +21,42 @@ SRC_URI:append = " \
 EDGE_KERNEL_DEV_FRAGMENTS ?= "1"
 SRC_URI:append = "${@' file://cfg/observability-dev.cfg file://cfg/crash-debug-dev.cfg' if d.getVar('EDGE_KERNEL_DEV_FRAGMENTS') == '1' else ''}"
 
+# BTF/CO-RE — independent, OFF by default. btf-core-dev.cfg turns on in-kernel
+# BTF (CONFIG_DEBUG_INFO_BTF + _MODULES) over un-reduced DWARF; the build runs
+# pahole to emit the .BTF section. Three things are required, all gated together:
+#   - btf-core-dev.cfg (the CONFIG_* request)
+#   - pahole-native in DEPENDS (meta-oe pahole v1.31; the generator)
+#   - KERNEL_DEBUG="True", which makes linux-yocto.inc drop its default
+#     `PAHOLE=false` from the config-time make and add pahole-native to
+#     do_kernel_configme. Without it, CONFIG_PAHOLE_VERSION probes `false`,
+#     resolves to 0, and Kconfig silently drops DEBUG_INFO_BTF even though
+#     pahole is in the sysroot.
+# Un-reduced DWARF + per-module BTF inflate /lib/modules and the OTA bundle, so
+# this is its own gate (separate from JTAG): off for DRP-AI/edge-AI builds, on
+# only for libbpf/CO-RE labs.
+EDGE_ENABLE_BTF_CORE_DEV ?= "0"
+SRC_URI:append = "${@' file://cfg/btf-core-dev.cfg' if d.getVar('EDGE_ENABLE_BTF_CORE_DEV') == '1' else ''}"
+DEPENDS:append = "${@' pahole-native' if d.getVar('EDGE_ENABLE_BTF_CORE_DEV') == '1' else ''}"
+KERNEL_DEBUG = "${@'True' if d.getVar('EDGE_ENABLE_BTF_CORE_DEV') == '1' else ''}"
+
+# JTAG/OpenOCD source-level kernel-debug fragment — opt-in, off by default.
+# Appended last so its KASLR/lockup-detector overrides win the merge over
+# crash-debug-dev.cfg. do_kernel_configcheck flags those two symbols as a
+# requested-vs-final mismatch; that is the intended override, not an error.
+EDGE_ENABLE_JTAG_DEBUG ?= "0"
+SRC_URI:append = "${@' file://cfg/jtag-debug.cfg' if d.getVar('EDGE_ENABLE_JTAG_DEBUG') == '1' else ''}"
+
+# Generate the in-tree gdb helpers' constants.py (lx-ps, lx-dmesg, lx-symbols).
+# CONFIG_GDB_SCRIPTS=y (jtag-debug.cfg) builds the infra, but constants.py is
+# only produced by `make scripts_gdb`; without it `source vmlinux-gdb.py` fails
+# with "No module named 'linux'". Emitted into ${B}/scripts/gdb/ for the host
+# debugger to source. Gated on the JTAG toggle — no cost on normal builds.
+do_compile:append() {
+    if [ "${EDGE_ENABLE_JTAG_DEBUG}" = "1" ]; then
+        oe_runmake scripts_gdb
+    fi
+}
+
 # display-rzv2l.cfg: RZ/G2L DU + MIPI-DSI + Lontium LT8912B bridge are =m
 # in defconfig; force built-in so the pipeline is up at boot without
 # depending on userspace autoload or which kernel-module-* land in rootfs.

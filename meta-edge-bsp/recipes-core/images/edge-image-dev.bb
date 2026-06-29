@@ -39,7 +39,7 @@ IMAGE_FEATURES:append = " \
 # is added by editing a packagegroup recipe in
 # meta-edge-bsp/recipes-core/packagegroups/, not this file. Ad-hoc tools:
 # `dnf install` at runtime (package-management is on via edge-image.bbclass).
-IMAGE_INSTALL:append = " packagegroup-edge-dev edge-sudoers-nopasswd"
+IMAGE_INSTALL:append = " packagegroup-edge-dev edge-sudoers-nopasswd edge-debug-mode"
 # edge-sudoers-nopasswd is the bench-tier sub-package of edge-sudoers; it
 # ships 15-edge-wheel-nopasswd which lexically overrides 10-edge-wheel
 # and makes %wheel passwordless. edge-image-base intentionally omits it
@@ -57,3 +57,19 @@ IMAGE_INSTALL:append:smarc-rzv2l = " packagegroup-edge-optee-test"
 # variable for per-build opt-in.
 EDGE_DEV_DBG_PKGS ?= "0"
 IMAGE_FEATURES:append = "${@' dbg-pkgs' if d.getVar('EDGE_DEV_DBG_PKGS') == '1' else ''}"
+
+# JTAG/OpenOCD source-level kernel debugging. Off by default. When "1":
+# linux-renesas adds jtag-debug.cfg (KASLR off, un-reduced DWARF, -Og, lockup
+# detectors out, kgdb in), and edge-debug-mode pre-places the watchdog-off
+# + sysctl-relax drop-ins so the image boots debug-safe. Pairs with
+# EDGE_DEV_DBG_PKGS=1 for on-target -dbg symbols. Cheap on OTA size: the
+# debug DWARF lives in the build-tree vmlinux and is stripped from the image.
+EDGE_ENABLE_JTAG_DEBUG ?= "0"
+
+# BPF/CO-RE labs. Off by default — this is the size-heavy toggle (kernel BTF
+# over un-reduced DWARF + per-module BTF in /lib/modules grow the OTA bundle).
+# When "1": linux-renesas adds btf-core-dev.cfg (/sys/kernel/btf/vmlinux) and
+# the image pulls packagegroup-edge-bpf (bpftool, ...). Leave off for
+# DRP-AI/edge-AI builds.
+EDGE_ENABLE_BTF_CORE_DEV ?= "0"
+IMAGE_INSTALL:append = "${@' packagegroup-edge-bpf' if d.getVar('EDGE_ENABLE_BTF_CORE_DEV') == '1' else ''}"
