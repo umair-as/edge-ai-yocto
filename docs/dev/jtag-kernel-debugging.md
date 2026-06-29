@@ -143,10 +143,16 @@ the full host setup. Summary:
    KASLR kernel you'd instead `add-symbol-file vmlinux -o <slide>` after reading
    runtime `_text`; the debug-profile kernel needs none of that.
 
-**The load-bearing gotcha:** halting a live *SMP* kernel stalls the
-unhalted core and the rootfs storage controller; expect SD/eMMC timeouts and
-soft-lockup unless the detectors are off (Layer 1) and ideally `maxcpus=1`
-(step 1). Halt early or single-core for clean sessions.
+**Two load-bearing gotchas** (both validated, both covered in `jtag/README.md`):
+- **Breakpoints need the single-core config** (`jtag/rzv2l-core0.cfg`). The
+  full SMP target mirrors the breakpoint to the unattached `a55.1` and the
+  insert fails; declaring only `a55.0` lets `hbreak` land. Use the full
+  `rzv2l-openocd.cfg` for scan/registers/backtrace, `rzv2l-core0.cfg` for
+  breakpoints/stepping.
+- **Sustained halts wedge an eMMC rootfs** (`renesas_sdhi` timeout). Either pin
+  the eMMC IRQ to the still-running `a55.1` (`echo 2 > /proc/irq/<N>/smp_affinity`
+  — validated to zero timeouts over a 25 s halt) or boot NFS-root (`NETBOOT=1`).
+  Brief sub-second halts on eMMC are fine.
 
 When finished, exit debug mode:
 
