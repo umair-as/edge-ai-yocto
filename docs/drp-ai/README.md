@@ -6,10 +6,7 @@ A ResNet-18 classifier auto-starts at boot inside a **rootless Podman container*
 executes on the **DRP-AI** accelerator in **~28 ms**, and never touches an interactive
 login or a graphical session — on a hardened, RAUC A/B, OTA-updatable platform.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="diagrams/rzv2l-drpai-pipeline.dark.svg">
-  <img alt="EDGE AI OS — RZ/V2L DRP-AI: author and export a model to ONNX, compile it on the build host, deploy to the device via RAUC A/B and /data, and run it in a rootless container on the DRP-AI NPU." src="diagrams/rzv2l-drpai-pipeline.svg">
-</picture>
+![EDGE AI OS — RZ/V2L DRP-AI: author and export a model to ONNX, compile it on the build host, deploy the compiled artifact to persistent /data on the device, and run it in a rootless container on the DRP-AI NPU.](diagrams/rzv2l-drpai-pipeline.svg)
 
 > **Why this exists.** The vendor's reference path for DRP-AI is a Weston/GUI demo, run
 > as **root**, on a vendor BSP image — fine for a first look at the silicon, not what
