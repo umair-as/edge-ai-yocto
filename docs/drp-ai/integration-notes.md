@@ -89,6 +89,13 @@ the markers are present when it scans. With that, the principal's user manager c
 at boot on its own, its Quadlet generates, and the inference runs — no human in the
 loop.
 
+That closes the **fresh-flash** case. It does **not** yet close the **post-OTA** case:
+after a RAUC slot switch, logind's linger enumeration fails on a `default_t`-labeled
+`/var/lib/systemd` (a `User enumeration failed` log plus an SELinux AVC), so `user@608`
+never starts and the Quadlet does not auto-run until the tree is relabelled. The ordering
+fix above is validated as-deployed, not yet from a clean full-image build — see
+[Status & roadmap](README.md#status--roadmap).
+
 ## Why a dedicated principal, not the operator login
 
 An interactive developer login and a headless service runtime are two different trust

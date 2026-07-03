@@ -17,7 +17,7 @@ It is the centre of gravity for two reasons:
 
 1. **It is the on-device runtime.** The libraries this platform ships
    (packaged by the `drpai-tvm-runtime` recipe, see
-   [the runtime layer](README.md#4-the-runtime-layer)) come straight from
+   [the runtime layer](README.md#architecture--how-the-pieces-fit)) come straight from
    this project. Nothing runs on the board without it.
 2. **It is the model compiler.** The same project provides the MERA/TVM
    compiler and the `compile_*` tutorial scripts that turn an ONNX /
@@ -83,6 +83,9 @@ build context, never committed):
 docker build -f Dockerfile.v2l -t drpai-tvm-v2l:<tag> "$DRPAI_BUILD"
 ```
 
+`$DRPAI_BUILD` is the compile-env checkout — the build context that holds
+`Dockerfile.v2l` and the staged Translator installer.
+
 ## Mount the SDK at its install path (the one gotcha)
 
 The cross SDK is relocatable, but the relocation is fixed at *install*
@@ -138,7 +141,7 @@ The output directory is the deployable model:
   normalise / format conversion that runs *on the accelerator* before
   inference.
 
-On the device, the runtime ([runtime layer](README.md#4-the-runtime-layer))
+On the device, the runtime ([runtime layer](README.md#architecture--how-the-pieces-fit))
 loads this directory and drives the accelerator. The artifact has a low
 glibc floor, so it isn't tied to the exact toolchain of the rootfs that
 runs it. Deploying it is just placing the directory where the workload
@@ -306,14 +309,15 @@ produced. Two honest caveats:
 - The compiler container is currently assembled from host-staged AI SDK
   inputs. A fully **pinned, reproducible-from-scratch** compile
   environment is tracked as roadmap (see the integration doc's
-  [Status and roadmap](README.md#status-and-roadmap)).
+  [Status & roadmap](README.md#status--roadmap)).
 - The **compile** side is exercised across classes — classification,
   segmentation, and detection all compile through this flow (see the
-  four-model table above). **On-device execution** is proven for
-  classification only; the detection/segmentation artifacts have been
-  compiled and their DRP-AI partition inspected, but not yet run on the
-  board, and their CPU-side post-processing (detection-head decode) is not
-  yet built into an application.
+  four-model table above). On hardware, all three have been **profiled for
+  latency and work-placement** (see
+  [benchmarking-models.md](benchmarking-models.md)); **output correctness**
+  is validated for classification only, and the detection models' CPU-side
+  post-processing (detection-head decode) is not yet built into an
+  application.
 
 ## References
 

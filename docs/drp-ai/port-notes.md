@@ -1,9 +1,9 @@
 # Porting the DRP-AI driver to linux-cip 6.12
 
 Notes on forward-porting the Renesas DRP-AI kernel driver from its **6.1** baseline
-to the **linux-cip 6.12** the platform standardises on, and on how the driver is
-sourced. Orientation for this integration lives in the [README](README.md); this is
-the how.
+to the **linux-cip 6.12** the platform standardises on (the CIP Super-LTS base, see
+[ADR-0001](../adr/0001-kernel-base.md)), and on how the driver is sourced. Orientation
+for this integration lives in the [README](README.md); this is the how.
 
 Driver source: **[github.com/umair-as/rzv2l-drpai-driver](https://github.com/umair-as/rzv2l-drpai-driver)**
 (GPL-2.0), fetched by the `kernel-module-drpai` recipe, pinned by commit.
@@ -21,7 +21,7 @@ is wrong, and the reason is the whole point:
 > architecture in the [integration notes](integration-notes.md)). So the dma-buf churn
 > that dominates other drivers' forward-ports simply isn't in this one's surface.
 
-## The API drift — five small fixes
+## The API drift — a handful of small fixes
 
 Ordinary drift, version-guarded with `LINUX_VERSION_CODE` so the same source still
 builds against 6.1:

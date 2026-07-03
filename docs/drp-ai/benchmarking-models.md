@@ -123,7 +123,7 @@ Board RZ/V2L, kernel 6.12.43-cip7, `performance` governor. Steady `Run()`:
 | YOLOX-L @320 | ~206 | ~206 | 199 | **98 %** |
 | DeepLabv3-r50 @224 | ~346 | ~346 | 312 | **99.95 %** |
 
-All land within ~10–15 % of Renesas' published figures — the check that the
+All land within ~15 % of Renesas' published figures — the check that the
 method is sound.
 
 ## The finding to reproduce
