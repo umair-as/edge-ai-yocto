@@ -128,6 +128,8 @@ method is sound.
 
 ## The finding to reproduce
 
+![DRP-AI NPU vs CPU — measured Run() split on RZ/V2L: DeepLabv3-r50 99.95% NPU and YOLOX-L 98% NPU, but YOLOv5s only 21% NPU because its 6×6 stride-2 stem conv falls back to CPU and is 58% of inference.](diagrams/npu-cpu-split.svg)
+
 The two detectors look identical in the static partition (each: one `mera_drp`
 subgraph plus a few CPU ops). At runtime they are **opposite**:
 
