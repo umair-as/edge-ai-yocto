@@ -9,9 +9,9 @@ LICENSE     = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=0ba5044c64ef53cb0189c9546081e228"
 BUGTRACKER  = "https://github.com/renesas-rz/rzv_drp-ai_tvm/issues"
 
-SRC_URI = "git://github.com/renesas-rz/rzv_drp-ai_tvm.git;protocol=https;branch=main"
-# Release-2026-04-17 (matches drpai-tvm-runtime)
-SRCREV  = "110048ecadc6a997628d9a79024b9d59ae2ef7ea"
+require recipes-support/drpai-tvm/drpai-tvm-src.inc
+SRC_URI = "${DRPAI_TVM_GIT}"
+SRCREV  = "${DRPAI_TVM_SRCREV}"
 
 COMPATIBLE_MACHINE = "smarc-rzv2l"
 
