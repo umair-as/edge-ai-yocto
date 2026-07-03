@@ -1,0 +1,39 @@
+<svg viewBox="0 0 1280 600" xmlns="http://www.w3.org/2000/svg" font-family="Inter,'IBM Plex Sans','Segoe UI',system-ui,'Liberation Sans',sans-serif">
+<title>DRP-AI NPU vs CPU — measured Run() split on RZ/V2L</title>
+<rect width="1280" height="600" fill="#FFFFFF"/>
+<text x="48" y="66" font-size="26" font-weight="700" fill="#0F172A">Where the accelerator actually runs</text>
+<text x="48" y="94" font-size="14" fill="#64748B">RZ/V2L &#183; on-hardware Run() time split &#183; kernel 6.12.43-cip7 &#183; performance governor</text>
+<rect x="872" y="46" width="360" height="30" rx="15" fill="#F7F9FC" stroke="#D3DAE6" stroke-width="1"/>
+<rect x="890" y="56" width="10" height="10" rx="2" fill="#0891B2"/>
+<text x="906" y="65" font-size="12" fill="#64748B">DRP-AI NPU</text>
+<rect x="1008" y="56" width="10" height="10" rx="2" fill="#D97706"/>
+<text x="1024" y="65" font-size="12" fill="#64748B">CPU fallback</text>
+<rect x="1126" y="56" width="10" height="10" rx="2" fill="#94A3B8"/>
+<text x="1142" y="65" font-size="12" fill="#64748B">CPU glue</text>
+<text x="48" y="174" font-size="15.5" font-weight="600" fill="#0F172A">DeepLabv3-r50</text>
+<text x="48" y="193" font-size="11.5" fill="#94A3B8">segmentation @224</text>
+<rect x="360" y="150" width="780" height="58" rx="8" fill="#F7F9FC" stroke="#D3DAE6" stroke-width="1"/>
+<rect x="360.0" y="150" width="779.6" height="58" rx="6" fill="#0891B2"/>
+<text x="749.8" y="184.0" font-size="12.5" font-weight="600" fill="#FFFFFF" text-anchor="middle">NPU 99.95%</text>
+<text x="1156" y="184.0" font-size="14" font-weight="600" fill="#0891B2" font-family="'JetBrains Mono','IBM Plex Mono','DejaVu Sans Mono',monospace">346 ms</text>
+<text x="48" y="284" font-size="15.5" font-weight="600" fill="#0F172A">YOLOX-L</text>
+<text x="48" y="303" font-size="11.5" fill="#94A3B8">detection (anchor-free) @320</text>
+<rect x="360" y="260" width="780" height="58" rx="8" fill="#F7F9FC" stroke="#D3DAE6" stroke-width="1"/>
+<rect x="360.0" y="260" width="764.4" height="58" rx="6" fill="#0891B2"/>
+<text x="742.2" y="294.0" font-size="12.5" font-weight="600" fill="#FFFFFF" text-anchor="middle">NPU 98%</text>
+<rect x="1124.4" y="260" width="15.6" height="58" rx="6" fill="#94A3B8"/>
+<text x="1156" y="294.0" font-size="14" font-weight="600" fill="#0891B2" font-family="'JetBrains Mono','IBM Plex Mono','DejaVu Sans Mono',monospace">206 ms</text>
+<text x="48" y="394" font-size="15.5" font-weight="600" fill="#0F172A">YOLOv5s</text>
+<text x="48" y="413" font-size="11.5" fill="#94A3B8">detection @320</text>
+<rect x="360" y="370" width="780" height="58" rx="8" fill="#F7F9FC" stroke="#D3DAE6" stroke-width="1"/>
+<rect x="360.0" y="370" width="163.8" height="58" rx="6" fill="#0891B2"/>
+<text x="441.9" y="404.0" font-size="12.5" font-weight="600" fill="#FFFFFF" text-anchor="middle">NPU 21%</text>
+<rect x="523.8" y="370" width="452.4" height="58" rx="6" fill="#D97706"/>
+<text x="750.0" y="404.0" font-size="12.5" font-weight="600" fill="#FFFFFF" text-anchor="middle">stem conv 58%</text>
+<rect x="976.2" y="370" width="163.8" height="58" rx="6" fill="#94A3B8"/>
+<text x="1058.1" y="404.0" font-size="12.5" font-weight="600" fill="#FFFFFF" text-anchor="middle">head + glue 21%</text>
+<text x="1156" y="404.0" font-size="14" font-weight="600" fill="#0891B2" font-family="'JetBrains Mono','IBM Plex Mono','DejaVu Sans Mono',monospace">187 ms</text>
+<text x="48" y="484" font-size="12.5" fill="#D97706">&#9650; YOLOv5s: the 6&#215;6 stride-2 stem conv does not place on gen-1 DRP-AI &#8594; runs on CPU, 58% of inference.</text>
+<text x="48" y="562" font-size="13" fill="#64748B">Static partition (deploy.json) shows <tspan font-weight="700">which</tspan> ops fall to CPU; only the on-hardware profile shows they can <tspan font-weight="700" fill="#0F172A">dominate</tspan>.</text>
+<text x="48" y="582" font-size="13" fill="#94A3B8">Necessary, not sufficient &#8212; profile a new model on hardware before trusting any latency estimate.</text>
+</svg>

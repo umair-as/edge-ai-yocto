@@ -17,7 +17,7 @@ It is the centre of gravity for two reasons:
 
 1. **It is the on-device runtime.** The libraries this platform ships
    (packaged by the `drpai-tvm-runtime` recipe, see
-   [the runtime layer](README.md#4-the-runtime-layer)) come straight from
+   [the runtime layer](README.md#architecture--how-the-pieces-fit)) come straight from
    this project. Nothing runs on the board without it.
 2. **It is the model compiler.** The same project provides the MERA/TVM
    compiler and the `compile_*` tutorial scripts that turn an ONNX /
@@ -83,6 +83,9 @@ build context, never committed):
 docker build -f Dockerfile.v2l -t drpai-tvm-v2l:<tag> "$DRPAI_BUILD"
 ```
 
+`$DRPAI_BUILD` is the compile-env checkout — the build context that holds
+`Dockerfile.v2l` and the staged Translator installer.
+
 ## Mount the SDK at its install path (the one gotcha)
 
 The cross SDK is relocatable, but the relocation is fixed at *install*
@@ -138,7 +141,7 @@ The output directory is the deployable model:
   normalise / format conversion that runs *on the accelerator* before
   inference.
 
-On the device, the runtime ([runtime layer](README.md#4-the-runtime-layer))
+On the device, the runtime ([runtime layer](README.md#architecture--how-the-pieces-fit))
 loads this directory and drives the accelerator. The artifact has a low
 glibc floor, so it isn't tied to the exact toolchain of the rootfs that
 runs it. Deploying it is just placing the directory where the workload
@@ -160,6 +163,144 @@ Classification is the simplest case (a single output vector); detection,
 segmentation, and pose add CPU-side post-processing that lives in the
 application, not the compile.
 
+## The export step: getting an ONNX in the first place
+
+The `compile_*` scripts take a model file as input, but many models are
+not *distributed* as a ready ONNX. Classifiers from the ONNX model zoo
+(ResNet-18, MobileNetV2) are — download the `.onnx` and compile it. Most
+detection / segmentation / pose models are not: they ship as framework
+checkpoints (`.pt`, torchvision weights, TFLite) and must be **exported**
+to ONNX before the compile step.
+
+Export is a *source-framework* operation, not a DRP-AI one, and it wants
+the framework's own pinned environment. Two things make it awkward, and
+both have a fixed answer:
+
+- **Python version.** The upstream export recipes pin old framework
+  versions (e.g. `torch==2.3.1`). These resolve cleanly on Python 3.10 and
+  fight a modern host Python. The compiler image is already Ubuntu 22.04 /
+  Python 3.10, so run the export **inside that same image** — a throwaway
+  virtualenv, bind-mounting an output directory to keep the resulting ONNX
+  on the host. The image is `--rm`; nothing about the export persists in it.
+- **CUDA vs CPU wheels.** A model repo's `requirements.txt` frequently
+  pulls a **CUDA** build of `torch` (e.g. `2.4.1+cu121`) over a CPU pin, so
+  a plain `pip install torch==<ver>` followed by `-r requirements.txt`
+  silently ends up on a GPU wheel. On a CPU build host that is heavier and
+  off-recipe. Force the CPU build with an explicit index and re-assert it
+  **after** `requirements.txt` so it wins:
+
+  ```sh
+  pip install torch==2.3.1 torchvision==0.18.1 \
+      --index-url https://download.pytorch.org/whl/cpu
+  # ... pip install -r requirements.txt ...
+  pip install torch==2.3.1 torchvision==0.18.1 \
+      --index-url https://download.pytorch.org/whl/cpu   # re-assert CPU wins
+  ```
+
+The per-model export procedure (which repo, which weights, which
+`--imgsz`, which opset) is in the project's how-to pages under
+`docs/model_list/how_to_convert/`, one file per family
+(`How_to_convert_yolov5_onnx_models_V2L_V2M_V2MA.md`, etc.). Note the
+input shape there can differ from the shape the V2L benchmark table uses —
+e.g. the YOLOv5 how-to exports at 640, but the V2L-profiled configuration
+is 320; export at the shape you intend to run. Confirm the exported model's
+input node name and shape before compiling — that name is the `-i`
+argument and the shape is `-s`:
+
+```sh
+python3 -c 'import onnx; m=onnx.load("model.onnx"); \
+  print([(i.name,[d.dim_value for d in i.type.tensor_type.shape.dim]) \
+  for i in m.graph.input])'
+```
+
+## Reading which operators ran on CPU
+
+The flow's CPU-fallback is automatic and *silent* — the compile succeeds
+whether the whole model mapped to the accelerator or half of it fell back
+to CPU. The partition it chose is recorded in `deploy.json`, not printed.
+Read it there.
+
+Each accelerator subgraph is a `tvm_op` node whose `attrs.Compiler` is
+`mera_drp`; everything else is CPU-side TVM (real CPU operators, or trivial
+`__nop` reshapes). A clean, fully-offloaded model has **exactly one**
+`mera_drp` subgraph and nothing but nops around it:
+
+```sh
+python3 -c '
+import json, collections
+d = json.load(open("deploy.json"))
+ops = [n for n in d["nodes"] if n["op"] == "tvm_op"]
+drp = [n for n in ops if (n.get("attrs") or {}).get("Compiler") == "mera_drp"]
+cpu = [n for n in ops if (n.get("attrs") or {}).get("Compiler") != "mera_drp"]
+print("mera_drp subgraphs:", len(drp))
+print("CPU-side tvm ops   :", collections.Counter(
+    (n.get("attrs") or {}).get("func_name","?") for n in cpu))'
+```
+
+- **One `mera_drp` subgraph, only `__nop` on CPU** → the accelerator ran
+  the whole network end to end.
+- **One `mera_drp` subgraph, a few real CPU ops** → the convolutional body
+  ran on the accelerator; the CPU ops are the non-convolutional "glue" the
+  backend leaves behind — input casts/slices at the head, and the
+  detection-head decode (`reshape`/`transpose`/`strided_slice`/`concat` plus
+  the box math) at the tail. Expected for detectors, not a gap.
+- **Several `mera_drp` subgraphs** → the graph was *split*: the compiler hit
+  an operator it can't place mid-graph, ran it on CPU, and resumed on the
+  accelerator after. This is the failure mode to watch for — but see the
+  observation below: it did **not** occur for any model tried on V2L.
+
+### What V2L actually did (four models, measured)
+
+Every model compiled so far — across classification, segmentation, and
+detection — produced **exactly one** `mera_drp` subgraph. The backend maps
+the entire convolutional feature-extraction graph to the accelerator in a
+single piece; the only CPU work is head/tail glue. No model fragmented into
+multiple subgraphs.
+
+| Model | Task | `mera_drp` subgraphs | CPU-side ops |
+|---|---|---|---|
+| MobileNetV2 @224 | classification | 1 | none (`__nop` only) |
+| DeepLabv3-r50 @224 | segmentation | 1 | none |
+| YOLOv5s @320 | detection | 1 | head decode (sigmoid/anchor) |
+| YOLOX-L @320 | detection (anchor-free) | 1 | input slice + head decode |
+
+The segmentation result is the notable one: dilated convolutions, the ASPP
+module, and bilinear upsampling all mapped to the accelerator with **zero**
+CPU fallback.
+
+The subgraph count is a useful *first* signal — it turns "does it run on the
+accelerator?" into a countable fact before hardware. But it is **not**
+sufficient, and the next section is why.
+
+### Static partition is necessary, not sufficient — measure the weight
+
+`deploy.json` shows *which* ops fall to CPU. It does **not** show how much
+they *cost*. On hardware, that gap is decisive. The runtime's own per-op
+profiler (`ProfileRun`, exposed by the `drpai-runner` benchmark) measured
+this on the board (RZ/V2L, 6.12.43-cip7, `performance` governor); the split
+of end-to-end `Run()` time:
+
+| Model | NPU subgraph | CPU-side ops | Verdict |
+|---|---|---|---|
+| DeepLabv3-r50 @224 | **99.95 %** | ~0 | NPU-bound |
+| YOLOX-L @320 | **98 %** | head decode + slice ≈ 2 % | NPU-bound |
+| YOLOv5s @320 | **21 %** | **stem conv 58 %** + head decode 13 % + cast | **CPU-bound** |
+
+The two detectors look *identical* in the static table above — each is "one
+`mera_drp` subgraph plus CPU ops." At runtime they are opposites. YOLOX-L is
+98 % accelerator. YOLOv5s spends **58 % of its inference in a single CPU
+convolution** — its 6×6 stride-2 stem conv (the Focus-replacement) does not
+place on gen-1 DRP-AI, so it runs on the A55 and dominates; the actual NPU
+backbone is only ~21 % of the time. YOLOX-L's plain 3×3 stem places fine.
+
+So the CPU fallback is **not** always lightweight "post-processing glue" — it
+can be a heavyweight body convolution that determines the whole latency, and
+which one it is depends on the model's stem/architecture, not on the task
+type. The actionable rule for gen-1 V2L: a large-kernel, high-resolution stem
+conv is a fallback risk; profile the compiled model on hardware before
+trusting a latency estimate. Static analysis scopes the question; only the
+runtime profile answers it.
+
 ## Status
 
 This procedure is **proven** — it is how the validated on-device model was
@@ -168,10 +309,15 @@ produced. Two honest caveats:
 - The compiler container is currently assembled from host-staged AI SDK
   inputs. A fully **pinned, reproducible-from-scratch** compile
   environment is tracked as roadmap (see the integration doc's
-  [Status and roadmap](README.md#status-and-roadmap)).
-- Only classification has been taken end-to-end so far; detection /
-  segmentation / pose compile through the same flow, but their on-device
-  post-processing is not yet built.
+  [Status & roadmap](README.md#status--roadmap)).
+- The **compile** side is exercised across classes — classification,
+  segmentation, and detection all compile through this flow (see the
+  four-model table above). On hardware, all three have been **profiled for
+  latency and work-placement** (see
+  [benchmarking-models.md](benchmarking-models.md)); **output correctness**
+  is validated for classification only, and the detection models' CPU-side
+  post-processing (detection-head decode) is not yet built into an
+  application.
 
 ## References
 
