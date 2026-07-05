@@ -19,8 +19,8 @@ EU Cyber Resilience Act, Annex I (essential cybersecurity requirements). This ta
 
 | Sub-requirement | Status | Implementation |
 |---|---|---|
-| 1.a — Minimum attack surface (no unnecessary services) | ✅ | Base image is minimal Weston; dev image opt-in via packagegroups. `tools-debug` / `tools-profile` only in `edge-image-dev`. No demo / sample daemons. |
-| 1.b — Hardened build flags | ✅ | `security_flags.bbclass` auto-inherited. `SECURITY_CFLAGS` = `-fstack-protector-strong -O2 -D_FORTIFY_SOURCE=2 -Wformat -Wformat-security -Werror=format-security`. Userspace built PIE. |
+| 1.a — Minimum attack surface (no unnecessary services) | ✅ | Base image is minimal Weston; dev image opt-in via packagegroups. `tools-debug` / `tools-profile` only in `edge-image-dev`. No demo / sample daemons. U-Boot surface reduction via `EDGE_UBOOT_FEATURES` — see [uboot-hardening.md](uboot-hardening.md). |
+| 1.b — Hardened build flags | ✅ | `security_flags.bbclass` auto-inherited. `SECURITY_CFLAGS` = `-fstack-protector-strong -O2 -D_FORTIFY_SOURCE=2 -Wformat -Wformat-security -Werror=format-security`. Userspace built PIE. U-Boot stack canary via `CONFIG_STACKPROTECTOR=y` (see uboot-hardening.md). |
 | 1.c — Kernel hardening | ✅ | `security-hardening.cfg` fragment + `rauc_set_bootargs` tokens (init_on_alloc, slab_nomerge, page_alloc.shuffle, randomize_kstack_offset, vsyscall=none). LSM stack `CONFIG_LSM="lockdown,yama,bpf,landlock,selinux"` — lockdown (early, `SECURITY_LOCKDOWN_LSM_EARLY=y`) + landlock compiled in. |
 | 1.d — Sysctl baseline | ✅ | `edge-sysctl-hardening` — CIS L1. |
 | 1.e — Read-only rootfs | 📅 | Prod tier — separate `edge-image-prod.bb` (not in this iteration). |

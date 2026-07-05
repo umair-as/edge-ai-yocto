@@ -7,6 +7,20 @@ EDGE AI OS is designed to satisfy the essential cybersecurity requirements of EU
 - The runtime is **CIS Level 1-aligned by default**, with additional hardening controls on the prod-tier roadmap.
 - Every control is **documented and verifiable on-board**, so the implementation can be mapped to CRA Annex I requirements.
 
+Documents here:
+
+- [`README.md`](README.md) — this orientation page.
+- [`CRA-CONTROLS.md`](CRA-CONTROLS.md) — per-requirement status table.
+- [`uboot-hardening.md`](uboot-hardening.md) — U-Boot surface-reduction
+  architecture, feature tokens, and per-symbol rationale.
+- [`selinux-101.md`](selinux-101.md) — SELinux mental model + the
+  `meta-selinux` wiring on this distro.
+- [`sbom-cve-triage.md`](sbom-cve-triage.md) — reading the SBOM + CVE
+  artifacts and the `CVE_STATUS` triage workflow (`scripts/sbom-cve-report.py`).
+- [`foss-cra-tooling-survey.md`](foss-cra-tooling-survey.md) — mid-2026 market
+  survey of the FOSS vuln-management stack (VEX, scanners, Dependency-Track,
+  VulnScout) and an honest view of its strengths and limits.
+
 ## What's enabled today (current image)
 
 | Surface | Mechanism | Recipe / config |
