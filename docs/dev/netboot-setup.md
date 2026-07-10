@@ -42,8 +42,8 @@ NFS path on eth0 is undisturbed; `eth1` is the DHCP uplink.
 At the U-Boot prompt:
 
 ```
-setenv ipaddr 192.168.0.232          # board's static IP
-setenv serverip 192.168.0.10         # TFTP/NFS host
+setenv ipaddr 192.168.0.100          # board's static IP — pick a free one on the bench subnet
+setenv serverip 192.168.0.2          # TFTP/NFS host — setup-tftp-nfs.sh prints this
 setenv netmask 255.255.255.0
 setenv nfs_export /srv/nfs/edge-image-dev
 saveenv
