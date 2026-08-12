@@ -1,25 +1,31 @@
 # CLAUDE.md
 
-Claude-Code-specific notes layered on top of `AGENTS.md`. Read
-`AGENTS.md` first.
+This file provides guidance to Claude Code (claude.ai/code) when
+working with code in this repository.
+
+Project orientation, build commands, repo layout, conventions, and
+task routing live in the agent-agnostic file:
+
+@AGENTS.md
+
+The rest of this file is Claude-Code-specific tooling that does not
+apply to other agents.
 
 ## Skills available
 
-`.claude/skills/` is intentionally empty for now. The Yocto/BSP
-capabilities this repo leans on are provided today by shared,
-repo-agnostic skills at the operator's global Claude Code level;
-repo-local skills get factored into this directory as they solidify
-for this project.
+`.claude/skills/` holds two repo-local skills:
 
-Reach for these shared, repo-agnostic skills when relevant:
-- `build-image` — wraps the `make`/`kas`/`bitbake` flow.
-- `add-package` — recipe + image-recipe edits for adding software.
-- `create-kernel-fragment` — for kernel config fragments (new driver
-  support, feature sets).
-- `debug-bitbake` — for parse/build failures.
-- `patch-kernel-bsp`, `patch-uboot-bsp` — when board patches land.
-- `devtool-workflow` — for iterating on recipes pulled in from upstream
-  sources before they're finalized in tree.
+- `devtool-workflow` — iterating on recipe source (U-Boot,
+  `linux-renesas`, app) via `devtool` instead of hand-editing patches.
+  Cited as a field guide by `.claude/rules/yocto-patterns.md` ("Patch
+  iteration — when to reach for devtool").
+- `yocto-worktree` — isolated worktrees for subagent/parallel builds:
+  `kas/local.yml` seeding, shared-cache verification, branch naming
+  before PR, locked-worktree cleanup. Companion to §"Parallel sessions"
+  below.
+
+Where a skill and `.claude/rules/` ever disagree, **the rules win** —
+they are repo-specific and wrynose-current.
 
 ## Permission allowlist
 
@@ -40,29 +46,55 @@ ugly fast.
 
 ### Setting up worktrees (operator)
 
+Worktrees live **inside the repo, under `.claude/worktrees/`** — not as
+siblings of the checkout. That keeps them next to the agent-harness
+worktrees `isolation: "worktree"` creates, and out of the parent
+directory.
+
 ```bash
 # From the repo root:
-git worktree add ../edge-ai-yocto-<topic> -b <topic>
+git worktree add .claude/worktrees/<topic> -b <topic>
 ```
 
 `cd` into the worktree and spawn the Claude instance there. Each
 worktree gets its own working tree, its own `.kas/`, its own `build/`.
-Caches (`KAS_REPO_REF_DIR`, `DL_DIR`, `SSTATE_DIR`) are host-shared
-across worktrees — that's the speed win — but per-worktree tooling
-state stays isolated. Clean up when the topic merges:
+Clean up when the topic merges:
 
 ```bash
-git worktree remove ../edge-ai-yocto-<topic>
+git worktree remove .claude/worktrees/<topic>
 ```
 
 For task-scoped subagents spawned from inside one session, prefer
 `isolation: "worktree"` on the Agent tool rather than running them
 in-place against the same tree.
 
-### First build in a worktree is fast (sstate reuse)
+### Seed `kas/local.yml` first — a fresh worktree does not have it
+
+`kas/local.yml` is gitignored (`.gitignore:17`), so **it does not exist
+in a new worktree**. Without it the Makefile falls back to
+`BASE_DEFAULT = kas/base.yml:kas/machines/rzv2l.yml` (`Makefile:46-51`)
+and the build runs with no shared `DL_DIR`/`SSTATE_DIR` — cold, hours
+instead of minutes. Nothing warns you; it just builds slowly.
+
+Seed and verify before the first build, from the main checkout root:
+
+```bash
+.claude/skills/yocto-worktree/scripts/seed-and-verify.sh <worktree-dir>
+```
+
+See the `yocto-worktree` skill for exit-code handling and cleanup. If
+the script reports `kas/local.yml` missing in the *main* checkout, stop
+and ask the operator — do not invent cache paths.
+
+Layer setup stays fast regardless: `KAS_REPO_REF_DIR` defaults to
+`/mnt/yocto-nvme/layers-wrynose` in `Makefile:27` and `scripts/env.sh`,
+so git alternates work without `local.yml`. Only sstate and downloads
+go missing — the expensive half.
+
+### Once seeded, the first build is fast (sstate reuse)
 
 Sstate keys are recipe task *signatures* — a hash of recipe content,
-variables, and source inputs — not build paths. A new worktree shares
+variables, and source inputs — not build paths. A seeded worktree shares
 `SSTATE_DIR` and `DL_DIR` (operator-set to a shared fast-storage cache in
 `kas/local.yml`) with the main checkout, so a build started right after a
 recent full build on main is almost entirely a sstate restore: bitbake
@@ -87,6 +119,13 @@ corrupt, but two builds hitting the same recipe simultaneously queue
 briefly on the lock.
 
 ### Mid-session collision detection
+
+Before starting build-running or build-polluting work, or a substantial
+multi-file change (not just when spawning a subagent), run `git status`
+first. If unrelated uncommitted changes from a different thread are
+already sitting in the tree, don't silently add to them — flag it and
+ask whether the new work should go in its own worktree instead. Skip
+this for minimal/single-file changes.
 
 Before any destructive move (`rm -rf <anything>`, `make purge`, mass
 file deletions, branch resets), check for signs of another instance:
@@ -127,11 +166,18 @@ overwriting another agent's diff is much higher.
   strategy). Do not run `git add`, `git commit`, `git branch`,
   `git tag`, or other state-changing git commands without operator
   confirmation. If a change feels like it warrants a commit, stop and ask.
-- **Commit trailers.** End commit messages with the default Claude Code
-  footer:
+- **Commit trailers.** The canonical rule is `AGENTS.md` §"Commit style →
+  AI attribution": an `Assisted-by: <tool>:<model-id>` line per model that
+  touched the change. From Claude Code that is
+  `Assisted-by: claude-code:<the model id you are running as>`.
 
-  ```
-  🤖 Generated with [Claude Code](https://claude.com/claude-code)
+  **Do not copy a model name from this file.** This bullet deliberately
+  contains no literal model id: an earlier revision pinned one, and it was
+  already two releases stale before anyone noticed. Read your own model
+  identity from your instructions and write that.
 
-  Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
-  ```
+  **Do not add `Co-Authored-By:` for an AI tool** — not in commits, not
+  in PR bodies. This overrides the harness default, which emits one;
+  drop that line along with the generated-with footer. The why and the
+  applicability date live in `AGENTS.md` §"Commit style → AI
+  attribution".

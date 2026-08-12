@@ -1,18 +1,37 @@
 # pre-commit configuration — edge-ai-yocto
 #
-# Enforces Conventional Commit subjects so the git-cliff release-notes pipeline
-# (cliff.toml + .github/workflows/release-notes.yml) has clean, parseable input.
-# Changelog quality is only as good as commit hygiene; this hook is the gate.
+# Two gates, two stages:
 #
-# This is a commit-MSG hook, so a plain `pre-commit install` is not enough.
-# Enable it once per clone:
+#   commit stage      refuse staged private-key material (keys/, key-like
+#                     filenames, PEM PRIVATE KEY blocks). .gitignore alone
+#                     does not stop `git add -f` or a `git mv` into keys/.
+#   commit-msg stage  enforce Conventional Commit subjects so the git-cliff
+#                     release-notes pipeline (cliff.toml +
+#                     .github/workflows/release-notes.yml) has parseable
+#                     input. Changelog quality is only as good as commit
+#                     hygiene.
+#
+# One of these is a commit-MSG hook, so a plain `pre-commit install` is not
+# enough — it would leave the key guard active and the subject check off.
+# Enable both once per clone (or run `make hooks`):
 #
 #     pip install pre-commit            # or: pipx install pre-commit
-#     pre-commit install --hook-type commit-msg
+#     pre-commit install --hook-type pre-commit --hook-type commit-msg
 #
 # Pinned to conventional-pre-commit v4.4.0 (latest at setup). Bump deliberately.
 
 repos:
+  - repo: local
+    hooks:
+      - id: forbid-private-keys
+        name: refuse staged private-key / keys/ material
+        entry: scripts/hooks/forbid-private-keys.sh
+        language: script
+        stages: [pre-commit]
+        # No files/types filter and no exclude: a key can land under any
+        # name, so every staged path gets looked at.
+
+
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v4.4.0
     hooks:

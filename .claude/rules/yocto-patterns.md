@@ -7,6 +7,42 @@ HOMEPAGE, SECTION, LICENSE, CVE_PRODUCT, UPSTREAM_CHECK_*, etc.) see
 `recipe-metadata.md`. This file covers wrynose-specific syntax;
 `recipe-metadata.md` covers what metadata to put in every recipe and why.
 
+## BitBake failure triage
+
+Validate progressively — `make parse` first, then the affected recipe's
+task, then the image. Extract the first causal error from the task log;
+don't paste whole build logs.
+
+```bash
+# Task log for a failing recipe
+find build/tmp/work -path "*/<recipe>/*/temp/log.do_<task>" | head -1
+
+# Variable inspection
+make shell   # then, inside:
+bitbake-getvar -r <recipe> <VAR>
+
+# Who provides / who appends
+bitbake-layers show-recipes <recipe>
+bitbake-layers show-appends | grep -i <recipe>
+
+# Re-run one task
+bitbake <recipe> -c <task> -f
+```
+
+| Error | Likely cause |
+|---|---|
+| `Nothing PROVIDES` | Missing `DEPENDS`, or the layer isn't in the kas composition |
+| `do_fetch failed` | Bad URI, no network, or wrong `SRCREV`. CVE-DB recipes are AUTOREV and need network on first fetch |
+| `QA Issue: -dev contains` | Missing `RDEPENDS` or `FILES` entries |
+| `multiple providers` | Need `PREFERRED_PROVIDER` in distro/machine conf |
+| `do_patch failed` | Patch base doesn't match current `SRCREV` — regenerate, don't rebase hunks |
+| `Missing Upstream-Status in patch` | `patch-status` QA gate; see "Patch headers" below |
+| `virtual:devupstream:target:...:do_patch` | meta-arm `BBCLASSEXTEND` trap — see below |
+| Packagegroup resolves as `noarch` | `PACKAGE_ARCH` set after `inherit packagegroup` — see below |
+| `S`/unpack path errors | `S = "${WORKDIR}/git"` is gone — see "Source layout" below |
+| Filesystems silently not built | `IMAGE_FSTYPES ?=` loses to oe-core's weak default — use `=` or `:append` |
+| Taskhash / sstate mismatch | Usually a patch-header edit (see "Patch + sstate cascade") |
+
 ## Override syntax (colons, not underscores)
 
 Wrynose uses the colon-based override syntax. The deprecated underscore
@@ -109,6 +145,7 @@ Date: <RFC2822 date>
 Subject: [PATCH] <subsystem>: <imperative-mood one-line summary>
 
 Upstream-Status: <value> [<short reason>]
+Assisted-by: <tool>:<model-id>
 Signed-off-by: Author Name <author@example.invalid>
 
 <optional body — why the patch exists, links to bug trackers, etc.>
@@ -136,6 +173,30 @@ Optional for board-specific patches that will never be submitted.
 Default for repo-local DTS patches:
 `Inappropriate [board-specific configuration]` — matches the existing
 pattern in `meta-edge-bsp/recipes-kernel/linux/files/`.
+
+### AI attribution in patch headers
+
+Same trailer as commits (`AGENTS.md` §"Commit style → AI attribution"):
+`Assisted-by: <tool>:<model-id>`, one line per model that touched the
+patch, immediately **above** the `Signed-off-by:` line. Never copy a
+model id out of a doc or an existing patch — state the model actually
+running. Policy applies to patches written or modified from 2026-08-02
+onward; existing patches are not retrofitted, because reconstructing
+which model wrote them from memory would fabricate the audit trail the
+trailer exists to provide.
+
+Which patches it applies to depends on `Upstream-Status`:
+
+| Status | AI trailer |
+|---|---|
+| `Inappropriate [...]`, `Denied [...]` | Yes. Never leaves the repo; our rules are the only rules. |
+| `Pending`, `Submitted [...]` | Yes here — but the receiving project's trailer rules win at submission time. `Assisted-by:` is not part of the kernel/U-Boot canonical trailer set; check that project's current contribution docs before sending, and be ready to drop it. |
+| `Backport [...]`, `Accepted [...]` | **No — do not touch the header.** The commit message and its `Signed-off-by:` chain belong to the original author. Only the `Upstream-Status:` line is ours to add. Adding our trailers misattributes their work and destroys the verbatim-cherry-pick property. |
+
+`Signed-off-by:` stays last and stays a **human**. Attribution records
+who helped write the patch; the DCO sign-off certifies who takes
+responsibility for it. An `Assisted-by:` line never substitutes for a
+sign-off, and an agent never adds a sign-off on the operator's behalf.
 
 ## Patch + sstate cascade
 
