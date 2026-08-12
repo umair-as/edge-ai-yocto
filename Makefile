@@ -1,4 +1,4 @@
-.PHONY: help base dev prod bundle parse layers shell info clean-lock netboot-sync lock verify-pins purge
+.PHONY: help base dev prod bundle parse layers shell info clean-lock netboot-sync lock verify-pins purge hooks
 
 KAS ?= kas
 
@@ -143,6 +143,7 @@ help:
 	@echo "  See docs/dev/netboot-setup.md for host setup + per-board env."
 	@echo ""
 	@echo "Utility targets:"
+	@echo "  make hooks                   Install the git hooks (run once per clone)"
 	@echo "  make parse                   bitbake -p (parse-only sanity check)"
 	@echo "  make layers                  bitbake-layers show-layers"
 	@echo "  make shell                   Interactive KAS shell"
@@ -218,6 +219,15 @@ info:
 
 clean-lock:
 	rm -f build/bitbake.lock
+
+# pre-commit installs into .git/hooks, which is per-clone and untracked —
+# a fresh clone has both gates silently disabled until this runs. Both
+# stages are needed: --hook-type commit-msg alone leaves the key guard off,
+# and a bare `pre-commit install` leaves the subject check off. Idempotent.
+hooks:
+	@command -v pre-commit >/dev/null || { \
+	  echo "pre-commit not on PATH — install it first: pipx install pre-commit"; exit 1; }
+	@pre-commit install --hook-type pre-commit --hook-type commit-msg
 
 # Freeze floating upstream branches (e.g. meta-rauc on `wrynose`) to a
 # concrete SHA. Writes kas/base.lock.yml next to kas/base.yml; commit
