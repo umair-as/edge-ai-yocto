@@ -19,7 +19,7 @@
 
 - 🔒 **Signed boot chain, end to end.** TF-A (Renesas CIP fork) → OP-TEE (secure world, BL32) → U-Boot → FIT image with RSA-2048 signature verified against a key embedded in the U-Boot control DTB. A file key covers the dev profile; the signing slot is designed for HSM/YubiKey-ROT in production.
 
-- 🔄 **RAUC A/B OTA with automatic rollback.** Signed verity bundles, atomic install, U-Boot boot-count fallback. Kernel/DTB and rootfs update paths both validated on hardware. mTLS streaming is scoped but not yet wired.
+- 🔄 **RAUC A/B OTA with automatic rollback.** Signed verity bundles, atomic install, U-Boot boot-count fallback. Kernel/DTB and rootfs update paths both validated on hardware, as is mTLS HTTPS streaming install — a 253 MB bundle streamed from the update server straight into the inactive slot, with no local copy and the transfer running as an unprivileged user.
 
 - 🧱 **Board-agnostic from the first commit.** A second SoC joins the build with one kas machine fragment, one WKS file, and board-gated bbappends — distro, image recipes, and hardening are untouched. Designed for portability, not retrofitted after the fact.
 
