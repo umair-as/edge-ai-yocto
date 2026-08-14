@@ -1,7 +1,7 @@
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 
-inherit bundle edge-wic-label-check
+inherit bundle
 
 # Single source of truth: must match rauc-conf-edge byte-for-byte.
 RAUC_BUNDLE_COMPATIBLE ?= "edge-ai-${MACHINE}"
@@ -14,7 +14,8 @@ BUNDLE_IMAGE_NAME ?= "edge-image-dev"
 BUNDLE_IMAGE       = "${BUNDLE_IMAGE_NAME}"
 
 RAUC_SLOT_rootfs           = "${BUNDLE_IMAGE}"
-RAUC_SLOT_rootfs[fstype]   = "ext4"
+RAUC_SLOT_rootfs[fstype]   = "ext4.verity"
+RAUC_SLOT_rootfs[imagetype] = "raw"
 RAUC_SLOT_rootfs[hooks]    = "pre-install;post-install"
 
 # Disable adaptive updates (block-hash-index) by default. Re-enable per-build
@@ -38,14 +39,13 @@ RAUC_BUNDLE_DESCRIPTION = "EDGE AI OS bundle for ${MACHINE} (image: ${BUNDLE_IMA
 RAUC_BUNDLE_BUILD       = "${EDGE_BUILD_ID}"
 RAUC_BUNDLE_BUILD[vardepsexclude] = "EDGE_BUILD_ID DATETIME"
 
-EDGE_RAUC_UPDATE_BOOTFILES         ?= "0"
-EDGE_RAUC_BOOTFILES_ARCHIVE_RECIPE ?= "edge-bootfiles-archive"
-EDGE_RAUC_BOOTFILES_SOURCE_FILE    ?= "bootfiles.tar.gz"
-EDGE_RAUC_BOOTFILES_BUNDLE_FILE    ?= "bootfiles.tar.gz"
-EDGE_RAUC_TRACK_DEPLOY_FILES       ?= ""
+EDGE_RAUC_FIT_A = "${BUNDLE_IMAGE}${IMAGE_MACHINE_SUFFIX}${IMAGE_NAME_SUFFIX}.fitImage-A"
+EDGE_RAUC_FIT_B = "${BUNDLE_IMAGE}${IMAGE_MACHINE_SUFFIX}${IMAGE_NAME_SUFFIX}.fitImage-B"
+EDGE_RAUC_TRACK_DEPLOY_FILES ?= ""
 
-RAUC_BUNDLE_EXTRA_DEPENDS += "${@bb.utils.contains('EDGE_RAUC_UPDATE_BOOTFILES','1',' ${EDGE_RAUC_BOOTFILES_ARCHIVE_RECIPE}','',d)}"
-RAUC_BUNDLE_EXTRA_FILES   += "${@bb.utils.contains('EDGE_RAUC_UPDATE_BOOTFILES','1',' ${EDGE_RAUC_BOOTFILES_BUNDLE_FILE}','',d)}"
+# The root hash and dm table live in the signed slot FIT. A rootfs-only
+# bundle would install an unbootable or unauthenticated slot.
+RAUC_BUNDLE_EXTRA_FILES += "${EDGE_RAUC_FIT_A} ${EDGE_RAUC_FIT_B}"
 RAUC_BUNDLE_HOOKS[file]    = "bundle-hooks.sh"
 
 # Track selected deploy artifacts in the task hash so sstate invalidates
@@ -57,10 +57,7 @@ python __anonymous() {
     extra = (d.getVar("EDGE_RAUC_TRACK_DEPLOY_FILES") or "").split()
     files.extend(extra)
 
-    if d.getVar("EDGE_RAUC_UPDATE_BOOTFILES") == "1":
-        bootfiles = d.getVar("EDGE_RAUC_BOOTFILES_SOURCE_FILE")
-        if bootfiles:
-            files.append(bootfiles)
+    files.extend((d.getVar("EDGE_RAUC_FIT_A"), d.getVar("EDGE_RAUC_FIT_B")))
 
     if not files:
         return
@@ -71,40 +68,18 @@ python __anonymous() {
     d.setVarFlag("do_configure", "file-checksums", (checksums + " " + " ".join(entries)).strip())
 }
 
-# Stage the bootfiles archive into WORKDIR when EDGE_RAUC_UPDATE_BOOTFILES=1.
-# Must not use bare `return` — bitbake stitches this prepend body into the
-# bbclass do_configure, so an early return would skip write_manifest below.
-python do_configure:prepend() {
-    if d.getVar("EDGE_RAUC_UPDATE_BOOTFILES") == "1":
-        import os, shutil
-        src_name = d.getVar("EDGE_RAUC_BOOTFILES_SOURCE_FILE")
-        dst_name = d.getVar("EDGE_RAUC_BOOTFILES_BUNDLE_FILE")
-
-        src = os.path.join(d.getVar("DEPLOY_DIR_IMAGE"), src_name)
-        dst = os.path.join(d.getVar("WORKDIR"), dst_name)
-
-        if not os.path.isfile(src):
-            bb.fatal("Bootfiles source archive not found: %s" % src)
-
-        if src != dst:
-            shutil.copyfile(src, dst)
-}
-
 # Pick up bundle-hooks.sh from the sibling rauc/files directory.
-FILESEXTRAPATHS:prepend := "${THISDIR}/../rauc/files:"
-SRC_URI:append = " file://bundle-hooks.sh;mode=0755 "
+FILESEXTRAPATHS:prepend := "${THISDIR}/../rauc/files:${THISDIR}/../../recipes-bsp/u-boot/files:"
+SRC_URI:append = " file://bundle-hooks.sh;mode=0755 file://rauc-uboot-env.defaults "
+RAUC_BUNDLE_EXTRA_FILES += "rauc-uboot-env.defaults"
 
-# Per-board substitution: bundle-hooks.sh ships with @DTB_FILENAME@
-# placeholder; EDGE_BOOT_DTB (per kas/machines/<board>.yml) supplies the
-# value. Done at unpack so bundle.bbclass picks up the substituted file
-# from UNPACKDIR. Failing-loud on empty EDGE_BOOT_DTB prevents shipping
-# a bundle whose hook would silently install no DTB.
-do_unpack[postfuncs] += "edge_bundle_substitute_dtb"
-edge_bundle_substitute_dtb() {
-    if [ -z "${EDGE_BOOT_DTB}" ]; then
-        bbfatal "EDGE_BOOT_DTB is empty — set it in kas/machines/${MACHINE}.yml"
-    fi
-    sed -i "s|@DTB_FILENAME@|${EDGE_BOOT_DTB}|g" \
+# Substitute image-specific bundle filenames before bundle.bbclass copies the
+# hook. Slot selection remains a runtime RAUC decision.
+do_unpack[postfuncs] += "edge_bundle_substitute_fit_names"
+edge_bundle_substitute_fit_names() {
+    sed -i \
+        -e "s|@FIT_IMAGE_A@|${EDGE_RAUC_FIT_A}|g" \
+        -e "s|@FIT_IMAGE_B@|${EDGE_RAUC_FIT_B}|g" \
         "${UNPACKDIR}/bundle-hooks.sh"
 }
 

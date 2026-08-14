@@ -3,6 +3,7 @@ DESCRIPTION = "Renders /etc/rauc/system.conf from a template with toggle-driven 
 keyring mode (single-cert path vs. multi-cert directory), optional codeSigning \
 purpose enforcement, allowed-signer CN allowlist, optional encrypted-bundle \
 support, and a PKCS#11 streaming TLS key URI."
+HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
