@@ -27,7 +27,7 @@ jobs:
       # fetch-depth: 0 is REQUIRED — git-cliff walks the full tag/commit graph.
       # A shallow clone yields an empty or truncated changelog.
       - name: Checkout (full history + tags)
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 
@@ -35,7 +35,7 @@ jobs:
       # --strip header drops the "# Changelog" preamble so the release notes
       # start at the version heading. GITHUB_REPO enables commit/compare links.
       - name: Generate release notes (--latest)
-        uses: orhun/git-cliff-action@v4
+        uses: orhun/git-cliff-action@f50e11560dce63f7c33227798f90b924471a88b5 # v4.8.0
         id: release_notes
         with:
           # git-cliff release tags are v-prefixed (the action fetches
