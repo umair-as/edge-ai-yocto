@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # Versioned idempotency marker so env migrations can be rolled out safely.
-STAMP="/boot/.rauc-uboot-env-initialized-v7-khc-wave3-no-lockdown"
+STAMP="/boot/.rauc-uboot-env-initialized-v9-fit-conf-selector"
 ENV_DEFAULTS="/etc/rauc-uboot-env.defaults"
 
 log() { echo "[rauc-uboot-env-init] $*"; }
@@ -74,6 +74,15 @@ if [ -f "$ENV_DEFAULTS" ]; then
     done < "$ENV_DEFAULTS"
 else
     log "WARNING: ${ENV_DEFAULTS} missing; skipping managed env migration"
+fi
+
+# Fresh images carry both slot FITs. OTA migration sets only the inactive
+# slot marker in the bundle hook so the old slot retains its legacy fallback.
+if [ -f /boot/fitImage-A ]; then
+    ensure_var "EDGE_VERITY_A" "1"
+fi
+if [ -f /boot/fitImage-B ]; then
+    ensure_var "EDGE_VERITY_B" "1"
 fi
 
 if [ "$env_ok" = "1" ] && fw_printenv >/dev/null 2>&1; then

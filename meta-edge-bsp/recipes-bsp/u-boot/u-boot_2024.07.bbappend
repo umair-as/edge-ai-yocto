@@ -16,13 +16,15 @@ SRC_URI:append = " \
     file://patches/0004-smarc-rzv2l-dts-add-optee-firmware-node-for-rng.patch \
     file://patches/0005-rzg2l-add-build-tag-banner.patch \
     file://patches/0006-rzg2l-ft_board_setup-add-debug-traces.patch \
+    file://patches/0007-arm-lib-bootm-fix-unsafe-wdt_overflow-append-to-bootargs.patch \
+    file://patches/0008-smarc-rzv2l-drop-legacy-CONFIG_BOOTCOMMAND-define.patch \
 "
 
 # U-Boot surface reduction. Three composable features:
-#   surface_reduce — universal disables (stack canary on, USB host stack
-#                    off, kermit/s-record load off). Safe in dev and prod.
-#   net_off        — disable network commands. EDGE_DEV_NETBOOT=1 builds
-#                    re-enable them implicitly by skipping this fragment.
+#   surface_reduce — usb/storage commands, USB host HCDs, kermit/s-record
+#                    load all off. Gadget side (ums eMMC flashing) remains.
+#   net_off        — network commands off; net core remains compiled in.
+#                    EDGE_DEV_NETBOOT=1 builds skip the fragment.
 #   fit_enforce    — regression-guard against legacy uImage re-enablement.
 EDGE_UBOOT_FEATURES ?= "surface_reduce net_off fit_enforce"
 
