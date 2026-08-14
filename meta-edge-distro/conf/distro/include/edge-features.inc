@@ -33,6 +33,16 @@ EDGE_ENABLE_CONTAINERS ?= "0"
 # ai-compute.cfg; the drpai DT node + reserved memory come from the BSP.
 EDGE_ENABLE_AI ?= "0"
 
+# OP-TEE normal-world userspace. On by default for boards that wire BL32 — the
+# secure world is unreachable from Linux without the client stack — but a build
+# that never enters the TEE drops the whole packagegroup with this at 0.
+EDGE_ENABLE_OPTEE ?= "1"
+
+# OP-TEE demo TAs (optee-examples). Off by default: they are loadable TAs signed
+# with the default devkit key, useful for bring-up and unused by any workload,
+# so shipping them widens the secure-world attack surface for no return.
+EDGE_ENABLE_OPTEE_EXAMPLES ?= "0"
+
 # Profiling / observability tooling (htop, sysstat, trace-cmd, ...).
 # Tier default lives in edge-profile-{dev,prod}.inc (the correctly-selected
 # include). Not defaulted here: a ?= in this file is parsed before the profile
@@ -66,3 +76,4 @@ BB_ENV_PASSTHROUGH_ADDITIONS .= " EDGE_RAUC_STREAMING_KEY_MODE EDGE_RAUC_PKCS11_
 BB_ENV_PASSTHROUGH_ADDITIONS .= " EDGE_RAUC_KEYRING_CERTS EDGE_RAUC_ALLOWED_SIGNER_CNS EDGE_RAUC_CHECK_PURPOSE"
 BB_ENV_PASSTHROUGH_ADDITIONS .= " EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION EDGE_RAUC_ENCRYPTION_KEY EDGE_RAUC_ENCRYPTION_CERT"
 BB_ENV_PASSTHROUGH_ADDITIONS .= " EDGE_RAUC_BUNDLE_ENCRYPT_RECIPIENTS EDGE_OTA_CERT_DIR"
+BB_ENV_PASSTHROUGH_ADDITIONS .= " EDGE_ENABLE_OPTEE EDGE_ENABLE_OPTEE_EXAMPLES"

@@ -1,7 +1,7 @@
-SUMMARY     = "OP-TEE userspace: client + tee-supplicant + xtest slice"
-DESCRIPTION = "${PN} carries libteec, tee-supplicant, and optee-examples. \
-${PN}-test adds optee-test/xtest (~10 MB; dev images only). Gated by \
-COMPATIBLE_MACHINE=smarc-rzv2l — only that board wires BL32."
+SUMMARY     = "OP-TEE secure-world userspace for boards that wire BL32"
+DESCRIPTION = "${PN} pulls the normal-world side of the OP-TEE stack: client \
+libraries, supplicant, and the Trusted Applications selected for this distro. \
+${PN}-test adds the OP-TEE test suite (~10 MB), for dev images only."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "bootloaders"
 LICENSE     = "MIT"
@@ -17,9 +17,14 @@ PACKAGES = " \
     ${PN}-test \
 "
 
-RDEPENDS:${PN} = " \
-    optee-client \
-    optee-examples \
-"
+# Baseline: the client library and tee-supplicant, without which the secure
+# world is unreachable from Linux. Everything else about this packagegroup is
+# selectable, so nothing lands in an image that did not ask for it.
+RDEPENDS:${PN} = "optee-client"
+
+# Demo TAs, loadable from optee_armtz and signed with the devkit's default key.
+# Off by default: no workload calls them, and every TA in the image is secure-world
+# attack surface and a CVE-tracking obligation.
+RDEPENDS:${PN} += "${@bb.utils.contains('EDGE_ENABLE_OPTEE_EXAMPLES','1',' optee-examples','',d)}"
 
 RDEPENDS:${PN}-test = "optee-test"

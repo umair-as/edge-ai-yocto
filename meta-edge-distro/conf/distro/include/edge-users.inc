@@ -115,6 +115,14 @@ EXTRA_USERS_PARAMS = " \
 # Added at image assembly, not in the recipe useradd: render is created by
 # another recipe and a recipe-level --groups render could race its creation.
 EXTRA_USERS_PARAMS:append = "${@bb.utils.contains('EDGE_ENABLE_AI', '1', ' usermod -aG render edge-ctr;', '', d)}"
+
+# optee-client creates the tee group owning /dev/tee0 (0660, no uaccess ACL);
+# devel joins it to open a TEE context without sudo. Machine-scoped append, not
+# a member of the universal -G list above: the tee group is absent on non-rzv2l
+# machines, where -G tee would fail assembly. EDGE_ENABLE_OPTEE keys it for the
+# same reason — with the packagegroup dropped, the group is absent on this board
+# too, and usermod against a missing group fails the rootfs task.
+EXTRA_USERS_PARAMS:append:smarc-rzv2l = "${@bb.utils.contains('EDGE_ENABLE_OPTEE', '1', ' usermod -aG tee devel;', '', d)}"
 # Supplementary group choice for devel:
 #   wheel            sudo escalation (paired with edge-sudoers)
 #   systemd-journal  journalctl -f / read all messages without -q

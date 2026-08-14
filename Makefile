@@ -57,6 +57,7 @@ endif
 #   make dev SBOM_TUNE=1   # add SBOM/CVE per-build tuning knobs
 #   make dev JTAG=1        # KASLR off + kgdb + debug-safe (JTAG kernel labs)
 #   make dev BPF=1         # kernel BTF + bpftool (libbpf CO-RE labs; size-heavy)
+#   make dev OPTEE_EXAMPLES=1    # add the OP-TEE demo TAs (bring-up only)
 #
 # Flags compose: `make dev TPM=1 VIRT=1` adds both. Each fragment is a
 # pure additive overlay with no `includes:` — composition is explicit.
@@ -82,6 +83,9 @@ ifeq ($(JTAG),1)
 endif
 ifeq ($(BPF),1)
   CAPABILITY_YMLS += kas/bpf-labs.yml
+endif
+ifeq ($(OPTEE_EXAMPLES),1)
+  CAPABILITY_YMLS += kas/optee-examples.yml
 endif
 
 empty :=
@@ -136,6 +140,7 @@ help:
 	@echo "  NETBOOT=1                    + U-Boot 'netboot' env macro (TFTP/NFS dev workflow)"
 	@echo "  JTAG=1                       + KASLR off, kgdb, debug-safe boot (JTAG kernel labs)"
 	@echo "  BPF=1                        + kernel BTF + bpftool (libbpf CO-RE labs; size-heavy)"
+	@echo "  OPTEE_EXAMPLES=1             + OP-TEE demo TAs (bring-up/debug; off in shipped images)"
 	@echo "  EDGE_BOOT_TARGET=emmc        GPT user area + systemd-repart (eMMC boot; default esd)"
 	@echo ""
 	@echo "  Example: make dev NETBOOT=1"
