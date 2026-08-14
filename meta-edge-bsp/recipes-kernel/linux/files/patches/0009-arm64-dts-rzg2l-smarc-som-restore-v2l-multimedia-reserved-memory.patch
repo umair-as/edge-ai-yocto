@@ -1,0 +1,64 @@
+From b4a05f8219e60359fe91774803535371e599cb08 Mon Sep 17 00:00:00 2001
+From: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+Date: Thu, 16 Jul 2026 21:22:02 +0200
+Subject: [PATCH 09/10] arm64: dts: rzg2l-smarc-som: restore RZ/V2L multimedia
+ reserved-memory
+
+The rz-6.12-cip8 and later Renesas branches dropped the downstream V2L
+memory enablement from this SoM dtsi: the reserved-memory carveouts
+(global_cma at 0x58000000, mmp_reserved/linux,multimedia at 0x68000000)
+and the mmngr/mmngrbuf/vspm_if manager nodes. DRP-AI (default CMA pool),
+the mmngr kernel module (reads the MMP area from &mmp_reserved), and the
+VSP path all depend on these; without them mmngr has no memory region and
+VSP/DRP-AI buffer allocation fails. Restore them verbatim from
+rz-6.12-cip7 so the board is memory-complete on the newer CIP baseline.
+
+Upstream-Status: Inappropriate [Renesas downstream board enablement]
+---
+ .../boot/dts/renesas/rzg2l-smarc-som.dtsi     | 33 +++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/renesas/rzg2l-smarc-som.dtsi b/arch/arm64/boot/dts/renesas/rzg2l-smarc-som.dtsi
+index 21cf198b3c17..8ab198ac2df6 100644
+--- a/arch/arm64/boot/dts/renesas/rzg2l-smarc-som.dtsi
++++ b/arch/arm64/boot/dts/renesas/rzg2l-smarc-som.dtsi
+@@ -35,6 +35,39 @@ memory@48000000 {
+ 		reg = <0x0 0x48000000 0x0 0x78000000>;
+ 	};
+ 
++	reserved-memory {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		global_cma: linux,cma@58000000 {
++			compatible = "shared-dma-pool";
++			linux,cma-default;
++			reusable;
++			reg = <0x0 0x58000000 0x0 0x10000000>;
++		};
++
++		mmp_reserved: linux,multimedia {
++			compatible = "shared-dma-pool";
++			reusable;
++			reg = <0x0 0x68000000 0x0 0x8000000>;
++		};
++
++	};
++
++	mmngr {
++		compatible = "renesas,mmngr";
++		memory-region = <&mmp_reserved>;
++	};
++
++	mmngrbuf {
++		compatible = "renesas,mmngrbuf";
++	};
++
++	vspm_if {
++		compatible = "renesas,vspm_if";
++	};
++
+ 	reg_1p8v: regulator-1p8v {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "fixed-1.8V";
