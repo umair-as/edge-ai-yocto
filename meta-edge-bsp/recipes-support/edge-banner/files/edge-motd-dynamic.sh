@@ -9,7 +9,7 @@
 #
 # Source-of-truth choices (why these, not the obvious alternative):
 #   RAUC slot     : parsed from /proc/cmdline (`rauc.slot=A` is set by
-#                   U-Boot's rauc_set_bootargs macro). Zero IPC vs the
+#                   the signed slot FIT). Zero IPC vs the
 #                   `busctl get-property … BootSlot` D-Bus roundtrip.
 #                   Falls back to "external" for NFS-root dev boots
 #                   where no rauc.slot= is on the cmdline.
@@ -82,8 +82,8 @@ _edge_motd_render() {
         fi
     fi
 
-    # RAUC slot from /proc/cmdline. U-Boot's rauc_set_bootargs sets
-    # rauc.slot=A or =B on MMC boots. NFS-root dev boots don't set it.
+    # RAUC slot from /proc/cmdline. Signed slot FITs set rauc.slot=A or =B;
+    # NFS-root dev boots do not set it.
     _slot=external
     if [ -r /proc/cmdline ]; then
         _v=$(tr ' ' '\n' < /proc/cmdline 2>/dev/null \

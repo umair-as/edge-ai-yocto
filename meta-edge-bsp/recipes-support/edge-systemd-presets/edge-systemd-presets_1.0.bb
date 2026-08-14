@@ -4,6 +4,7 @@ enabled or masked at first boot. Vendor-layer units (v4l2-init, audio-init) \
 from meta-rz-distro are suppressed at parse time via BBMASK in kas/base.yml; \
 this preset is intentionally near-empty in v0. Add lines here for first-boot \
 preset control as needed."
+HOMEPAGE = "https://github.com/umair-as/edge-ai-yocto"
 
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
