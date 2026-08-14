@@ -14,6 +14,23 @@ inherit edge-rootfs
 # "selinux"; no-op on distros without it.
 inherit selinux-image
 
+# A verity root cannot fall back to first-boot relabelling: changing xattrs or
+# deleting /.autorelabel would invalidate the Merkle tree. Override the
+# upstream helper so image-time labelling is mandatory and no package-provided
+# fallback marker reaches do_image_verity.
+selinux_set_labels() {
+    if [ -f ${IMAGE_ROOTFS}/${sysconfdir}/selinux/config ]; then
+        pol_type=$(sed -n -e "s&^SELINUXTYPE[[:space:]]*=[[:space:]]*\([0-9A-Za-z_]\+\)&\1&p" \
+            ${IMAGE_ROOTFS}/${sysconfdir}/selinux/config)
+        if ! setfiles -m -r ${IMAGE_ROOTFS} \
+            ${IMAGE_ROOTFS}/${sysconfdir}/selinux/${pol_type}/contexts/files/file_contexts \
+            ${IMAGE_ROOTFS}; then
+            bbfatal "SELinux image-time labelling failed; dm-verity forbids first-boot relabelling"
+        fi
+        rm -f ${IMAGE_ROOTFS}/.autorelabel
+    fi
+}
+
 # Custom WICVARS appends live per-machine in kas/machines/<board>.yml,
 # alongside the variables they expose (e.g. RZ/V2L's FIP_WIC_OFFSET).
 # WIC only expands ${VAR} inside .wks files for variables listed in WICVARS;
@@ -23,7 +40,8 @@ inherit selinux-image
 # Common IMAGE_FEATURES for every edge tier.
 #   splash             — psplash, branded via meta-edge-distro/recipes-core/psplash
 #   ssh-server-openssh — operator access
-#   package-management — dnf/rpm at runtime (removed by edge-profile-prod.inc)
+#   package-management — package queries on immutable dev/base images
+#                        (removed by edge-profile-prod.inc)
 #   weston             — Wayland compositor (gated by EDGE_ENABLE_DISPLAY)
 IMAGE_FEATURES += " \
     splash \
@@ -77,13 +95,14 @@ CORE_IMAGE_EXTRA_INSTALL += "${@bb.utils.contains('EDGE_ENABLE_CONTAINERS', '1',
 # DRP-AI accelerator stack (drpai + u-dma-buf). Default off; RZ/V2L only.
 CORE_IMAGE_EXTRA_INSTALL += "${@bb.utils.contains('EDGE_ENABLE_AI', '1', ' packagegroup-edge-ai', '', d)}"
 
-# OP-TEE userspace (libteec + tee-supplicant + optee-examples) is bundled by
-# packagegroup-edge-optee. The packagegroup declares COMPATIBLE_MACHINE on
-# itself, but BitBake does NOT fail-soft on a COMPATIBLE_MACHINE-incompatible
-# dependency — a non-rzv2l image listing this packagegroup would error at
-# parse with "Nothing provides packagegroup-edge-optee". Hence the
-# machine-conditional append at the image level.
-CORE_IMAGE_EXTRA_INSTALL:append:smarc-rzv2l = " packagegroup-edge-optee"
+# OP-TEE normal-world userspace, toggled by EDGE_ENABLE_OPTEE (on by default;
+# the packagegroup's own contents are individually selectable). The packagegroup
+# declares COMPATIBLE_MACHINE on itself, but BitBake does NOT fail-soft on a
+# COMPATIBLE_MACHINE-incompatible dependency — a non-rzv2l image listing this
+# packagegroup would error at parse with "Nothing provides
+# packagegroup-edge-optee". Hence the machine-conditional append at the image
+# level, with the toggle applied inside it.
+CORE_IMAGE_EXTRA_INSTALL:append:smarc-rzv2l = "${@bb.utils.contains('EDGE_ENABLE_OPTEE', '1', ' packagegroup-edge-optee', '', d)}"
 
 # mtd-utils brings flashcp/flash_erase/nandwrite for the BL2/FIP SPI flash
 # partitions exposed by mtd0/mtd1. Needed for in-place FIP updates without
