@@ -2,15 +2,18 @@
 Description=OpenSSH Key Generation
 Documentation=man:ssh-keygen(1)
 RequiresMountsFor=/var /run
-ConditionFileNotEmpty=!/etc/ssh/ssh_host_ed25519_key
+ConditionFileNotEmpty=!/run/edge-sshd-keys/ssh_host_ed25519_key
 
 [Service]
 # Fallback host-key generator: edge-ssh-host-keys-persist is the primary one
-# (generate-or-restore from /data, ordered before this unit). This only fires
-# if that did not run (e.g. broken /data), and generates just the ed25519 key
-# — the sole HostKey in sshd_hardening.conf. ed25519 is instant; no RSA cost.
+# (generate-or-restore from /data into the same /run dir, ordered before this
+# unit). This only fires if that did not run (e.g. broken /data), and
+# generates just the ed25519 key — the sole HostKey in sshd_hardening.conf —
+# volatile in /run because the rootfs is immutable and /data is unavailable
+# in exactly this case. ed25519 is instant; no RSA cost.
 # The Condition above keeps ssh-keygen from prompting on an existing key.
 Type=oneshot
 RemainAfterExit=yes
 Nice=10
-ExecStart=/usr/bin/ssh-keygen -q -t ed25519 -N "" -C "" -f /etc/ssh/ssh_host_ed25519_key
+ExecStartPre=/usr/bin/install -d -m 0700 /run/edge-sshd-keys
+ExecStart=/usr/bin/ssh-keygen -q -t ed25519 -N "" -C "" -f /run/edge-sshd-keys/ssh_host_ed25519_key

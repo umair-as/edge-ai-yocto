@@ -19,6 +19,12 @@
 
 FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
 
+# /data mountpoint must exist in the rootfs image: the dm-verity root is
+# immutable, so systemd cannot create it at mount time and the LABEL=data
+# fstab entry fails, taking every /data-dependent unit down with it.
+# /boot is already in base-files' stock dirs755.
+dirs755:append = " /data"
+
 SRC_URI += " \
     file://fstab \
     file://edge-issue.tmpl \

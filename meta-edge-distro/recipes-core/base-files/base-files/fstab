@@ -16,10 +16,14 @@
 # Pass 0 0 (no fsck) — journaled ext4 with commit=60 plus an unmounted
 # /data on failed boot makes the boot-time fsck cost not worth its delay
 # on an SD card.
-/dev/root            /                    auto       defaults              1  1
+/dev/root            /                    auto       ro                    0  0
 LABEL=boot           /boot                ext4       noatime,nodiratime,nofail    0  0
 LABEL=data           /data                ext4       defaults,noatime,nodiratime,commit=60,nofail    0  0
 proc                 /proc                proc       defaults              0  0
 devpts               /dev/pts             devpts     mode=0620,ptmxmode=0666,gid=5    0  0
 tmpfs                /run                 tmpfs      mode=0755,nodev,nosuid,strictatime    0  0
 tmpfs                /var/volatile        tmpfs      defaults              0  0
+# /tmp on the dm-verity root is a read-only directory; without a tmpfs every
+# /tmp consumer fails with EROFS. Early oneshots must still use /run — this
+# mount is not ordered before DefaultDependencies=no units.
+tmpfs                /tmp                 tmpfs      mode=1777,nodev,nosuid,strictatime    0  0

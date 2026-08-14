@@ -15,8 +15,15 @@ mkdir -p /data/machine-id
 if [ -s "${PERSIST}" ]; then
     if ! cmp -s "${PERSIST}" "${LIVE}" 2>/dev/null; then
         log "restoring machine-id from ${PERSIST}"
-        cp "${PERSIST}" "${LIVE}"
-        chmod 0444 "${LIVE}"
+        # On the dm-verity root /etc is immutable and PID 1 has already
+        # bind-mounted a transient id over /etc/machine-id; stack the
+        # persisted copy on top. cp remains the path for a writable /etc
+        # (legacy rw images).
+        if cp "${PERSIST}" "${LIVE}" 2>/dev/null; then
+            chmod 0444 "${LIVE}"
+        else
+            mount --bind "${PERSIST}" "${LIVE}"
+        fi
     fi
 elif [ -s "${LIVE}" ]; then
     log "capturing first-boot machine-id to ${PERSIST}"
