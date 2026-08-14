@@ -232,7 +232,7 @@ fi
 section "sshd host keys persistence"
 
 for kt in ed25519 rsa ecdsa; do
-    live="/etc/ssh/ssh_host_${kt}_key.pub"
+    live="/run/edge-sshd-keys/ssh_host_${kt}_key.pub"
     persist="/data/ssh/ssh_host_${kt}_key.pub"
     if sudo -n test -s "${live}" 2>/dev/null; then
         live_fp=$(sudo ssh-keygen -lf "${live}" 2>/dev/null | awk '{print $2}')
