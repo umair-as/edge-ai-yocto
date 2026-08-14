@@ -1,0 +1,54 @@
+From 1d2ca41a19cfb89363931ec8f0c0cdb23dd5242d Mon Sep 17 00:00:00 2001
+From: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+Date: Thu, 16 Jul 2026 21:22:02 +0200
+Subject: [PATCH 10/10] clk: renesas: r9a07g044-cpg: restore ISU module clocks
+ and resets
+
+rz-6.12-cip8 and later dropped the ISU (image scaling unit) module-clock
+and reset table entries from the RZ/G2L CPG driver, though the clock IDs
+remain defined in the g044 binding header. cip14 also refactored the mod
+clock table into a fixed-size struct, so restoring the two ISU DEF_MOD
+entries requires bumping the .common array bound from 79 to 81. The isum
+device node (renesas,isum, VSP hardware convert/scale) references
+R9A07G054_ISU_ACLK/PCLK and the ISU resets; without these entries the ISU
+clocks cannot be gated and vspm-isu fails to bind. Values verbatim from
+rz-6.12-cip7.
+
+Upstream-Status: Inappropriate [Renesas downstream board enablement]
+---
+ drivers/clk/renesas/r9a07g044-cpg.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/clk/renesas/r9a07g044-cpg.c b/drivers/clk/renesas/r9a07g044-cpg.c
+index 77ca3a789568..1e1184e121f9 100644
+--- a/drivers/clk/renesas/r9a07g044-cpg.c
++++ b/drivers/clk/renesas/r9a07g044-cpg.c
+@@ -235,7 +235,7 @@ static const struct {
+ };
+ 
+ static const struct {
+-	struct rzg2l_mod_clk common[79];
++	struct rzg2l_mod_clk common[81];
+ #ifdef CONFIG_CLK_R9A07G054
+ 	struct rzg2l_mod_clk drp[5];
+ #endif
+@@ -303,6 +303,10 @@ static const struct {
+ 					0x558, 1),
+ 		DEF_MOD("gpu_ace_clk",	R9A07G044_GPU_ACE_CLK, R9A07G044_CLK_P1,
+ 					0x558, 2),
++		DEF_MOD("isu_aclk",	R9A07G044_ISU_ACLK, R9A07G044_CLK_P1,
++					0x55C, 0),
++		DEF_MOD("isu_pclk",	R9A07G044_ISU_PCLK, R9A07G044_CLK_P2,
++					0x55C, 1),
+ 		DEF_MOD("cru_sysclk",   R9A07G044_CRU_SYSCLK, CLK_M2_DIV2,
+ 					0x564, 0),
+ 		DEF_MOD("cru_vclk",     R9A07G044_CRU_VCLK, R9A07G044_CLK_M2,
+@@ -439,6 +443,8 @@ static const struct rzg2l_reset r9a07g044_resets[] = {
+ 	DEF_RST(R9A07G044_GPU_RESETN, 0x858, 0),
+ 	DEF_RST(R9A07G044_GPU_AXI_RESETN, 0x858, 1),
+ 	DEF_RST(R9A07G044_GPU_ACE_RESETN, 0x858, 2),
++	DEF_RST(R9A07G044_ISU_ARESETN, 0x85C, 0),
++	DEF_RST(R9A07G044_ISU_PRESETN, 0x85C, 1),
+ 	DEF_RST(R9A07G044_CRU_CMN_RSTB, 0x864, 0),
+ 	DEF_RST(R9A07G044_CRU_PRESETN, 0x864, 1),
+ 	DEF_RST(R9A07G044_CRU_ARESETN, 0x864, 2),
