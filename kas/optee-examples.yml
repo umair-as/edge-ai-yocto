@@ -1,0 +1,25 @@
+# Capability fragment: OP-TEE demo Trusted Applications (optee-examples).
+#
+# Self-contained: pure additive overlay, no `includes:` and no `repos:` (adds
+# no layers, only a local.conf toggle). Compose with the base+machine stack:
+#   kas build kas/base.yml:kas/machines/<board>.yml:kas/optee-examples.yml
+#   make dev OPTEE_EXAMPLES=1                     # via Makefile flag
+#
+# Flips EDGE_ENABLE_OPTEE_EXAMPLES = 1, adding the upstream demo TAs
+# (hello_world, secure_storage, random, ...) and their CAs to
+# packagegroup-edge-optee. They exercise the TEE end to end during bring-up and
+# after a BL32 or devkit change.
+#
+# Off by default: the demos are loadable TAs signed with the devkit's default
+# key, sitting in optee_armtz on every image that ships them, called by no
+# workload. An image built for the field carries the attack surface and the
+# CVE-tracking obligation for no return.
+#
+# For a permanent local preference, set EDGE_ENABLE_OPTEE_EXAMPLES = "1" in
+# kas/local.yml instead of passing the flag on every build.
+header:
+  version: 19
+
+local_conf_header:
+  optee_examples: |
+    EDGE_ENABLE_OPTEE_EXAMPLES = "1"
