@@ -38,7 +38,8 @@ IMAGE_FEATURES:append = " \
 # observability, hwtools, netdiag, storage, and media. New dev userspace
 # is added by editing a packagegroup recipe in
 # meta-edge-bsp/recipes-core/packagegroups/, not this file. Ad-hoc tools:
-# `dnf install` at runtime (package-management is on via edge-image.bbclass).
+# Package metadata remains available for inspection; the authenticated local
+# root is read-only. NFS netboot is the writable development workflow.
 IMAGE_INSTALL:append = " packagegroup-edge-dev edge-sudoers-nopasswd edge-debug-mode"
 # edge-sudoers-nopasswd is the bench-tier sub-package of edge-sudoers; it
 # ships 15-edge-wheel-nopasswd which lexically overrides 10-edge-wheel
@@ -49,8 +50,9 @@ IMAGE_INSTALL:append = " packagegroup-edge-dev edge-sudoers-nopasswd edge-debug-
 # packagegroup-edge-dev — that recipe is machine-portable; the test slice
 # is on packagegroup-edge-optee which is COMPATIBLE_MACHINE=smarc-rzv2l.
 # packagegroup-edge-optee-test is the ${PN}-test output package of the
-# packagegroup-edge-optee recipe.
-IMAGE_INSTALL:append:smarc-rzv2l = " packagegroup-edge-optee-test"
+# packagegroup-edge-optee recipe. Follows EDGE_ENABLE_OPTEE: xtest against a
+# TEE that the image has no client stack for is dead weight.
+IMAGE_INSTALL:append:smarc-rzv2l = "${@bb.utils.contains('EDGE_ENABLE_OPTEE', '1', ' packagegroup-edge-optee-test', '', d)}"
 
 # Optional: dbg-pkgs ships -dbg sub-packages for every recipe so gdb
 # backtraces resolve symbols. Roughly 3x rootfs size; gate behind a

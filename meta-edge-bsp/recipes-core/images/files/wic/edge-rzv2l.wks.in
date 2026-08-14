@@ -21,7 +21,7 @@
 #   │  ── gap to 4 MB alignment ──                │
 #   ├─────────────────────────────────────────────┤ 0x00400000   p1
 #   │ /boot              ext4, 500 MB             │
-#   │  fitImage + ${EDGE_BOOT_DTB} + splash.bmp   │
+#   │  fitImage-A + fitImage-B + splash.bmp       │
 #   ├─────────────────────────────────────────────┤              p2
 #   │ ${EDGE_SLOT_A_LABEL}  ext4, ${EDGE_SLOT_SIZE_MB} MB
 #   │  RAUC slot A — active at first boot         │
@@ -57,14 +57,10 @@ part --source rawcopy --sourceparams="file=fip-${MACHINE}_pmic.bin"        --no-
 # which must end BEFORE the first partition. 4 MB alignment guarantees that.
 part /boot --source bootimg-partition --fstype=ext4 --label boot --ondisk mmcblk0 --align 4096 --size 500 --no-fstab-update
 
-# A/B rootfs slots. Labels driven by ${EDGE_SLOT_{A,B}_LABEL} (default
-# rootfsA/rootfsB; OTA-backend-specific values come from the backend
-# include). Both --label entries are also enforced by
-# edge-wic-label-check.bbclass; WIC does not reliably set the ext4 label
-# on the first --source rootfs partition, and the OTA install hooks
-# re-label post-install as the runtime safety net.
-part / --source rootfs --fstype=ext4 --label ${EDGE_SLOT_A_LABEL} --ondisk mmcblk0 --align 1024 --fixed-size ${EDGE_SLOT_SIZE_MB}
-part / --source rootfs --fstype=ext4 --label ${EDGE_SLOT_B_LABEL} --ondisk mmcblk0 --align 1024 --fixed-size ${EDGE_SLOT_SIZE_MB}
+# A/B slots contain the same self-contained ext4 + appended Merkle tree.
+# Partition-number udev aliases provide slot identity on the MBR layout.
+part / --source rawcopy --sourceparams="file=${IMGDEPLOYDIR}/${IMAGE_LINK_NAME}.ext4.verity" --ondisk mmcblk0 --align 1024 --fixed-size ${EDGE_SLOT_SIZE_MB}
+part / --source rawcopy --sourceparams="file=${IMGDEPLOYDIR}/${IMAGE_LINK_NAME}.ext4.verity" --ondisk mmcblk0 --align 1024 --fixed-size ${EDGE_SLOT_SIZE_MB}
 
 # /data preformatted in-image so first boot only needs resize, not mkfs.
 # edge-grow-data.service grows this to fill the SD on first boot (parted on this

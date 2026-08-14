@@ -1,7 +1,6 @@
 SUMMARY     = "Production image: hardened, locked-down tier"
-DESCRIPTION = "Production tier. profile-prod.inc removes package-management \
-and defaults observability off. Reserve here for further prod tightening \
-(read-only-rootfs, IMAGE_FSTYPES trimming, etc.) as the security harvest lands."
+DESCRIPTION = "Production tier with an authenticated read-only rootfs, no \
+package management, and observability disabled by default."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "base"
 LICENSE     = "MIT"
