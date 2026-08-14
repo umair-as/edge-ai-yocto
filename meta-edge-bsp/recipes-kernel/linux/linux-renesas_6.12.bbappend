@@ -27,6 +27,7 @@ SRC_URI:append = " \
     file://cfg/ai-compute.cfg \
     file://cfg/security-hardening.cfg \
     file://cfg/pstore-persist.cfg \
+    file://cfg/surface-trim.cfg \
 "
 
 # Dev-only fragments. Tier defaults live in edge-profile-{dev,prod}.inc;
