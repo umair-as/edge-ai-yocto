@@ -1,5 +1,9 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
+# Human-ratified not-applicable-config CVE decisions (config-unreachable
+# only; version/backport gaps are patched, not annotated).
+require ${THISDIR}/files/cve-exclusion-renesas-6.12.inc
+
 # Kernel pin: rz-6.12-cip14 (6.12.59), ~150 version-in-range CVEs clear of the
 # cip7 default in the kas-pinned meta-renesas. Newer meta-renesas revisions also
 # default to cip14 but name a KERNEL_REV absent from rz_linux-cip; this SRCREV is
