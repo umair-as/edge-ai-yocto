@@ -8,6 +8,9 @@
 # this include. An explicit operator value (env / local.yml) still wins.
 EDGE_ENABLE_OBSERVABILITY ?= "1"
 
+# Kernel observability and crash-debug fragments are on in the dev tier.
+EDGE_KERNEL_DEV_FRAGMENTS ?= "1"
+
 # package-management (dnf/rpm at runtime) stays — it's already in
 # edge-image.bbclass IMAGE_FEATURES; the prod profile removes it.
 
