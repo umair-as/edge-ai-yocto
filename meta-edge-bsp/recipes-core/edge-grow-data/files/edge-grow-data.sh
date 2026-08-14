@@ -104,7 +104,9 @@ main() {
         case "$rc" in 0|76|77) ;; *) die "systemd-repart failed (exit $rc)" ;; esac
         log_ok "systemd-repart grew GPT /data + relocated backup header"
     else
-        RESIZE_ERR="$(mktemp)"
+        # /run, not default /tmp: this unit runs DefaultDependencies=no, before
+        # tmp.mount; /tmp is also read-only rootfs until that mount lands.
+        RESIZE_ERR="$(mktemp -p /run edge-grow-data.XXXXXX)"
         if run_parted_resize "$DISK" "$PART_NUM" "$RESIZE_ERR"; then
             log_ok "resized MBR partition $PART_NUM to 100%"
         elif grep -qi "cannot be grown\|already at maximum size\|out of range\|in use\|busy" "$RESIZE_ERR" 2>/dev/null; then
