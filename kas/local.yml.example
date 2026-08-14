@@ -181,6 +181,10 @@ local_conf_header:
     # prod-debug image:
     # EDGE_ENABLE_OBSERVABILITY = "1"
 
+    # Kernel observability + crash-debug fragments follow the profile
+    # (prod=0, dev=1). An explicit 1 produces a prod-debug kernel:
+    # EDGE_KERNEL_DEV_FRAGMENTS = "1"
+
     # --- Dev netboot -----------------------------------------------------
     # 1 — rauc-uboot-env installs a `netboot` macro into U-Boot env
     #     defaults. Operator-typed (`run netboot` at the prompt); bootcmd

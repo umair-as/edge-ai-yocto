@@ -113,7 +113,7 @@ BOOT_TARGET_ENV := $(if $(EDGE_BOOT_TARGET),EDGE_BOOT_TARGET=$(EDGE_BOOT_TARGET)
 # rescue the startup import. Set both on the bitbake command line together.
 # $(1) = profile (dev|prod), $(2) = image target.
 define edge_build
-	$(KAS) shell -c 'BB_ENV_PASSTHROUGH_ADDITIONS="$$BB_ENV_PASSTHROUGH_ADDITIONS EDGE_PROFILE EDGE_OTA_BACKEND EDGE_BOOT_TARGET" EDGE_PROFILE=$(1) $(BOOT_TARGET_ENV)bitbake $(2)' $(STACK)
+	$(KAS) shell -c 'BB_ENV_PASSTHROUGH_ADDITIONS="$$BB_ENV_PASSTHROUGH_ADDITIONS EDGE_PROFILE EDGE_OTA_BACKEND EDGE_BOOT_TARGET EDGE_KERNEL_DEV_FRAGMENTS" EDGE_PROFILE=$(1) $(BOOT_TARGET_ENV)bitbake $(2)' $(STACK)
 endef
 
 # kas refuses to run if KAS_WORK_DIR is set to a non-existent dir
@@ -194,13 +194,13 @@ bundle: | $(KAS_WORK_DIR)
 		exit 1; \
 	fi
 	@echo "==> Building edge-bundle (EDGE_PROFILE=$(EDGE_PROFILE)) [$(STACK)]"
-	$(KAS) shell -c 'BB_ENV_PASSTHROUGH_ADDITIONS="$$BB_ENV_PASSTHROUGH_ADDITIONS EDGE_PROFILE EDGE_OTA_BACKEND BUNDLE_IMAGE_NAME EDGE_BOOT_TARGET" EDGE_PROFILE=$(EDGE_PROFILE) $(BOOT_TARGET_ENV)bitbake edge-bundle' $(STACK)
+	$(KAS) shell -c 'BB_ENV_PASSTHROUGH_ADDITIONS="$$BB_ENV_PASSTHROUGH_ADDITIONS EDGE_PROFILE EDGE_OTA_BACKEND BUNDLE_IMAGE_NAME EDGE_BOOT_TARGET EDGE_KERNEL_DEV_FRAGMENTS" EDGE_PROFILE=$(EDGE_PROFILE) $(BOOT_TARGET_ENV)bitbake edge-bundle' $(STACK)
 	@echo "==> Bundle artefacts:"
 	@find build/tmp/deploy/images -name '*.raucb' -printf '    %p\n'
 
 parse: | $(KAS_WORK_DIR)
-	@echo "==> Parsing BitBake recipes [$(STACK)]"
-	$(KAS) shell -c 'bitbake -p' $(STACK)
+	@echo "==> Parsing BitBake recipes (EDGE_PROFILE=$(EDGE_PROFILE)) [$(STACK)]"
+	$(KAS) shell -c 'BB_ENV_PASSTHROUGH_ADDITIONS="$$BB_ENV_PASSTHROUGH_ADDITIONS EDGE_PROFILE EDGE_OTA_BACKEND EDGE_BOOT_TARGET EDGE_KERNEL_DEV_FRAGMENTS" EDGE_PROFILE=$(EDGE_PROFILE) $(BOOT_TARGET_ENV)bitbake -p' $(STACK)
 
 layers: | $(KAS_WORK_DIR)
 	@echo "==> Showing layers [$(STACK)]"

@@ -29,9 +29,8 @@ SRC_URI:append = " \
     file://cfg/pstore-persist.cfg \
 "
 
-# Dev-only fragments — gated so we don't bake debug/tracing surface into
-# prod images. EDGE_KERNEL_DEV_FRAGMENTS defaults on; flip to "0" in the
-# prod image variant (Phase 2) to drop observability bits.
+# Dev-only fragments. Tier defaults live in edge-profile-{dev,prod}.inc;
+# this fallback keeps them on for builds that do not use the edge-ai distro.
 EDGE_KERNEL_DEV_FRAGMENTS ?= "1"
 SRC_URI:append = "${@' file://cfg/observability-dev.cfg file://cfg/crash-debug-dev.cfg' if d.getVar('EDGE_KERNEL_DEV_FRAGMENTS') == '1' else ''}"
 
