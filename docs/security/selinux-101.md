@@ -50,7 +50,7 @@ the access regardless of what DAC said. So even root can be restricted:
                           |                 gets allowed/denied
                  (any LSM may deny;
                   SELinux usually does
-                  the deciding for us)
+                  the deciding)
                           |
                           v
                    file descriptor
@@ -58,13 +58,13 @@ the access regardless of what DAC said. So even root can be restricted:
 
 LSM is a stack. Multiple LSMs run side-by-side:
 
-| LSM | What it does | In our build? |
+| LSM | What it does | In this build? |
 |---|---|---|
 | Lockdown | Reduces kernel attack surface (no /dev/mem, no kexec, no module loading without integrity, etc.) | yes |
 | Yama | Restricts ptrace to parent-child relationships | yes |
 | BPF | Constrains eBPF program loading | yes |
 | Landlock | Sandboxing API that unprivileged processes can use on themselves | yes |
-| AppArmor | Path-based MAC (one profile per binary) | **no** — we don't ship profiles |
+| AppArmor | Path-based MAC (one profile per binary) | **no** — profiles not shipped |
 | **SELinux** | **Type-enforcement MAC (labels everywhere)** | **yes — the active MAC** |
 | SMACK / TOMOYO | Alternative MACs | no |
 
@@ -72,7 +72,7 @@ Only **one** of {SELinux, AppArmor, SMACK, TOMOYO} can be the active MAC
 at a time — they're "exclusive" LSMs. The non-exclusive ones
 (Lockdown, Yama, BPF, Landlock) stack alongside.
 
-The `CONFIG_LSM=` kernel string defines initialization ORDER. We set:
+The `CONFIG_LSM=` kernel string defines initialization ORDER, set to:
 
 ```
 CONFIG_LSM="lockdown,yama,bpf,landlock,selinux"
@@ -95,7 +95,7 @@ endpoint, …) carries an SELinux label. A label has four fields:
    (RBAC)        (RBAC)         (TE — the part   (MCS/MLS,
    advanced     advanced         policy actually  almost
                                     decides on)   always s0
-                                                  for us)
+                                                  here)
 ```
 
 For most policy decisions only the **type** matters. The others are for
@@ -150,7 +150,7 @@ new binaries.
 
 | Object | Label source |
 |---|---|
-| Files on disk | extended attribute `security.selinux` (xattr). Set at build time by `selinux-image.bbclass`, or at first boot by `selinux-autorelabel`, or any time by `restorecon -R /` |
+| Files on disk | extended attribute `security.selinux` (xattr). A/B images set it at build time before dm-verity hashing; the authenticated root cannot be relabelled after deployment. |
 | Processes | Inherited from parent, OR set by a `type_transition` rule when an executable runs |
 | Sockets, IPC, /proc, /sys | Computed per-call by policy |
 
@@ -196,14 +196,14 @@ legitimate operations → repeat until denials stop → flip to enforcing.
 ### 2.5 Reference policy variants
 
 SELinux ships with a reference policy ("refpolicy") — a big collection of
-TE rules covering common Linux daemons. Variants we could pick:
+TE rules covering common Linux daemons. Available variants:
 
 | Variant | Use case |
 |---|---|
 | `refpolicy-minimum` | Login + getty only. Too little coverage for real systems. |
 | `refpolicy-targeted` | Fedora-style: confine services, leave user shells unconfined. Common production choice. |
 | `refpolicy-standard` | Full module set, no sensitivity dimension. Sensible coverage for systemd, PAM, sshd, audit, NetworkManager — but its 3-field contexts are rejected by the container runtime (see below). |
-| `refpolicy-mcs` | **Our pick.** Same full module set as standard plus a single non-hierarchical sensitivity level (Multi-Category Security). |
+| `refpolicy-mcs` | **This distro's pick.** Same full module set as standard plus a single non-hierarchical sensitivity level (Multi-Category Security). |
 | `refpolicy-mls` | Multi-Level Security (Bell-LaPadula). Very strict — every domain must be correctly labelled or the system won't boot. Not a fit. |
 
 The pick lives in `edge-floor.inc`:
@@ -224,7 +224,7 @@ bridge and host networking (rootful + slirp4netns escape it only because
 they skip the netns-directory relabel codepath). MCS adds the single
 `s0` sensitivity level the labels require, with the same module coverage
 as standard. The relabel-target types themselves (`container_file_t`,
-`iptables_var_run_t`, …) are already present in refpolicy at our pin —
+`iptables_var_run_t`, …) are already present in refpolicy at the pinned version —
 `iptables_var_run_t` is an alias for `iptables_runtime_t`
 (`policy/modules/system/iptables.te`); the gap was always the missing
 sensitivity dimension, never a missing type.
@@ -248,12 +248,12 @@ that activate libselinux in oe-core recipes.
   `semanage-fcontext`. These are what you'll use daily.
 - `setools` — `sesearch`, `seinfo`, `sechecker`. Advanced policy
   inspection.
-- `mcstrans` — MCS/MLS label translation daemon (we don't use)
+- `mcstrans` — MCS/MLS label translation daemon (not used)
 - `selinux-init`, `selinux-autorelabel`, `selinux-labeldev` — boot-time
   helpers
 
 ### Policy
-- The 5 refpolicy variants above. We require `refpolicy-mcs` via
+- The 5 refpolicy variants above. `refpolicy-mcs` is required via
   `PREFERRED_PROVIDER_virtual/refpolicy`.
 
 ### bbclass: `selinux-image.bbclass`
@@ -285,14 +285,14 @@ each has a `PACKAGECONFIG[selinux] = "--with-selinux,...,libselinux,..."`
 line that's just dormant until something flips it on. Meta-selinux flips
 the switch.
 
-**Practical takeaway: enabling SELinux does NOT require us to touch any
-of those 36 recipes.** Two things on our side trigger all of it:
+**Practical takeaway: enabling SELinux does NOT require touching any
+of those 36 recipes.** Two things trigger all of it:
 
 1. `meta-selinux` present in `kas/base.yml` (so bitbake sees the bbappends)
 2. `DISTRO_FEATURES += " selinux"` in `edge-floor.inc` (so the bbappends
    fire)
 
-The only recipe-level work we own is for OUR own daemons in
+The only recipe-level work is for this distro's own daemons in
 `meta-edge-bsp` — and that's policy authoring (Phase 4), not recipe
 editing.
 
@@ -318,7 +318,7 @@ semodule -r edge-fix                  # remove
 # Re-apply labels
 restorecon -Rv /var/log              # relabel a tree
 fixfiles relabel                     # full system relabel
-touch /.autorelabel ; reboot         # forced relabel on next boot
+# Immutable A/B roots must be rebuilt to change rootfs labels.
 
 # Inspect / change policy contexts
 semanage fcontext -l | grep var_log_t
@@ -401,7 +401,7 @@ labelled `data_t`. Three possible fixes:
 Always **review** `audit2allow` output before installing. Auto-allowing
 everything that AVC denies defeats the point of SELinux.
 
-## 5. Our wiring — file by file
+## 5. Local wiring — file by file
 
 ```
    +------------------------+
@@ -480,14 +480,14 @@ policycoreutils, restorecond, setools, mcstrans, semodule-utils.
 kept in sync with `PREFERRED_PROVIDER_virtual/refpolicy` in
 `edge-floor.inc`. A mismatch builds both policy variants into the image.
 
-`selinux-autorelabel` is the systemd unit that runs `restorecon -R /` on
-first boot when `/.autorelabel` exists, then deletes the marker.
+`selinux-autorelabel` remains packaged for recovery and non-verity images. The
+A/B image class removes `/.autorelabel` and fails the build if image-time
+`setfiles` fails; first-boot relabelling would invalidate dm-verity.
 
 ### 5.4 Kernel cmdline — `meta-edge-bsp/recipes-bsp/u-boot/files/rauc-uboot-env.defaults`
 
 ```
-rauc_set_bootargs=... ${EXTRA_KERNEL_ARGS}; echo "[RAUC] ..."
-EXTRA_KERNEL_ARGS=security=selinux enforcing=0
+EDGE_VERITY_KERNEL_ARGS=... security=selinux ...
 ```
 
 `security=selinux` activates the LSM. `enforcing=0` starts permissive.
@@ -555,27 +555,23 @@ selinux=0
 This disables SELinux for that boot only. Investigate, regenerate
 policy, drop `selinux=0`, reboot.
 
-### Re-label is corrupted or wrong
-```sh
-touch /.autorelabel
-reboot
-# selinux-autorelabel.service runs `restorecon -R /` on next boot
-```
+### A rootfs label is wrong
+
+Correct the policy or file installation and rebuild the authenticated image.
+Do not create `/.autorelabel` on an A/B root.
 
 ## 8. Roadmap — what isn't in Phases 1+2
 
 ### Phase 3 — label at build, OTA integration
-- `IMAGE_CLASSES:append = " selinux-image"` in `edge-floor.inc` — runs
-  `setfiles` at `do_rootfs`. Saves 5–15 min on first boot.
-- `meta-edge-bsp/recipes-ota/rauc/files/bundle-hooks.sh` post-install
-  hook: `touch "${RAUC_SLOT_MOUNT}/.autorelabel"` so OTA-installed slots
-  relabel on their first boot.
+
+Implemented: `selinux-image` runs `setfiles` before the verity tree is created.
+Failure is fatal, and OTA raw-writes the already-labelled authenticated image.
 
 ### Phase 4 — enforce
 - Flip `EXTRA_KERNEL_ARGS=security=selinux enforcing=1` in prod tier.
 - Drop `CONFIG_SECURITY_SELINUX_DEVELOP=y` from the prod fragment to
   remove the per-domain permissive override surface.
-- Custom policy modules for our own daemons (edge-banner,
+- Custom policy modules for this distro's own daemons (edge-banner,
   edge-pstore-prune, edge-persistence services, weston) as their
   domains stabilize.
 
@@ -586,6 +582,6 @@ reboot
   — best deep-dive reference
 - [Reference Policy](https://github.com/SELinuxProject/refpolicy) — the
   source of `refpolicy-mcs`
-- `meta-selinux/SELinux-FAQ` in our pinned layer — short FAQ shipped with
+- `meta-selinux/SELinux-FAQ` in the pinned layer — short FAQ shipped with
   the layer itself
 - `meta-selinux/README` — layer's own integration notes

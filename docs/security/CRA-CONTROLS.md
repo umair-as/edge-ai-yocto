@@ -20,10 +20,10 @@ EU Cyber Resilience Act, Annex I (essential cybersecurity requirements). This ta
 | Sub-requirement | Status | Implementation |
 |---|---|---|
 | 1.a — Minimum attack surface (no unnecessary services) | ✅ | Base image is minimal Weston; dev image opt-in via packagegroups. `tools-debug` / `tools-profile` only in `edge-image-dev`. No demo / sample daemons. U-Boot surface reduction via `EDGE_UBOOT_FEATURES` — see [uboot-hardening.md](uboot-hardening.md). |
-| 1.b — Hardened build flags | ✅ | `security_flags.bbclass` auto-inherited. `SECURITY_CFLAGS` = `-fstack-protector-strong -O2 -D_FORTIFY_SOURCE=2 -Wformat -Wformat-security -Werror=format-security`. Userspace built PIE. U-Boot stack canary via `CONFIG_STACKPROTECTOR=y` (see uboot-hardening.md). |
-| 1.c — Kernel hardening | ✅ | `security-hardening.cfg` fragment + `rauc_set_bootargs` tokens (init_on_alloc, slab_nomerge, page_alloc.shuffle, randomize_kstack_offset, vsyscall=none). LSM stack `CONFIG_LSM="lockdown,yama,bpf,landlock,selinux"` — lockdown (early, `SECURITY_LOCKDOWN_LSM_EARLY=y`) + landlock compiled in. |
+| 1.b — Hardened build flags | ✅ | `security_flags.bbclass` auto-inherited. `SECURITY_CFLAGS` = `-fstack-protector-strong -O2 -D_FORTIFY_SOURCE=2 -Wformat -Wformat-security -Werror=format-security`. Userspace built PIE. U-Boot stack canary deferred — `CONFIG_STACKPROTECTOR` off pending a proof build (see uboot-hardening.md "Explicit deferrals"). |
+| 1.c — Kernel hardening | ✅ | `security-hardening.cfg` plus hardening arguments embedded in the signed slot DTBs. LSM stack includes lockdown, yama, BPF, landlock, and SELinux; lockdown is compiled but not activated. |
 | 1.d — Sysctl baseline | ✅ | `edge-sysctl-hardening` — CIS L1. |
-| 1.e — Read-only rootfs | 📅 | Prod tier — separate `edge-image-prod.bb` (not in this iteration). |
+| 1.e — Read-only rootfs | ✅ | All A/B images use a read-only dm-verity mapping; persistent writes live under `/data`. |
 
 ### 2. No known exploitable vulnerabilities at time of release
 
@@ -50,7 +50,7 @@ EU Cyber Resilience Act, Annex I (essential cybersecurity requirements). This ta
 
 | Sub-requirement | Status | Implementation |
 |---|---|---|
-| 4.a — DM-VERITY rootfs (immutable) | 🟡 | Kernel symbols on (`CONFIG_DM_VERITY=y`, `DM_VERITY_FEC=y`, `BLK_DEV_DM=y`, `DM_INIT=y`). RAUC bundle format already `verity`. Boot-flow wiring deferred — needs `rauc_set_bootargs` change to construct `root=/dev/dm-0 dm-mod.create=...` from active-slot root hash. |
+| 4.a — DM-VERITY rootfs (immutable) | ✅ | RAUC raw-writes `ext4.verity`; the signed slot FIT supplies the root hash and early `dm-mod.create`, mounting `/dev/dm-0` read-only. On-target validation remains required after the first build. |
 | 4.b — `/data` LUKS encryption | 🟡 | `cryptsetup` (LUKS + `veritysetup`) userspace ships in `packagegroup-edge-security`. No wiring yet. Needs TPM2 chip on the board (RZ/V2L doesn't have internal TPM) OR PBKDF-derived key from per-device secret. |
 | 4.c — Key material protection | ⏸ | TPM-sealed LUKS key. Same blocker as 4.b. |
 
@@ -60,16 +60,16 @@ EU Cyber Resilience Act, Annex I (essential cybersecurity requirements). This ta
 |---|---|---|
 | 5.a — TLS client trust store | ✅ | `ca-certificates` (Mozilla bundle) in `packagegroup-edge-security`. |
 | 5.b — Modern SSH ciphers | ✅ | curve25519-sha256, chacha20-poly1305, aes-gcm only (`edge-sshd-hardening` → `sshd_config.d/99-edge-hardening.conf`). |
-| 5.c — TLS for OTA bundles | 🟡 | `rauc-conf-edge` uses `bundle-formats=verity` (integrity). Streaming-over-TLS deferred — RAUC streaming section commented in `system.conf`. |
+| 5.c — TLS for OTA bundles | ✅ | `bundle-formats=verity` for integrity, plus mTLS transport: the `[streaming]` block in `system.conf` binds a client cert/key and CA, and the transfer runs as the unprivileged `ota` user. Hardware-validated on RZ/V2L — a 253 MB bundle streamed over HTTPS with client-certificate auth and installed to the inactive slot. Requires a per-device identity in `/etc/ota` (`EDGE_OTA_CERT_DIR`); not shipped by default. |
 
 ### 6. Integrity protection
 
 | Sub-requirement | Status | Implementation |
 |---|---|---|
-| 6.a — Signed boot chain | ✅ | TF-A (BL2/BL31) → OP-TEE (BL32) → U-Boot (BL33). RAUC bundle signed. |
-| 6.b — Signed FIT image | ✅ | `sha256,rsa2048:edge-fit-dev` — kernel + DTB signatures verified by U-Boot's control DTB pubkey. |
-| 6.c — DM-VERITY at runtime | 🟡 | See 4.a. |
-| 6.d — Module signing | 🟡 | `MODULE_SIG=y`, `MODULE_SIG_ALL=y`. `MODULE_SIG_FORCE=y` deferred to prod tier. |
+| 6.a — Signed boot chain | 🟡 | U-Boot verifies FIT configurations and RAUC verifies bundles, but TF-A has `TRUSTED_BOARD_BOOT=0`; BL2 through BL33 are not hardware-authenticated. |
+| 6.b — Signed FIT image | ✅ | `sha256,rsa2048:edge-fit-dev` covers the kernel and slot DTB, including the root hash. Interactive U-Boot commands can still bypass the managed boot macro. |
+| 6.c — DM-VERITY at runtime | ✅ | See 4.a; implementation is parse-checked but not yet on-target validated. |
+| 6.d — Module signing | ✅ | `MODULE_SIG=y`, `MODULE_SIG_ALL=y`, and `MODULE_SIG_FORCE=y`; hand-installed Renesas modules use the shared signing include. |
 | 6.e — IMA appraisal | 🟡 | Kernel `CONFIG_IMA=y`, `IMA_LSM_RULES=y`. `ima_appraise=enforce` cmdline + signed policy deferred. |
 
 ### 7. Minimisation of data processed
@@ -119,7 +119,7 @@ EU Cyber Resilience Act, Annex I (essential cybersecurity requirements). This ta
 |---|---|---|
 | 12.a — Signed OTA bundles | ✅ | RAUC bundle signed by `edge-fit-dev` keychain. |
 | 12.b — Atomic install + rollback | ✅ | A/B slot architecture. |
-| 12.c — Update transport authenticity | 🟡 | Bundle signature is checked locally. HTTPS streaming with mTLS deferred (`rauc-conf-edge` has the `[streaming]` block commented; lands in Phase 2). |
+| 12.c — Update transport authenticity | ✅ | Two independent layers: the bundle signature is verified against the device keyring regardless of transport, and the transport itself is mutually authenticated — the device presents a client certificate and validates the server against its own CA. Both exercised in the same hardware-validated streaming install; signature verification happens over the stream, before any slot is written. |
 | 12.d — Update without user interruption | ✅ | RAUC install while running; reboot to flip slot. |
 
 ### 13. Possibility to delete all data + settings
