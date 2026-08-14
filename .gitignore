@@ -52,3 +52,6 @@ scratch/**
 # Claude Code per-user local settings — board IP, credentials, personal
 # paths. Never commit. Everything else under .claude/ is tracked.
 .claude/settings.local.json
+# Ephemeral git worktrees (agent-harness and operator) live in-repo here.
+# Runtime state, never committed — see CLAUDE.md "Parallel sessions".
+.claude/worktrees/
