@@ -66,22 +66,23 @@ repos:
   # --- Yocto upstream layers (SHA-pinned to the wrynose 6.0 baseline) ---
   openembedded-core:
     url: https://git.openembedded.org/openembedded-core
-    # yocto-6.0 tag
-    commit: 42fa856a00ac16b2a7a83d7ecfa60a5be192b16c
+    # wrynose branch tip, 2026-07-30 (bumped from the yocto-6.0 tag to pull
+    # ~3 months of stable-branch CVE backports and recipe updates)
+    commit: f09a0f28aeb54ddd90415dd458338e1565bb5a49
     layers:
       meta:
 
   bitbake:
     url: https://git.openembedded.org/bitbake
-    # yocto-6.0 tag
-    commit: 33581c84f3a85008239acbd940501a35de48dc91
+    # 2.18 branch tip, 2026-07-09 (still 2.18.0; moves with the poky cluster)
+    commit: fae9db3168dbff1b8c76fe9c6726a9687ff97514
     layers:
       bitbake: disabled
 
   meta-yocto:
     url: https://git.yoctoproject.org/meta-yocto
-    # yocto-6.0 tag
-    commit: 904846ae078ee20de073040ebb77c86e19250f56
+    # wrynose branch tip, 2026-07-30 (poky cluster: moves with oe-core/bitbake)
+    commit: 1b132647002eea43a2c7a7f857f63f42dacbc26c
     layers:
       meta-poky:
 
@@ -95,8 +96,9 @@ repos:
 
   meta-openembedded:
     url: https://git.openembedded.org/meta-openembedded
-    # wrynose HEAD at baseline
-    commit: 420222862f5a6d95023b8f5f3b7e1808b2264ef9
+    # wrynose branch tip, 2026-08-07 (moves in lockstep with the poky cluster;
+    # shares oe-core's class/python API, carries userland CVE backports)
+    commit: 6bf0d8ad57b33950bab4c7f6c037e1ccb6f6e2eb
     # All meta-oe sublayers any edge image might need are activated here.
     # meta-networking + meta-filesystems are parse-only for edge-image-base
     # (no packagegroup pulls from them); edge-image-dev consumes them via
