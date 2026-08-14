@@ -3,8 +3,11 @@ Description=Initialize U-Boot environment for RAUC bootchooser
 DefaultDependencies=no
 After=boot.mount
 Requires=boot.mount
+# Migration gating lives in the script's versioned stamp, not here: a
+# unit-level marker condition pins the check to ONE version and strands
+# boards stamped at any other. The script exits immediately when the
+# current stamp exists.
 ConditionPathExists=/etc/fw_env.config
-ConditionPathExists=!/boot/.rauc-uboot-env-initialized-v3-fit-only
 
 [Service]
 Type=oneshot

@@ -1,0 +1,32 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+Date: Thu, 13 Aug 2026 15:41:00 +0200
+Subject: [PATCH] smarc-rzv2l: drop legacy CONFIG_BOOTCOMMAND define
+
+The board header re-defines the CONFIG_BOOTCOMMAND macro after the
+Kconfig-generated value, so the vendor "env default -a;run
+bootcmd_check;run bootimage" flow silently wins over any
+CONFIG_BOOTCOMMAND set in a defconfig or config fragment. Fresh media
+with an erased environment then boots the legacy raw Image path
+instead of the distro's signed-FIT boot command. Drop the define; the
+Kconfig value now reaches the built-in default environment. The
+vendor env scripts (bootcmd_check, emmcload, sd1load, bootimage) stay
+available for manual use.
+
+Upstream-Status: Inappropriate [board-specific configuration]
+Assisted-by: claude-code:claude-fable-5
+---
+ include/configs/smarc-rzv2l.h | 2 --
+ 1 file changed, 2 deletions(-)
+
+--- a/include/configs/smarc-rzv2l.h
++++ b/include/configs/smarc-rzv2l.h
+@@ -55,8 +55,6 @@
+ 	"sd1load=ext4load mmc 1:2 0x48080000 boot/Image;ext4load mmc 1:2 0x48000000 boot/r9a07g054l2-smarc.dtb;run prodsdbootargs \0" \
+ 	"bootcmd_check=if mmc dev 1; then run sd1load; else run emmcload; fi \0"
+ 
+-#define CONFIG_BOOTCOMMAND	"env default -a;run bootcmd_check;run bootimage"
+-
+ /* For board */
+ /* Ethernet RAVB */
+ #define CONFIG_BITBANGMII_MULTI

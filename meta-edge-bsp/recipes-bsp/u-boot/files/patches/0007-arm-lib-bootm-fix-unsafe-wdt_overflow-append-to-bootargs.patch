@@ -1,0 +1,69 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+Date: Thu, 13 Aug 2026 15:40:00 +0200
+Subject: [PATCH] arm: lib: bootm: fix unsafe wdt_overflow append to bootargs
+
+boot_prep_linux() appends " wdt_overflow=<n>" by strcat-ing directly
+onto the pointer returned by env_get("bootargs"). This is broken in
+both bootargs states:
+
+- bootargs unset: env_get() returns NULL and strcat(NULL, ...) raises
+  a synchronous abort. Unset bootargs is a legitimate state - it is
+  how a signed FIT DTB's /chosen/bootargs is allowed to survive
+  fdt_chosen(), so any verified-boot flow that carries the command
+  line in the signed devicetree crashes at bootm.
+- bootargs set: the strcats write up to ~26 bytes past the end of the
+  env hashtable's malloc'd value string. Corruption detonates later
+  in the boot path whenever bootargs is not the most recent heap
+  allocation; observed on RZ/V2L as an abort after "Starting kernel"
+  with " wdt_overflow=0" ASCII bytes in the fault registers.
+
+Build the amended command line in a properly sized buffer and store it
+back with env_set(), skipping the append when bootargs is unset (the
+signed-DTB case, where injecting anything would defeat the design).
+
+Reported-at: https://github.com/renesas-rz/renesas-u-boot-cip/issues/3
+Upstream-Status: Pending
+Assisted-by: claude-code:claude-fable-5
+---
+ arch/arm/lib/bootm.c | 22 ++++++++++++++++++++--
+ 1 file changed, 20 insertions(+), 2 deletions(-)
+
+--- a/arch/arm/lib/bootm.c
++++ b/arch/arm/lib/bootm.c
+@@ -35,6 +35,7 @@
+ #include <asm/cache.h>
+ 
+ #ifdef CONFIG_WDT
++#include <malloc.h>
+ #include <wdt.h>
+ #endif
+ 
+@@ -205,8 +206,25 @@
+ 	char *commandline = env_get("bootargs");
+ 
+ #ifdef CONFIG_WDT
+-	strcat(commandline, " wdt_overflow=");
+-	strcat(commandline, simple_itoa(watchdog_overflow));
++	/*
++	 * Append the watchdog-overflow status without writing into the
++	 * env-owned string: strcat on the env_get() pointer overruns its
++	 * allocation, and bootargs may legitimately be unset (a signed FIT
++	 * DTB carrying /chosen/bootargs relies on that to survive
++	 * fdt_chosen()), in which case there is nothing to append to.
++	 */
++	if (commandline) {
++		size_t cmdline_len = strlen(commandline) + 32;
++		char *buf = malloc(cmdline_len);
++
++		if (buf) {
++			snprintf(buf, cmdline_len, "%s wdt_overflow=%s",
++				 commandline, simple_itoa(watchdog_overflow));
++			env_set("bootargs", buf);
++			free(buf);
++			commandline = env_get("bootargs");
++		}
++	}
+ #endif
+ 
+ 	if (CONFIG_IS_ENABLED(OF_LIBFDT) && IS_ENABLED(CONFIG_LMB) && images->ft_len) {

@@ -12,30 +12,22 @@ Part I §1 (minimum attack surface, hardened build flags) — see
 U-Boot is the highest-privilege software stage this project controls. On
 the SMARC RZ/V2L EVK, the boot chain is:
 
-```
-RZ/V2L SoC mask ROM (eSD boot)
-  → BL2  (TF-A, from FIP)
-    → BL31 (TF-A SPMC)
-      → BL32 (OP-TEE)
-        → BL33 (U-Boot 2024.07, Renesas CIP fork)
-          → rauc_select_slot   (A/B slot pick, BOOT_x_LEFT decrement)
-          → rauc_set_bootargs  (root=, rauc.slot=, EXTRA_KERNEL_ARGS)
-          → boot_fit            (bootm of FIT with signature verify)
-            → linux-renesas (CIP 6.12)
-```
+![Secure boot chain of trust: mask ROM → BL2 → BL31 → BL32 → BL33 (U-Boot, hardened) → boot_fit (FIT signature verify) → linux-renesas](diagrams/secure-boot-chain.svg)
 
-Hardware-rooted secure boot starts at BL2 (TF-A's trusted boot chain).
-U-Boot's hardening complements that: it is the policy layer where
-unused commands, legacy boot paths, and runtime mutation surfaces are
-shrunk to the minimum needed for FIT-verified A/B boot.
+TF-A currently reports `TRUSTED_BOARD_BOOT=0` and `MEASURED_BOOT=0`.
+Authentication therefore starts at U-Boot's embedded FIT public key, not at a
+hardware root. U-Boot is also an interactive shell whose remaining commands can
+bypass the managed boot macro. This document describes the normal A/B path and
+surface reduction; it does not claim console-resistant secure boot.
 
 The hardening addresses three orthogonal objectives:
 
-1. **Enforce signed boot** — make legacy image format unavailable; FIT
-   is the only allowed boot artifact.
+1. **Verify the managed boot artifact** — disable legacy uImage and require a
+   valid signature when the normal path invokes `bootm` on a slot FIT.
 2. **Reduce attack surface** — remove U-Boot commands that the
    appliance boot path and field diagnostics do not use.
-3. **Build-loader self-protection** — native stack canary at U-Boot.
+3. **Build-loader self-protection** — native stack canary at U-Boot
+   (deferred, not yet active — see "Explicit deferrals").
 
 All changes are additive to the FIT signing infrastructure and preserve
 RAUC A/B update compatibility.
@@ -51,7 +43,7 @@ controls which hardening layers are active:
 
 | Token | Purpose | Safe for dev? |
 |---|---|---|
-| `surface_reduce` | Disable unused commands, enable stack canary | Yes |
+| `surface_reduce` | Disable unused commands (usb, storage, loadb/loads) | Yes |
 | `net_off` | Drop U-Boot network commands when netboot is off | Yes (skipped when `EDGE_DEV_NETBOOT=1`) |
 | `fit_enforce` | Reassert legacy image format off | Yes |
 
@@ -88,8 +80,8 @@ escape hatch is `EDGE_DEV_NETBOOT=1`, which selects the
   `EDGE_DEV_NETBOOT != "1"` condition).
 - `CMD_NET`, `CMD_DHCP`, `CMD_TFTPBOOT` stay on, enabling the
   `rauc-uboot-env-init` service to populate a `netboot` env macro.
-- All other hardening (`surface_reduce`, `fit_enforce`, stack canary)
-  remains active.
+- All other hardening (`surface_reduce`, `fit_enforce`) remains
+  active.
 
 A dev-netboot build is therefore strictly a network-bring-up dev
 profile, not a hardening downgrade. FIT signature verification, the
@@ -108,8 +100,7 @@ raw MMC area `0x1F0000`-`0x230000`). The `bootcmd` macro runs:
 rauc_init           → seed BOOT_ORDER / BOOT_x_LEFT if absent
 rauc_select_slot    → choose A or B, decrement counter
 rauc_validate_slot  → fall back to A if no slot has attempts left
-rauc_set_bootargs   → assemble cmdline, append EXTRA_KERNEL_ARGS
-boot_fit            → ext4load fitImage from /boot, bootm
+boot_fit            → load fitImage-A/B; signed DTB supplies verity cmdline
 ```
 
 | Env var | Role | Owner |
@@ -117,7 +108,8 @@ boot_fit            → ext4load fitImage from /boot, bootm
 | `BOOT_ORDER` | Slot priority (`A B` or `B A`) | RAUC at OTA, init at first boot |
 | `BOOT_A_LEFT` / `BOOT_B_LEFT` | Remaining attempt counter | RAUC + U-Boot decrement |
 | `rauc_slot` | Selected slot for this boot | U-Boot scratch |
-| `EXTRA_KERNEL_ARGS` | Distro-set kernel cmdline appendix | `rauc-uboot-env-init.service` |
+| `EDGE_VERITY_A` / `EDGE_VERITY_B` | Slot has a matching signed verity FIT | bundle hook / first-boot init |
+| `EXTRA_KERNEL_ARGS` | Transitional legacy-slot cmdline appendix | `rauc-uboot-env-init.service` |
 
 ### FIT verification chain
 
@@ -127,16 +119,17 @@ embeds the public key (`UBOOT_SIGN_ENABLE=1` +
 `sha256,rsa2048` at the configuration node level — `bootm` rejects an
 unsigned or mis-signed config.
 
-`fit_enforce` adds a regression guard: even if a future Renesas
+`fit_enforce` adds a legacy-format regression guard: even if a future Renesas
 defconfig sync flipped `CONFIG_LEGACY_IMAGE_FORMAT=y` back on, the
-fragment overlay restores it to off, preserving "FIT-only" semantics.
+fragment overlay restores it to off. It does not remove `booti`, memory access,
+or every alternate command reachable from an interrupted shell.
 
-### Shared `/boot` partition (single FIT)
+### Shared `/boot` partition (paired FITs)
 
-Both RAUC slots reference the **same** FIT image at `/boot/fitImage`.
-The slot udev rules + RAUC system.conf own slot-vs-active state; the
-boot artifact itself is shared. This avoids per-slot FIT naming
-gymnastics and keeps the `bootcmd` script slot-symmetric.
+The shared filesystem contains `/boot/fitImage-A` and `/boot/fitImage-B`.
+Each signed DTB binds its root hash and physical rootfs partition. OTA replaces
+only the inactive slot FIT before setting its verity-ready environment marker.
+An unconverted slot can temporarily use `/boot/fitImage` during migration.
 
 ---
 
@@ -148,12 +141,25 @@ gymnastics and keeps the `bootcmd` script slot-symmetric.
 |---|---|---|---|
 | `CONFIG_CMD_USB` | y | **n** | RZ/V2L boots from eSD via SoC mask ROM. USB is not in `boot_targets` and not used by the splash-load or FIT-load paths. |
 | `CONFIG_USB_STORAGE` | y | **n** | Same — block-device layer above `CMD_USB`. |
+| `CONFIG_USB_XHCI_HCD` | y | **n** | USB 3.x host controller driver. Host mode is unused at U-Boot; disabling the HCDs deselects `USB_HOST` (both HCDs `select` it, so the HCDs are the symbols to disable). `USB_XHCI_RCAR` is a hidden child and drops with it. |
+| `CONFIG_USB_EHCI_HCD` | y | **n** | USB 2.0 host controller driver. Same. |
 | `CONFIG_CMD_LOADB` | y | **n** | Kermit serial download. Unused — flashing is via `bmaptool` from host or RAUC bundle from network. |
 | `CONFIG_CMD_LOADS` | y | **n** | S-record serial download. Same. |
 
-Net binary size reduction: ~30-40 KB. More important than size: every
-removed command is one fewer code path the FIT-verified-boot chain has
-to treat as trusted.
+More important than size: every removed command or driver is one fewer
+code path the FIT-verified-boot chain has to treat as trusted.
+
+The gadget (device-mode) side is deliberately retained: `CONFIG_USB`,
+`CONFIG_USB_GADGET`, `CONFIG_USB_RENESAS_USBHS` (the dedicated function
+controller — a separate IP block from the xHCI/EHCI hosts), and the
+`ums` command (`CONFIG_CMD_USB_MASS_STORAGE`). `ums` exposes eMMC/SD to
+a connected PC as USB mass storage and is the established eMMC flashing
+path on this board. It is reachable only from the U-Boot prompt, which
+is gated by the keyed autoboot stop string. The Linux-side counterpart
+is the opposite: the kernel drops `USB_GADGET` (no runtime consumer,
+`surface-trim.cfg`) and keeps USB host for the carrier hub and UVC
+capture — the two configs are independent builds and do not need to
+match.
 
 `CONFIG_STACKPROTECTOR` is left at the defconfig default — see deferral
 note below.
@@ -164,13 +170,20 @@ Applied when `EDGE_DEV_NETBOOT != "1"`:
 
 | Symbol | Effect |
 |---|---|
-| `CONFIG_CMD_NET=n` | Drops the full U-Boot net layer (PHY, ARP, IP). |
-| `CONFIG_CMD_DHCP=n` | No automatic IP acquisition at U-Boot. |
-| `CONFIG_CMD_TFTPBOOT=n` | No TFTP download path at U-Boot. |
+| `CONFIG_CMD_NET=n` | Removes all interactive network commands (bootp, dhcp, tftpboot, ping, …). |
+| `CONFIG_CMD_DHCP=n` | Child of `CMD_NET` — already removed by the parent; kept as defensive re-assertion. |
+| `CONFIG_CMD_TFTPBOOT=n` | Child of `CMD_NET` — same. |
 
-Net binary size reduction: ~50 KB. Removes the entire U-Boot network
-stack (drivers, protocol code) from a build that has no business
-talking to the network at this stage.
+`CMD_DHCP` and `CMD_TFTPBOOT` live inside `if CMD_NET` in `cmd/Kconfig`,
+so once the parent is off, Kconfig drops the children from the resolved
+`.config` entirely — the two fragment lines cannot appear in it and are
+redundant by construction.
+
+This removes the network command *entry points*, not the network stack:
+the resolved config retains `CONFIG_NET=y`, `CONFIG_ETH=y`,
+`CONFIG_NETDEVICES=y`, and `CONFIG_BOOTDEV_ETH=y`, so the eth driver and
+protocol core remain compiled in. Dropping `CONFIG_NET` itself is an
+open follow-up decision, weighed against dev-netboot needs.
 
 ### `fit_enforce` — regression guard
 
@@ -191,13 +204,15 @@ layer:
 - `CONFIG_CMD_NFS`, `CONFIG_CMD_PXE`, `CONFIG_CMD_WGET`, `CONFIG_CMD_DNS`
 - `CONFIG_CMD_LICENSE`, `CONFIG_CMD_SOURCE`, `CONFIG_CMD_IMLS`
 - `CONFIG_LEGACY_IMAGE_FORMAT`
-- The `CMD_MEMORY` umbrella (`md`/`mm`/`mw`/`mx`/`bdinfo`) — gated off
-  entirely, not even exposed in Kconfig at this defconfig depth
+- Several memory and board-inspection commands remain. The resolved artifact
+  has `CONFIG_CMD_MEMORY=y` and `CONFIG_CMD_BDI=y`; they are part of the
+  interactive-shell bypass threat until separately removed.
 
-### Default cmdline appendix — `EXTRA_KERNEL_ARGS`
+### Signed verity cmdline and legacy appendix
 
-`rauc_set_bootargs` appends `${EXTRA_KERNEL_ARGS}` verbatim. The
-default contents come from `rauc-uboot-env.defaults`:
+Normal verified boot clears the environment `bootargs`; the slot FIT's signed
+DTB supplies the complete root and hardening command line. `${EXTRA_KERNEL_ARGS}`
+is used only by the transitional legacy-slot path:
 
 ```
 EXTRA_KERNEL_ARGS=security=selinux hash_pointers=always \
@@ -216,11 +231,10 @@ EXTRA_KERNEL_ARGS=security=selinux hash_pointers=always \
 `lockdown=` is **intentionally absent** — see the Kernel lockdown
 deferral below for the module-signing dependency that gates activation.
 
-The cmdline-level escape `selinux=0` remains available for field
-recovery via `fw_setenv EXTRA_KERNEL_ARGS 'selinux=0'`. The U-Boot env
-init service (`rauc-uboot-env-init.service`) writes the values above
-to U-Boot env on the first boot of a freshly flashed image, marked
-with the stamp `/boot/.rauc-uboot-env-initialized-v6-khc-wave3`.
+Changing `EXTRA_KERNEL_ARGS` does not alter a verity-ready slot. Recovery that
+changes signed boot policy requires a newly signed FIT or an explicit alternate
+boot from the U-Boot shell. The environment migration stamp is
+`/boot/.rauc-uboot-env-initialized-v9-fit-conf-selector`.
 
 ---
 
@@ -231,17 +245,28 @@ path back to the codebase when activated.
 
 ### U-Boot stack canary (`CONFIG_STACKPROTECTOR`)
 
-U-Boot 2024.07 declares the `CONFIG_STACKPROTECTOR` Kconfig symbol but
-does not ship `lib/stack_protector.c`. Setting `=y` routes
-`-fstack-protector` through KCFLAGS, GCC emits `__stack_chk_guard` /
-`__stack_chk_fail` references in every compiled object, and the final
-link fails because no runtime symbols exist.
+Current state: the symbol is at the defconfig default (off). The shipped
+binary is built with `-fno-stack-protector` and contains no
+`__stack_chk_guard` / `__stack_chk_fail` symbols.
 
-The fix is a backport of `lib/stack_protector.c` from a later upstream
-U-Boot tag — a single file, ~30 lines, plus a `lib/Makefile` entry
-gated on the existing Kconfig symbol. Pending that patch, the symbol
-is left at the defconfig default (off). The `surface_reduce` fragment
-still ships its other four disables; only the canary line is deferred.
+An earlier revision of this note claimed U-Boot 2024.07 lacks the
+stack-check runtime (`lib/stack_protector.c`) and that enabling the
+symbol fails at link. That was checked against the wrong path: the
+2024.07 tree ships the runtime at `common/stackprot.c` (all three
+`__stack_chk_*` symbols), wired via `common/Makefile`
+(`obj-$(CONFIG_$(SPL_TPL_)STACKPROTECTOR) += stackprot.o`), and the
+top-level Makefile adds `-fstack-protector-strong
+-mstack-protector-guard=global` when the symbol is set. Enabling it
+plausibly just works; activation is deferred until a proof build and
+boot test on the RZ/V2L toolchain confirm it.
+
+Related gotcha, verified in `log.do_configure`: OE-Core's
+`merge_config.sh` parses any fragment comment line starting
+`# CONFIG_<sym> ...` as a config assignment. The fragment's explanatory
+comment previously triggered a spurious "Value of CONFIG_STACKPROTECTOR
+is redefined" event (`oldconfig` then restored the default, so the
+result was correct by accident). The fragment comment now omits the
+`CONFIG_` prefix to avoid this.
 
 ### Kernel lockdown — module-signing-gated, `FORCE_NONE` declared as interim
 
@@ -254,12 +279,11 @@ require the kernel to be at or below `LOCKDOWN_CONFIDENTIALITY_MAX`.
 
 `LOCKDOWN_MODULE_SIGNATURE` sits in the integrity band. Both
 `lockdown=integrity` and `lockdown=confidentiality` block loading of any
-unsigned kernel module. There is no lockdown level that activates the
-LSM and also loads unsigned modules. Module signing is not optional
-prerequisite work that "would be nice once we get there" — it is
-intrinsically coupled to using lockdown at all.
+unsigned kernel module. There is no lockdown level that activates the LSM and
+also permits unsigned modules. The current build enforces module signatures;
+lockdown activation still needs a separate runtime regression pass.
 
-The bench observation on the Wave 3 build (which shipped
+The bench observation on the earlier Wave 3 build (which shipped
 `CONFIG_LOCK_DOWN_KERNEL_FORCE_CONFIDENTIALITY=y` in the kernel cfg
 fragment, paired with `lockdown=integrity` on the cmdline) was that the
 kernel entered confidentiality at boot regardless of the cmdline. The
@@ -310,11 +334,12 @@ Two questions need separate answers. Wave 3 answered them as one:
 | `CONFIG_LOCK_DOWN_KERNEL_FORCE_NONE` | `=y` | LSM dormant at boot, cmdline can activate |
 | `CONFIG_MODULE_SIG` | `=y` (pre-existing) | Module-signature checking compiled in |
 | `CONFIG_MODULE_SIG_ALL` | `=y` (pre-existing) | In-tree modules signed at kernel build |
-| `CONFIG_MODULE_SIG_FORCE` | `=n` | Without lockdown, unsigned modules can load |
+| `CONFIG_MODULE_SIG_FORCE` | `=y` | Unsigned modules are rejected independently of lockdown |
 | `CONFIG_MODULE_SIG_KEY` | `"certs/signing_key.pem"` (kernel default) | Auto-generated per build |
 | `EXTRA_KERNEL_ARGS` | no `lockdown=` token | LSM stays dormant; modules load |
 
-In this state the Lockdown LSM is built but inactive. KHC scores the
+The four hand-installed Renesas modules are now signed by their bbappends. The
+Lockdown LSM remains built but inactive. KHC scores the
 absent `lockdown=` cmdline as `FAIL: lockdown != confidentiality`.
 That FAIL is **a declared interim**, gated on signing the out-of-tree
 modules (task #58 below). It is not the target posture.
@@ -323,9 +348,8 @@ modules (task #58 below). It is not the target posture.
 
 | Step | Action | Where |
 |---|---|---|
-| 1 | Sign mmngr / mmngrbuf / vspm / vspm_if at recipe build using the existing kernel signing key. The infrastructure (`scripts/sign-file`, `certs/signing_key.pem`) is already present from the in-tree signing pipeline; only the out-of-tree module recipes need a `do_install:append` invoking `sign-file`. | `meta-edge-bsp/recipes-kernel/kernel-module-{mmngr,mmngrbuf,vspm,vspmif}/*.bbappend` |
-| 2 | Add `lockdown=integrity` to `EXTRA_KERNEL_ARGS`, bump the env-init stamp. | `meta-edge-bsp/recipes-bsp/u-boot/files/rauc-uboot-env.defaults` |
-| 3 | Optionally set `CONFIG_MODULE_SIG_FORCE=y` to require signatures even without lockdown active, hardening the prod tier. | `security-hardening.cfg` |
+| 1 | Completed: sign mmngr / mmngrbuf / vspm / vspm_if with the kernel signing key. | module recipe bbappends |
+| 2 | Add `lockdown=integrity` to `EDGE_VERITY_KERNEL_ARGS` after an on-target regression pass. | `edge-verity-image.bbclass` |
 
 The kernel rebuild is needed only for step (3) if taken — steps (1)+(2)
 are recipe + env edits.
@@ -362,13 +386,11 @@ to read OTP and inject deterministic MACs.
 
 ### KASLR seed injection from U-Boot HW RNG
 
-Dmesg currently reports `KASLR disabled due to lack of seed`. The
-RZ/V2L exposes a TRNG at the SoC level and the OP-TEE HWRNG PTA is
-already wired (`0006-rzg2l-ft_board_setup-add-debug-traces.patch`
-mentions the path). Pending wiring: U-Boot reads from the OP-TEE
-HWRNG PTA, fills `/chosen/kaslr-seed`, kernel KASLR activates from a
-hardware-rooted seed. Same patch can also fill
-`/chosen/rng-seed` for early kernel `random.c` entropy.
+The RZ/V2L exposes a TRNG through the OP-TEE HWRNG PTA. U-Boot reads it,
+fills `/chosen/kaslr-seed`, and the kernel reports `KASLR enabled`; patch
+`0006-rzg2l-ft_board_setup-add-debug-traces.patch` traces that path.
+`/chosen/rng-seed` remains unwired; adding it would separately supply early
+entropy to kernel `random.c`.
 
 ### Build-tag for fleet provenance
 
@@ -383,12 +405,12 @@ remains future work; visible as part of the SBOM track.
 
 | Sub-requirement | Mechanism in this layer |
 |---|---|
-| §1.a — Minimum attack surface | `surface_reduce` + `net_off` strip ~80 KB of unused U-Boot code paths. |
-| §1.b — Hardened build flags | `CONFIG_STACKPROTECTOR=y` wires U-Boot's native canary at build. |
-| §1.c — Kernel hardening | `EXTRA_KERNEL_ARGS=security=selinux` activates the MAC; mode is policy-driven. |
+| §1.a — Minimum attack surface | `surface_reduce` + `net_off` remove unused U-Boot commands (usb, storage, loadb/loads, all net commands) and the USB host-controller drivers. Retained: the USB gadget side (`ums` eMMC flashing) and the net core — see the fragment sections above. |
+| §1.b — Hardened build flags | Deferred — `CONFIG_STACKPROTECTOR` is off pending a proof build (see "Explicit deferrals"). |
+| §1.c — Kernel hardening | The signed slot DTB activates SELinux and carries the dm-verity table. |
 | §1.d — Sysctl baseline | Out of scope here (kernel/runtime layer). See `CRA-CONTROLS.md` §1.d. |
 | §2.b — CVE scanning | U-Boot is in the SBOM (CPE `u-boot:u-boot`). `sbom-cve-check` runs at build. |
-| §5.b — Signed updates | FIT signature verification at bootm; legacy format off via `fit_enforce`. |
+| §5.b — Signed updates | Managed `bootm` verifies the slot FIT; legacy uImage format is off. Interactive-shell bypass remains. |
 
 See [CRA-CONTROLS.md](CRA-CONTROLS.md) for the full table.
 
@@ -404,7 +426,8 @@ strings /dev/mtd0 | grep -iE '^load[bs]$|^usb$' && echo "FAIL: command survived"
 # Expected: no output (commands not present).
 
 # At U-Boot prompt:
-help                              # expected: no usb / loadb / loads
+help                              # expected: no usb / loadb / loads;
+                                  # ums present (gadget flash path retained)
 printenv EXTRA_KERNEL_ARGS        # expected: security=selinux
 fdt addr ${fdtcontroladdr}; fdt print /signature
 # Expected: key-edge-fit-dev with required="conf", sha256,rsa2048
