@@ -151,13 +151,25 @@ LICENSE_FLAGS_ACCEPTED ?= ""
 INHERIT       += "create-spdx"
 OE_FRAGMENTS  += "yocto/sbom-cve-check"
 IMAGE_CLASSES:append = " sbom-cve-check"
-SRCREV:pn-sbom-cve-check-update-nvd-native     = "49f8bbe1b0b0884e16bdc37ab68db997085570a7"
-SRCREV:pn-sbom-cve-check-update-cvelist-native = "ada54ee3cc8380820aa45e4996910bdc9dcb94e7"
+# nvd-json-data-feeds @ 2026-06-16
+SRCREV:pn-sbom-cve-check-update-nvd-native     = "b9056dbe8175514b36ed1720cd223fc73aa1796c"
+# cvelistV5 @ 2026-06-16
+SRCREV:pn-sbom-cve-check-update-cvelist-native = "d34c26123e45e877be017cf361b64edc0eefc4b6"
 
 # sbom-cve-check fragment hard-codes the SPDX compiled-sources flag for
 # linux-yocto; apply to linux-renesas so kernel CVE
 # source-attribution doesn't over-report.
 SPDX_INCLUDE_COMPILED_SOURCES:pn-linux-renesas = "1"
+
+# The default ("current") drops fixed-version and cpe-stable-backport
+# CVE_STATUS entries from the VEX export on the assumption the CVE DB's
+# version range clears those rows itself. When the range data is wrong
+# (NVD ranges lag point releases; git-hash recipes never version-match),
+# the disposition is silently lost and the row ships Unpatched — observed
+# on rsync, ffmpeg (15 rows), and glibc (3 rows). "all" exports every
+# exportable disposition (unknown is skipped), so the report reflects
+# recipe CVE_STATUS verbatim.
+SPDX_INCLUDE_VEX = "all"
 
 # ----- FIT verified boot (file-key dev profile) --------------------------
 
