@@ -1,0 +1,31 @@
+---
+# Keeps the SHA pins in .github/workflows/ from rotting.
+#
+# Every `uses:` in this repo is pinned to a full commit SHA with the version
+# in a trailing comment. A floating tag like @v4 is a mutable pointer owned
+# by someone else; release-notes.yml runs on tag push with contents:write,
+# so a retagged action would execute inside the release path. Dependabot
+# understands the SHA + version-comment pairing and rewrites both together,
+# which is what stops pinning from freezing the actions forever.
+#
+# No `pip` ecosystem entry: pyproject.toml drives host-side tooling that CI
+# never installs (no Python is set up in any workflow). Add one if that
+# changes.
+#
+# No Yocto layer coverage is possible: layer revisions are pinned in
+# kas/base.yml and kas/base.lock.yml, which Dependabot does not parse.
+# Those bumps stay manual — see `make lock` / `make verify-pins`.
+version: 2
+
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      # `^chore` is skip = true in cliff.toml, so dependency bumps stay out
+      # of the generated release notes. Also satisfies the commit-msg hook.
+      prefix: "chore(ci)"
+    labels:
+      - "dependencies"
+    open-pull-requests-limit: 5
