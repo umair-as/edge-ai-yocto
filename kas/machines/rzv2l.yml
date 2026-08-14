@@ -37,13 +37,12 @@ local_conf_header:
     WICVARS:append = " FIP_WIC_OFFSET"
 
   boot: |
-    # Per-board boot artifacts. edge-image.bbclass consumes these.
+    # Per-board boot artifacts. edge-ab-image.bbclass consumes these.
     # See the comment block on EDGE_BOOT_* in that file for contract.
     #
-    # The DTB filename is the flat basename — WIC's IMAGE_BOOT_FILES
-    # handler strips the renesas/ prefix from KERNEL_DEVICETREE.
-    # splash.bmp is required because U-Boot's bootcmd calls splashload
-    # before kernel handoff.
+    # The DTB filename is the flat deploy basename consumed when the image
+    # task creates its signed slot FITs. splash.bmp remains a standalone
+    # U-Boot asset.
     EDGE_BOOT_DTB         = "r9a07g054l2-smarc.dtb"
     EDGE_BOOT_EXTRA       = "splash.bmp"
     EDGE_BOOT_DEPLOY_DEPS = "edge-splash-assets:do_deploy trusted-firmware-a:do_deploy edge-kernel-fit:do_deploy"

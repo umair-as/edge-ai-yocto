@@ -3,9 +3,10 @@ name = "edge-cra-tooling"
 version = "0.1.0"
 description = "CRA vulnerability-management analysis tooling for the edge-ai distro (SBOM/CVE triage, multi-scanner reconciliation, VEX)."
 requires-python = ">=3.12"
-# Intentionally dependency-free: the analysis scripts in scripts/ are
-# stdlib-only and read-only over build/tmp/deploy (matches sbom-cve-report.py).
-# The venv exists to pin an interpreter, not to pull packages.
+# Intentionally dependency-free: the analysis scripts in scripts/
+# (cve-report, sbom-report, cve-reconcile, cve-triage-funnel) are stdlib-only
+# and read-only over build/tmp/deploy. The venv exists to pin an interpreter,
+# not to pull packages.
 dependencies = []
 
 [tool.uv]
