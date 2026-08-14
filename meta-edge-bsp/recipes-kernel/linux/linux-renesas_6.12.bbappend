@@ -77,7 +77,7 @@ do_compile:append() {
 #
 # 0001 mmc-aliases: without this, async-probe race between sdhi0 and sdhi1
 # can put the boot card on mmcblk1 and hang at "Waiting for root device".
-# The full downstream chain (rauc_set_bootargs root=/dev/mmcblk0pN,
+# The full downstream chain (signed verity table for /dev/mmcblk0pN,
 # slot-udev KERNEL=="mmcblk0pN", /dev/disk/by-rauc-slot/*) assumes
 # mmcblk0 = sdhi0 = boot SDHI; the patch makes that hold by construction.
 SRC_URI:append:smarc-rzv2l = " \

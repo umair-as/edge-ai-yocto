@@ -1,7 +1,7 @@
 # A/B-slot image policy. Layers on top of edge-image.bbclass.
 #
 # Assumes a partition layout with:
-#   - shared /boot (fitImage + DTB + bootloader-staged assets)
+#   - shared /boot (slot-specific signed FITs + bootloader-staged assets)
 #   - two interchangeable rootfs slots (selected by the OTA backend)
 #   - /data for persistent state
 #
@@ -10,7 +10,7 @@
 # providers and EDGE_SLOT_*_LABEL variables (added in Phase 4 of ADR-0005).
 # See ADR-0005 for the full abstraction contract.
 
-inherit edge-image
+inherit edge-image edge-verity-image
 
 # Fail clean at parse if no OTA backend was selected. edge-features.inc
 # defaults EDGE_OTA_BACKEND to "rauc"; a build that strips it (or sets it
@@ -27,10 +27,7 @@ python () {
 # Per-machine boot artifacts. Each kas/machines/<board>.yml supplies
 # the values:
 #
-#   EDGE_BOOT_DTB         — flat DTB filename staged into /boot. WIC's
-#                           IMAGE_BOOT_FILES handler strips paths, so
-#                           use the basename even if KERNEL_DEVICETREE
-#                           is a nested path like renesas/foo.dtb.
+#   EDGE_BOOT_DTB         — flat DTB consumed by the signed FIT task.
 #   EDGE_BOOT_EXTRA       — extra files /boot needs beyond fitImage + DTB.
 #                           RZ/V2L uses U-Boot splashload → adds splash.bmp.
 #                           Boards that don't do pre-kernel splash leave
@@ -44,14 +41,16 @@ python () {
 #                           A board that doesn't use TF-A or a separate
 #                           FIT recipe leaves those out.
 #
-# Empty defaults so a non-overriding machine parses cleanly (it just
-# produces a /boot with only fitImage and no extra deps — which is
-# exactly what a minimal aarch64 board should get out of the box).
+# Empty defaults let a non-overriding machine reach the explicit FIT-input
+# validation instead of failing during variable expansion.
 EDGE_BOOT_DTB         ?= ""
 EDGE_BOOT_EXTRA       ?= ""
 EDGE_BOOT_DEPLOY_DEPS ?= ""
 
-IMAGE_BOOT_FILES = "fitImage ${EDGE_BOOT_DTB} ${EDGE_BOOT_EXTRA}"
+# The slot FITs are image-owned outputs and remain in IMGDEPLOYDIR until
+# do_image_complete publishes them. WIC accepts absolute IMAGE_BOOT_FILES
+# sources; other boot artifacts continue to come from DEPLOY_DIR_IMAGE.
+IMAGE_BOOT_FILES = "${IMGDEPLOYDIR}/${EDGE_VERITY_FIT_A};fitImage-A ${IMGDEPLOYDIR}/${EDGE_VERITY_FIT_B};fitImage-B ${EDGE_BOOT_EXTRA}"
 do_image_wic[depends] += "${EDGE_BOOT_DEPLOY_DEPS}"
 
 # Slot labels (EDGE_SLOT_A_LABEL / EDGE_SLOT_B_LABEL) are set by the

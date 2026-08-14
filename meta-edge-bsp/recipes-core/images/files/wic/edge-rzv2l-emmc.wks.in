@@ -29,11 +29,9 @@ bootloader --ptable gpt
 # eSD fw_env.config applies unchanged (CONFIG_SYS_MMC_ENV_PART=0, user area).
 part /boot --source bootimg-partition --fstype=ext4 --label boot --part-name boot --ondisk mmcblk0 --align 4096 --size 500 --no-fstab-update
 
-# A/B rootfs slots. Keep the ext4 --label (fstab LABEL=, /dev/disk/by-label,
-# bundle-hooks e2label, edge-wic-label-check all key off it) AND add the GPT
-# --part-name so udev by-partlabel slot rules work under GPT.
-part / --source rootfs --fstype=ext4 --label ${EDGE_SLOT_A_LABEL} --part-name ${EDGE_SLOT_A_LABEL} --ondisk mmcblk0 --align 1024 --fixed-size ${EDGE_SLOT_SIZE_MB}
-part / --source rootfs --fstype=ext4 --label ${EDGE_SLOT_B_LABEL} --part-name ${EDGE_SLOT_B_LABEL} --ondisk mmcblk0 --align 1024 --fixed-size ${EDGE_SLOT_SIZE_MB}
+# GPT PARTLABELs provide slot identity without mutating authenticated ext4 data.
+part / --source rawcopy --sourceparams="file=${IMGDEPLOYDIR}/${IMAGE_LINK_NAME}.ext4.verity" --part-name ${EDGE_SLOT_A_LABEL} --ondisk mmcblk0 --align 1024 --fixed-size ${EDGE_SLOT_SIZE_MB}
+part / --source rawcopy --sourceparams="file=${IMGDEPLOYDIR}/${IMAGE_LINK_NAME}.ext4.verity" --part-name ${EDGE_SLOT_B_LABEL} --ondisk mmcblk0 --align 1024 --fixed-size ${EDGE_SLOT_SIZE_MB}
 
 # /data: last partition, seeded small, grown on first boot by edge-grow-data
 # (systemd-repart grows the partition, resize2fs the ext4). The distinct
