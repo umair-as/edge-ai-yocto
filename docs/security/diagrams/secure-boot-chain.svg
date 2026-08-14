@@ -1,0 +1,41 @@
+<svg viewBox="0 0 1440 384" xmlns="http://www.w3.org/2000/svg" font-family="Inter, 'IBM Plex Sans', 'Segoe UI', system-ui, 'Liberation Sans', 'DejaVu Sans', sans-serif">
+<defs>
+<marker id="arw" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#9AA6B8"/></marker>
+<marker id="arwA" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#4F46E5"/></marker>
+</defs>
+<rect width="1440" height="384" fill="#FFFFFF"/>
+<text x="48" y="60" font-size="26" font-weight="700" fill="#0F172A">Secure boot chain of trust — SMARC RZ/V2L</text>
+<text x="48" y="86" font-size="14" fill="#64748B">Each stage verifies and loads the next; U-Boot is the hardened policy layer</text>
+<rect x="34" y="150" width="784" height="150" rx="12" fill="#F7F9FC"/>
+<text x="426.0" y="176" font-size="11.5" font-weight="700" fill="#94A3B8" letter-spacing="0.5" text-anchor="middle">HARDWARE ROOT OF TRUST  (TF-A / OP-TEE)</text>
+<rect x="818" y="150" width="584" height="150" rx="12" fill="#F1F5F9"/>
+<text x="1110.0" y="176" font-size="11.5" font-weight="700" fill="#94A3B8" letter-spacing="0.5" text-anchor="middle">U-BOOT (hardened)  -&gt;  FIT-VERIFIED KERNEL</text>
+<rect x="48.0" y="196.0" width="168.0" height="66" rx="10" fill="#FFFFFF" stroke="#D3DAE6" stroke-width="1.4"/>
+<text x="132.0" y="224.0" font-size="14.5" font-weight="600" fill="#0F172A" text-anchor="middle">mask ROM</text>
+<text x="132.0" y="244.0" font-size="11.5" fill="#64748B" text-anchor="middle" font-family="Inter, 'IBM Plex Sans', 'Segoe UI', system-ui, 'Liberation Sans', 'DejaVu Sans', sans-serif">eSD boot</text>
+<rect x="244.0" y="196.0" width="168.0" height="66" rx="10" fill="#FFFFFF" stroke="#D3DAE6" stroke-width="1.4"/>
+<text x="328.0" y="224.0" font-size="14.5" font-weight="600" fill="#0F172A" text-anchor="middle">BL2</text>
+<text x="328.0" y="244.0" font-size="11.5" fill="#64748B" text-anchor="middle" font-family="Inter, 'IBM Plex Sans', 'Segoe UI', system-ui, 'Liberation Sans', 'DejaVu Sans', sans-serif">TF-A, from FIP</text>
+<rect x="440.0" y="196.0" width="168.0" height="66" rx="10" fill="#FFFFFF" stroke="#D3DAE6" stroke-width="1.4"/>
+<text x="524.0" y="224.0" font-size="14.5" font-weight="600" fill="#0F172A" text-anchor="middle">BL31</text>
+<text x="524.0" y="244.0" font-size="11.5" fill="#64748B" text-anchor="middle" font-family="Inter, 'IBM Plex Sans', 'Segoe UI', system-ui, 'Liberation Sans', 'DejaVu Sans', sans-serif">TF-A SPMC</text>
+<rect x="636.0" y="196.0" width="168.0" height="66" rx="10" fill="#FFFFFF" stroke="#D3DAE6" stroke-width="1.4"/>
+<text x="720.0" y="224.0" font-size="14.5" font-weight="600" fill="#0F172A" text-anchor="middle">BL32</text>
+<text x="720.0" y="244.0" font-size="11.5" fill="#64748B" text-anchor="middle" font-family="Inter, 'IBM Plex Sans', 'Segoe UI', system-ui, 'Liberation Sans', 'DejaVu Sans', sans-serif">OP-TEE</text>
+<rect x="832.0" y="196.0" width="168.0" height="66" rx="10" fill="#EEF0FE" stroke="#4F46E5" stroke-width="1.8"/>
+<text x="916.0" y="224.0" font-size="14.5" font-weight="600" fill="#4F46E5" text-anchor="middle">BL33 U-Boot</text>
+<text x="916.0" y="244.0" font-size="11.5" fill="#64748B" text-anchor="middle" font-family="'JetBrains Mono', 'IBM Plex Mono', 'DejaVu Sans Mono', monospace">2024.07 CIP</text>
+<rect x="1028.0" y="196.0" width="168.0" height="66" rx="10" fill="#FFFFFF" stroke="#D3DAE6" stroke-width="1.4"/>
+<text x="1112.0" y="224.0" font-size="14.5" font-weight="600" fill="#0F172A" text-anchor="middle">boot_fit</text>
+<text x="1112.0" y="244.0" font-size="11.5" fill="#64748B" text-anchor="middle" font-family="Inter, 'IBM Plex Sans', 'Segoe UI', system-ui, 'Liberation Sans', 'DejaVu Sans', sans-serif">FIT sig verify</text>
+<rect x="1224.0" y="196.0" width="168.0" height="66" rx="10" fill="#FFFFFF" stroke="#D3DAE6" stroke-width="1.4"/>
+<text x="1308.0" y="224.0" font-size="14.5" font-weight="600" fill="#0F172A" text-anchor="middle">linux-renesas</text>
+<text x="1308.0" y="244.0" font-size="11.5" fill="#64748B" text-anchor="middle" font-family="'JetBrains Mono', 'IBM Plex Mono', 'DejaVu Sans Mono', monospace">CIP 6.12</text>
+<line x1="216.0" y1="229.0" x2="244.0" y2="229.0" stroke="#9AA6B8" stroke-width="1.6" marker-end="url(#arw)"/>
+<line x1="412.0" y1="229.0" x2="440.0" y2="229.0" stroke="#9AA6B8" stroke-width="1.6" marker-end="url(#arw)"/>
+<line x1="608.0" y1="229.0" x2="636.0" y2="229.0" stroke="#9AA6B8" stroke-width="1.6" marker-end="url(#arw)"/>
+<line x1="804.0" y1="229.0" x2="832.0" y2="229.0" stroke="#9AA6B8" stroke-width="1.6" marker-end="url(#arw)"/>
+<line x1="1000.0" y1="229.0" x2="1028.0" y2="229.0" stroke="#9AA6B8" stroke-width="1.6" marker-end="url(#arw)"/>
+<line x1="1196.0" y1="229.0" x2="1224.0" y2="229.0" stroke="#9AA6B8" stroke-width="1.6" marker-end="url(#arw)"/>
+<text x="48" y="360" font-size="12" fill="#94A3B8">Managed BL33 flow: rauc_select_slot -&gt; signed slot FIT -&gt; dm-verity root. Interactive U-Boot bypass remains open.</text>
+</svg>
