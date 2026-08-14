@@ -27,6 +27,23 @@ apply to other agents.
 Where a skill and `.claude/rules/` ever disagree, **the rules win** —
 they are repo-specific and wrynose-current.
 
+## Serial console MCP
+
+`mcp-serial-rs` gives direct UART access to the board
+(`serial_list_ports`, `serial_open`, `serial_exec`,
+`serial_read_until`). Prefer it over asking the operator to relay
+console output — especially for U-Boot work and for boot states where
+sshd is not up. The board's USB-serial adapter enumerates as
+`/dev/ttyUSB0`, 115200 baud.
+
+- The device cannot be shared: `serial_close` before the operator
+  starts `tio`, and expect open to fail while a `tio` session holds
+  the port.
+- When grepping operator-captured `tio` logs, the file can contain
+  high-bit control bytes that make vanilla `grep` treat it as binary
+  and silently skip lines. Use `grep -a` or `strings <log> | grep …`
+  so U-Boot/firmware output isn't filtered out.
+
 ## Permission allowlist
 
 `.claude/settings.local.json` is the per-user allowlist. The

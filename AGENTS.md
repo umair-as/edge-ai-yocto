@@ -293,6 +293,27 @@ What makes it actually work:
   request.
 - Subagents and isolated worktrees only when parallelism or build
   pollution justifies the cost (Claude: `yocto-worktree` skill).
+- **Long-running builds (>~10 min): launch detached, never via the
+  agent harness's background-process mechanism.** A harness-spawned
+  background process stays a child of the agent's tool runner and dies
+  with it — the build gets SIGTERM'd mid-task (`make` exits 241 with no
+  bitbake `ERROR:` lines, which reads like a mystery failure). Instead,
+  from an ordinary foreground shell call:
+
+  ```bash
+  setsid nohup make <target> > scratch/<topic>.log 2>&1 &
+  ```
+
+  `setsid` gives the job its own session; once the launching shell
+  exits it reparents to the init/user manager and nothing in the
+  agent's process tree can signal it. Watch progress with a
+  **separate** poller that only reads the log file — decouple the
+  watcher from the work, so a killed poller is just re-armed while the
+  build survives. For builds that matter, prefer handing the operator
+  the one-liner to run in their own shell. A killed build is
+  recoverable either way (bitbake resumes from sstate), but the
+  detached form avoids the wasted hours and the misleading failure
+  mode.
 - Stop at the requested milestone; report remaining work instead of
   continuing unprompted.
 
