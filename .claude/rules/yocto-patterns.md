@@ -166,13 +166,20 @@ Optional for board-specific patches that will never be submitted.
 | `Inappropriate [<reason>]` | Won't go upstream from this repo. Board/distro-specific. | `[board-specific configuration]` |
 | `Pending` | Could go upstream; not submitted yet. | (no bracket needed) |
 | `Submitted [<URL>]` | Sent upstream; awaiting decision. | `[patchwork.kernel.org/...]` |
-| `Backport [<from-version-or-URL>]` | Cherry-picked from a later upstream tag. | `[v6.13-rc1, commit abc123]` |
+| `Backport [<from-version-or-URL>]` | Cherry-picked verbatim from a later upstream tag. | `[v6.13-rc1, commit abc123]` |
+| `Backport [from <source>; adapted for <target>]` | Adapted from upstream — context or API shifts resolved locally. Not a verbatim cherry-pick; say so. | `[from v6.1 vendor driver; adapted for 6.12-cip]` |
 | `Denied [<reason>]` | Rejected by upstream; carried locally with cost noted. | `[maintainer NACK: locking]` |
 | `Accepted [<commit>]` | Merged upstream after we carried it. Transitional — drop on the next kernel/recipe bump that includes it. | `[v6.13, commit deadbeef]` |
 
 Default for repo-local DTS patches:
 `Inappropriate [board-specific configuration]` — matches the existing
 pattern in `meta-edge-bsp/recipes-kernel/linux/files/`.
+
+When a patch has more than one motivation (build-system mechanics vs.
+board/product policy, could-go-upstream vs. local-only), apply the
+counterfactual test: the motivation that is *necessary* for the patch's
+existence determines the tag; the other goes in the commit body as
+supporting context.
 
 ### AI attribution in patch headers
 
@@ -191,12 +198,33 @@ Which patches it applies to depends on `Upstream-Status`:
 |---|---|
 | `Inappropriate [...]`, `Denied [...]` | Yes. Never leaves the repo; our rules are the only rules. |
 | `Pending`, `Submitted [...]` | Yes here — but the receiving project's trailer rules win at submission time. `Assisted-by:` is not part of the kernel/U-Boot canonical trailer set; check that project's current contribution docs before sending, and be ready to drop it. |
-| `Backport [...]`, `Accepted [...]` | **No — do not touch the header.** The commit message and its `Signed-off-by:` chain belong to the original author. Only the `Upstream-Status:` line is ours to add. Adding our trailers misattributes their work and destroys the verbatim-cherry-pick property. |
+| `Backport [...]` (verbatim or adapted), `Accepted [...]` | **No — do not touch the header.** The commit message and its `Signed-off-by:` chain belong to the original author. Only the `Upstream-Status:` line is ours to add. Adding our trailers misattributes their work and destroys the verbatim-cherry-pick property. **Exception: CVE security backports — see below.** |
 
 `Signed-off-by:` stays last and stays a **human**. Attribution records
 who helped write the patch; the DCO sign-off certifies who takes
 responsibility for it. An `Assisted-by:` line never substitutes for a
-sign-off, and an agent never adds a sign-off on the operator's behalf.
+sign-off, and an agent never adds — or requests — a sign-off on its own
+initiative.
+
+**CVE security backports are the one exception, and only when the operator
+explicitly asks for a sign-off in that session** — never by default, never
+inferred from "this is a CVE fix." This holds however the backport was
+produced (by hand, by cve-corrector, or by cve-agent).
+
+When one is asked for, the invariants are:
+
+- **Never overwrite or remove an existing upstream `Signed-off-by:`** —
+  append below it. Each backporter adds their own line, chain-of-custody
+  style; see the CVE-2022-3341 FFmpeg example in the
+  [Yocto security manual](https://docs.yoctoproject.org/security-manual/vulnerabilities.html#fixing-vulnerabilities-in-recipes).
+- **Use the operator's real resolved identity** — never a placeholder,
+  never an automation identity.
+- **Add it only on that explicit request**, in that session — and batch
+  the header edits before any build (see §"Patch + sstate cascade": each
+  header edit re-triggers the recipe's full task chain).
+
+Everywhere else, the Backport rule above stands unchanged: don't touch
+the header, no `Assisted-by:`, no sign-off unless asked.
 
 ## Patch + sstate cascade
 
@@ -205,6 +233,33 @@ invalidates the patch file's content hash and triggers a rebuild of
 `do_patch -> do_compile -> do_install -> do_deploy` for that recipe,
 even though `patch -p1` would ignore the header text. Batch header
 edits before kicking off a build.
+
+## Estimating rebuild impact before launching
+
+After metadata changes (distro vars, class edits, new patches), measure
+what will rerun before committing to the build — not at launch time:
+
+```bash
+# Which tasks would rerun, and why (no execution; diffs new signatures
+# against the latest stamps/sstate, names the changed variable/dep)
+. scripts/env.sh && kas shell kas/local.yml -c 'bitbake <target> -S printdiff'
+
+# Why one task's hash flipped (pairwise sigdata diff, latest two runs)
+bitbake-diffsigs -t <recipe> <task>
+
+# Task-dependency graph, when the dependency shape is the question
+bitbake -g <target>          # writes task-depends.dot
+```
+
+`printdiff` output is large — grep it; the task count is the estimate.
+The `Sstate summary: Wanted X ... Missed Y` line at build init is the
+live proxy for the same number. Known cascade shapes: a distro-scope
+variable invalidates its consuming task repo-wide (e.g. an SPDX var →
+every recipe's spdx tasks — many but cheap); a do_patch change on a
+toolchain/libc recipe cascades through every dependent sysroot — a
+near-world rebuild. Manual: `bitbake/doc/bitbake-user-manual/`
+(`-intro.rst` for `-S`, `-execution.rst` §checksums) in the kas-cloned
+`bitbake/` checkout.
 
 ## Patch iteration — when to reach for devtool
 
