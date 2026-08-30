@@ -20,7 +20,7 @@ login or a graphical session — on a hardened, RAUC A/B, OTA-updatable platform
 | **Demonstrates** | ResNet-18 classifier · **~28 ms** on the accelerator (vs. seconds on CPU) |
 | **Runs as** | rootless Podman container → systemd Quadlet → dedicated `nologin` principal (`edge-ctr`) |
 | **Privilege** | no root, no `--privileged` — device access by `render`-group membership |
-| **Boot** | auto-starts, zero manual steps, survives OTA slot switches |
+| **Boot** | starts automatically once a model payload is present; the payload persists across OTA slot switches |
 | **Kernel** | linux-cip 6.12 (CIP Super-LTS, [ADR-0001](../adr/0001-kernel-base.md)) |
 | **Status** | validated on hardware under **permissive** SELinux — [details](#status--roadmap) |
 
@@ -106,12 +106,21 @@ the container-native, least-privilege, OTA-aware delivery is the durable part.**
 
 ## Reproduce & evaluate
 
-- **Build it** — enable `EDGE_ENABLE_AI` and build the image for `smarc-rzv2l`; flash
-  it and the classifier auto-runs at boot (no manual steps).
+- **Build it** — `make dev AI=1 VIRT=1` for `smarc-rzv2l` (`AI=1` adds the DRP-AI
+  stack, `VIRT=1` the container runtime the Quadlet needs). A freshly flashed device
+  boots with an empty `/data` and therefore **no model payload**, so nothing infers
+  until one is placed at `/data/drpai` — the inference unit's
+  `ConditionPathExists=` skips cleanly and the smoke test reports it. Automatic
+  model delivery is roadmap work, not a shipped feature.
 - **Compile your own model** → [compiling-models.md](compiling-models.md) — the
   host-side container flow (ONNX → DRP-AI artifact).
 - **Measure any model on the NPU** → [benchmarking-models.md](benchmarking-models.md) —
   the `drpai-runner` benchmark, latency + NPU-vs-CPU split.
+- **Understand model updates** → [model-ota-guide.md](model-ota-guide.md) — the
+  architecture of model delivery, for readers new to OCI artifacts and ModelPack.
+- **Deliver a model to the device** → [model-delivery.md](model-delivery.md) — a
+  signed-artifact prototype: what is verified on hardware today, and what a real
+  model update system still needs.
 - **Go deeper** → [port-notes.md](port-notes.md) (driver port) ·
   [integration-notes.md](integration-notes.md) (runtime, buffers, lifecycle) ·
   [ADRs](../adr/).
@@ -123,16 +132,35 @@ Stated honestly — the value of these docs depends on it.
 **✅ Validated on hardware (permissive SELinux)** — driver builds and binds on
 linux-cip 6.12 (`/dev/drpai0` present, accelerator confirmed via the interrupt
 witness); runtime + app run natively and rootless; all three buffer regions in use;
-rootless inference auto-starts at boot under the dedicated principal, end-to-end.
+rootless inference starts at boot under the dedicated principal, end-to-end, subject
+to the intermittent race noted below.
+Re-validated unchanged after three platform changes it predates: the CIP kernel
+bump to 6.12.59-cip14, a **dm-verity read-only rootfs**, and **enforced kernel
+module signing** — native 32.75 ms and containerized 28.54 ms, both in the proven
+band. Validated from a fresh full image build and reflash, not only as deployed.
+
+**⚠️ One known defect** — an **intermittent boot race** in `logind` linger
+enumeration (`Couldn't add lingering user`, `ESRCH`): when it hits, the principal's
+user manager does not come up, so the inference unit does not run. It self-heals on
+the next boot. It has been observed both after an OTA and on an ordinary reboot into
+an already-good slot, so it is **not** specific to the update path, and boots that
+succeed do not establish that a given path is immune. The root cause is not yet
+established — in particular, a plausible SELinux-labeling explanation was checked and
+did not hold up (the linger directory carries the correct type, the mode was
+permissive, and no relevant denial was recorded), so that repair is tracked
+separately as its own correctness issue.
 
 **⏭ Next, not done** — **SELinux enforcing** (needs a device-label policy for the
-accelerator nodes; the immediate next step, not claimed as achieved); **clean-build
-validation** of the boot-ordering fix (validated as deployed, not yet from a fresh full
-image build).
+accelerator nodes and correct labels on the persistent state; not claimed as
+achieved); the **linger race** above; and **model delivery** — the model is still
+placed on `/data` by hand, so a freshly flashed device is not yet self-contained.
 
 **🧭 Roadmap** — a reproducible model-compile environment; a baked, trust-pinned
-container base image; a self-seeding on-`/data` model payload for a self-contained
-fresh device.
+container base image; and a digest-addressed, signature-verified model artifact
+delivered independently of the firmware, replacing the hand-placed payload. The
+delivery half now has a hardware-verified prototype — signed artifact accepted,
+unsigned/wrong-key/corrupted refused — with the store and activation lifecycle
+still to build: [model-delivery.md](model-delivery.md).
 
 ---
 

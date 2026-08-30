@@ -101,10 +101,9 @@ utilisation means the CPU is idle while the NPU works.
 ## Step 5 — per-operator breakdown (the important one)
 
 ```sh
-ssh $BOARD 'export LD_LIBRARY_PATH=/data/drpai/lib
-    taskset -c 1 /tmp/drpai-runner /tmp/models/yolov5s_onnx -n 1 --profile'
-# the runtime appends its own extension -> the file is *.txt.txt / *.csv.csv
-ssh $BOARD 'cut -c1-135 /tmp/drpai_profile_table.txt.txt'
+ssh $BOARD 'taskset -c 1 /tmp/drpai-runner /tmp/models/yolov5s_onnx -n 1 --profile'
+# read the paths the runner prints; on the cip14 runtime they are:
+ssh $BOARD 'cut -c1-135 /tmp/drpai_profile_table.txt; cat /tmp/drpai_profile.csv'
 ```
 
 This is the runtime's own profiler (`ProfileRun`). It lists each operator, its
@@ -125,6 +124,12 @@ Board RZ/V2L, kernel 6.12.43-cip7, `performance` governor. Steady `Run()`:
 
 All land within ~15 % of Renesas' published figures — the check that the
 method is sound.
+
+**Kernel pin behind these numbers.** The table was measured on 6.12.43-cip7. The
+platform kernel has since moved to 6.12.59-cip14; on that kernel only the
+ResNet18 classifier was re-measured (32.75 ms native, 28.54 ms containerized —
+in band). The table above has not been re-run, so treat it as the method's
+reference output rather than a current-kernel measurement.
 
 ## The finding to reproduce
 
@@ -150,18 +155,35 @@ trust a latency estimate for a new model without this profile.
 
 ## Known limitations (current runner)
 
-- **Input is not explicitly bound.** `GetInputInfo` is unavailable in the v2ml
-  (Mera1.x) runtime mode, so `Run()` executes on the runtime's allocated input
-  buffer rather than a value you set. Latency is data-independent (fixed-function
-  conv, branchless tensor ops), so the timing is valid; binding a zero input from
-  the `deploy.json` shape is a planned refinement.
-- **Profiler filename** gets the runtime's extension appended (`*.csv.csv`).
+- **The input is not bound — confirmed on hardware.** The runtime reports
+  `Mera1.x unsupports this function: GetInputInfo` and returns an empty tensor
+  list, so `Run()` executes on whatever buffer the runtime allocated rather than a
+  value you set.
+
+  Note the shape of this defect, because it is easy to misread the source: the
+  runner *does* call `GetInputInfo()` and `SetInput()`, and it compiles cleanly —
+  the symbols exist. They just do nothing in this runtime mode. The binding loop
+  iterates zero times, prints nothing, raises no error, and the process exits 0.
+  Compile-time availability proved nothing about runtime behaviour here.
+
+  **The timing figures are unaffected** — the workload is data-independent
+  (fixed-function conv, branchless tensor ops), which is what this measurement
+  always relied on. A runner that must produce *correct output* cannot use this
+  idiom at all and needs the tutorial app's DRP-AI pre-processing path instead.
+- **Profiler output path**: the runner prints the paths it wrote. On the cip14
+  runtime they are single-extension (`/tmp/drpai_profile_table.txt`,
+  `/tmp/drpai_profile.csv`) and land in `/tmp`, not the working directory. An
+  earlier note here claimed the runtime appends its own extension
+  (`*.csv.csv`) — that does not hold on this runtime, so read the paths the runner
+  prints rather than constructing them.
 - **IRQ witness message** prints a fixed `2*iters` expectation; the true
   steps-per-run is model-dependent — judge by whether the delta *scales*.
 
 ## Status
 
 The build → deploy → measure → profile flow is **proven** (it produced the table
-above). The `drpai-runner` recipe is in-tree; it is a benchmark/recon tool, not
-yet the platform's production inference entry point. Measurement is latency +
+above). The `drpai-runner` recipe is in-tree but deliberately outside
+`packagegroup-edge-ai`: it is a benchmark/recon tool, deployed by hand for a
+measurement session, not the platform's production inference entry point. The
+shipped workload is still the ResNet18 classifier app. Measurement is latency +
 work-placement only; correctness/accuracy of model outputs is out of scope.
