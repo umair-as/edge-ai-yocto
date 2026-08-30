@@ -85,13 +85,27 @@ carries a hardware DMA stride (wider than the visible width), which is the
 fingerprint that the ISU genuinely processed the frame rather than a
 software element silently substituting.
 
+Re-confirmed on the CIP 6.12.59-cip14 kernel: plain CSI capture passes, the
+camera-to-VSP path passes with no kernel errors, the ISU is bound, and a captured
+NV12 frame is 529920 bytes — the expected 736-byte stride. MIPI camera to HDMI
+preview passes on the same boot, so the chain is proven end to end from sensor to
+display.
+
+**Run the sensor/CRU alignment first.** The OV5645 comes up at 1280x960 while the
+CSI-2 and CRU sub-devices default to 320x240. Without aligning them, `v4l2src`
+fails with a broken pipe — a format mismatch, not a VSP fault.
+`/usr/libexec/edge-ov5645-init.sh` (from the `edge-ov5645-init` recipe) performs
+the alignment; anything automating this path runs it before streaming.
+
 ## Caveats for downstream use
 
-- **`vspmfilter` requires root.** The memory-manager and VSP interface device
-  nodes are `0600 root:root`, so the element is invisible to a rootless
-  principal. Making VSP usable inside the rootless inference container needs a
-  udev rule (mode plus a group the container principal joins), not a switch to
-  a privileged principal.
+- **`vspmfilter` requires root.** `/dev/rgnmm` and `/dev/vspm_if` are
+  `0600 root:root`, so the element is invisible to a rootless principal. The
+  container principal is also not a member of `video`, which puts `/dev/video0`
+  out of reach as well. Making the media path usable inside the rootless inference
+  container needs a udev rule (mode plus a group the principal joins) and that
+  group membership — not a switch to a privileged principal. The accelerator nodes
+  already work this way, so the pattern is established rather than speculative.
 - **Modules ship with the kernel.** A kernel patch bumps the build-hash in the
   kernel version string, so the matching `/lib/modules/<version>/` must be
   deployed alongside the FIT. A full image or RAUC OTA bundles both; a
