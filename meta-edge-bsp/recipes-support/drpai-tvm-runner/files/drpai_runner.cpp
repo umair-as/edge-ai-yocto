@@ -132,7 +132,21 @@ int main(int argc, char** argv) {
 
     // Bind a synthetic input per model input tensor (values are data-independent
     // for NPU timing; zeros suffice).
+    //
+    // GetInputInfo is unsupported in the Mera1.x runtime mode used here: it returns
+    // an empty list, so the loop below binds nothing and Run() executes on whatever
+    // buffer the runtime allocated. That is acceptable for timing and fatal for
+    // anything else, so say so instead of proceeding silently.
     auto inputs = runtime.GetInputInfo();
+    if (inputs.empty()) {
+        fprintf(stderr,
+                "\n[WARNING] input is NOT bound: the runtime did not describe its input\n"
+                "          tensors (GetInputInfo unsupported in this runtime mode).\n"
+                "          Run() executes on an unspecified buffer.\n"
+                "          Latency and NPU-placement figures below remain VALID -- the\n"
+                "          workload is data-independent. Any output VALUE is meaningless.\n"
+                "          For real input and decoded output, use drpai-classify.\n\n");
+    }
     std::vector<std::vector<uint8_t>> bufs;
     bufs.reserve(inputs.size());
     for (size_t i = 0; i < inputs.size(); ++i) {

@@ -54,6 +54,12 @@ IMAGE_INSTALL:append = " packagegroup-edge-dev edge-sudoers-nopasswd edge-debug-
 # TEE that the image has no client stack for is dead weight.
 IMAGE_INSTALL:append:smarc-rzv2l = "${@bb.utils.contains('EDGE_ENABLE_OPTEE', '1', ' packagegroup-edge-optee-test', '', d)}"
 
+# packagegroup-edge-ai-test is the ${PN}-test output package of the
+# packagegroup-edge-ai recipe: drpai-classify and drpai-runner. Follows
+# EDGE_ENABLE_AI for the same reason as the OP-TEE slice above — measurement
+# instruments belong in a dev image, not in prod.
+IMAGE_INSTALL:append:smarc-rzv2l = "${@bb.utils.contains('EDGE_ENABLE_AI', '1', ' packagegroup-edge-ai-test', '', d)}"
+
 # Optional: dbg-pkgs ships -dbg sub-packages for every recipe so gdb
 # backtraces resolve symbols. Roughly 3x rootfs size; gate behind a
 # variable for per-build opt-in.
