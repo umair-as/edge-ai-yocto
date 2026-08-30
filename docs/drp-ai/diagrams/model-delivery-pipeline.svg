@@ -1,0 +1,71 @@
+<svg viewBox="0 0 1280 772" xmlns="http://www.w3.org/2000/svg" font-family="Inter, 'IBM Plex Sans', 'Segoe UI', system-ui, 'Liberation Sans', 'DejaVu Sans', sans-serif">
+<defs>
+<marker id="arw" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#9AA6B8"/></marker>
+<marker id="arwA" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#4F46E5"/></marker>
+</defs>
+<rect width="1280" height="772" fill="#FFFFFF"/>
+<text x="48" y="60" font-size="26" font-weight="700" fill="#0F172A">Model delivery: producer to device</text>
+<text x="48" y="86" font-size="14" fill="#64748B">A compiled model becomes a signed, digest-addressed artifact; the device checks it before it unpacks it</text>
+<rect x="812" y="52" width="26" height="14" rx="4" fill="#EEF0FE" stroke="#4F46E5" stroke-width="1.8"/>
+<text x="846" y="64" font-size="12" fill="#64748B">proven on hardware</text>
+<rect x="812" y="76" width="26" height="14" rx="4" fill="#FFFFFF" stroke="#D3DAE6" stroke-width="1.4" stroke-dasharray="5,4" opacity="0.6"/>
+<text x="846" y="88" font-size="12" fill="#64748B">planned, not implemented</text>
+<rect x="48" y="116" width="1184" height="128" rx="12" fill="#F7F9FC"/>
+<text x="64" y="174.0" font-size="11.5" font-weight="700" fill="#94A3B8" letter-spacing="0.5">PRODUCER</text>
+<text x="64" y="192.0" font-size="11.5" font-weight="700" fill="#94A3B8" letter-spacing="0.5">build host</text>
+<rect x="48" y="258" width="1184" height="128" rx="12" fill="#F1F5F9"/>
+<text x="64" y="316.0" font-size="11.5" font-weight="700" fill="#94A3B8" letter-spacing="0.5">TRANSPORT</text>
+<text x="64" y="334.0" font-size="11.5" font-weight="700" fill="#94A3B8" letter-spacing="0.5">registry</text>
+<rect x="48" y="400" width="1184" height="128" rx="12" fill="#F7F9FC"/>
+<text x="64" y="458.0" font-size="11.5" font-weight="700" fill="#94A3B8" letter-spacing="0.5">DEVICE</text>
+<text x="64" y="476.0" font-size="11.5" font-weight="700" fill="#94A3B8" letter-spacing="0.5">verify</text>
+<rect x="48" y="542" width="1184" height="128" rx="12" fill="#F7F9FC"/>
+<text x="64" y="600.0" font-size="11.5" font-weight="700" fill="#94A3B8" letter-spacing="0.5">DEVICE</text>
+<text x="64" y="618.0" font-size="11.5" font-weight="700" fill="#94A3B8" letter-spacing="0.5">install</text>
+<rect x="216.0" y="147.0" width="218.0" height="66" rx="10" fill="#FFFFFF" stroke="#D3DAE6" stroke-width="1.4"/>
+<text x="325.0" y="175.0" font-size="14.5" font-weight="600" fill="#0F172A" text-anchor="middle">train / export</text>
+<text x="325.0" y="195.0" font-size="11.5" fill="#64748B" text-anchor="middle" font-family="'JetBrains Mono', 'IBM Plex Mono', 'DejaVu Sans Mono', monospace">ONNX</text>
+<rect x="482.0" y="147.0" width="218.0" height="66" rx="10" fill="#FFFFFF" stroke="#D3DAE6" stroke-width="1.4"/>
+<text x="591.0" y="175.0" font-size="14.5" font-weight="600" fill="#0F172A" text-anchor="middle">accelerator compile</text>
+<text x="591.0" y="195.0" font-size="11.5" fill="#64748B" text-anchor="middle" font-family="'JetBrains Mono', 'IBM Plex Mono', 'DejaVu Sans Mono', monospace">artifact + preprocess/</text>
+<rect x="748.0" y="147.0" width="218.0" height="66" rx="10" fill="#FFFFFF" stroke="#D3DAE6" stroke-width="1.4"/>
+<text x="857.0" y="175.0" font-size="14.5" font-weight="600" fill="#0F172A" text-anchor="middle">deterministic pack</text>
+<text x="857.0" y="195.0" font-size="11.5" fill="#64748B" text-anchor="middle" font-family="'JetBrains Mono', 'IBM Plex Mono', 'DejaVu Sans Mono', monospace">tar+gzip, fixed mtime/uid</text>
+<rect x="1014.0" y="147.0" width="218.0" height="66" rx="10" fill="#FFFFFF" stroke="#D3DAE6" stroke-width="1.4"/>
+<text x="1123.0" y="175.0" font-size="14.5" font-weight="600" fill="#0F172A" text-anchor="middle">sign</text>
+<text x="1123.0" y="195.0" font-size="11.5" fill="#64748B" text-anchor="middle" font-family="'JetBrains Mono', 'IBM Plex Mono', 'DejaVu Sans Mono', monospace">detached signature</text>
+<line x1="438.0" y1="180.0" x2="476.0" y2="180.0" stroke="#9AA6B8" stroke-width="1.6" marker-end="url(#arw)"/>
+<line x1="704.0" y1="180.0" x2="742.0" y2="180.0" stroke="#9AA6B8" stroke-width="1.6" marker-end="url(#arw)"/>
+<line x1="970.0" y1="180.0" x2="1008.0" y2="180.0" stroke="#9AA6B8" stroke-width="1.6" marker-end="url(#arw)"/>
+<rect x="494.0" y="289.0" width="460.0" height="66" rx="10" fill="#FFFFFF" stroke="#D3DAE6" stroke-width="1.4"/>
+<text x="724.0" y="317.0" font-size="14.5" font-weight="600" fill="#0F172A" text-anchor="middle">OCI registry</text>
+<text x="724.0" y="337.0" font-size="11.5" fill="#64748B" text-anchor="middle" font-family="'JetBrains Mono', 'IBM Plex Mono', 'DejaVu Sans Mono', monospace">manifest digest sha256:&lt;hex&gt;  =  the model's identity</text>
+<path d="M 1123.0 213.0 L 1123.0 251 L 724.0 251 L 724.0 285.0" fill="none" stroke="#9AA6B8" stroke-width="1.6" marker-end="url(#arw)"/>
+<rect x="216.0" y="431.0" width="490.0" height="66" rx="10" fill="#EEF0FE" stroke="#4F46E5" stroke-width="1.8"/>
+<text x="461.0" y="459.0" font-size="14.5" font-weight="600" fill="#4F46E5" text-anchor="middle">verify signature</text>
+<text x="461.0" y="479.0" font-size="11.5" fill="#64748B" text-anchor="middle" font-family="'JetBrains Mono', 'IBM Plex Mono', 'DejaVu Sans Mono', monospace">default-reject policy</text>
+<rect x="742.0" y="431.0" width="490.0" height="66" rx="10" fill="#EEF0FE" stroke="#4F46E5" stroke-width="1.8"/>
+<text x="987.0" y="459.0" font-size="14.5" font-weight="600" fill="#4F46E5" text-anchor="middle">verify digest</text>
+<text x="987.0" y="479.0" font-size="11.5" fill="#64748B" text-anchor="middle" font-family="'JetBrains Mono', 'IBM Plex Mono', 'DejaVu Sans Mono', monospace">before anything is unpacked</text>
+<path d="M 724.0 355.0 L 724.0 393 L 461.0 393 L 461.0 427.0" fill="none" stroke="#4F46E5" stroke-width="2.2" marker-end="url(#arwA)"/>
+<line x1="710.0" y1="464.0" x2="736.0" y2="464.0" stroke="#4F46E5" stroke-width="2.2" marker-end="url(#arwA)"/>
+<rect x="216.0" y="573.0" width="218.0" height="66" rx="10" fill="#FFFFFF" stroke="#D3DAE6" stroke-width="1.4" stroke-dasharray="5,4" opacity="0.6"/>
+<text x="325.0" y="601.0" font-size="14.5" font-weight="600" fill="#0F172A" text-anchor="middle">safe extract</text>
+<text x="325.0" y="621.0" font-size="11.5" fill="#64748B" text-anchor="middle" font-family="'JetBrains Mono', 'IBM Plex Mono', 'DejaVu Sans Mono', monospace">hostile-archive rules</text>
+<rect x="482.0" y="573.0" width="218.0" height="66" rx="10" fill="#FFFFFF" stroke="#D3DAE6" stroke-width="1.4" stroke-dasharray="5,4" opacity="0.6"/>
+<text x="591.0" y="601.0" font-size="14.5" font-weight="600" fill="#0F172A" text-anchor="middle">model store</text>
+<text x="591.0" y="621.0" font-size="11.5" fill="#64748B" text-anchor="middle" font-family="'JetBrains Mono', 'IBM Plex Mono', 'DejaVu Sans Mono', monospace">active + previous digest</text>
+<rect x="748.0" y="573.0" width="218.0" height="66" rx="10" fill="#FFFFFF" stroke="#D3DAE6" stroke-width="1.4" stroke-dasharray="5,4" opacity="0.6"/>
+<text x="857.0" y="601.0" font-size="14.5" font-weight="600" fill="#0F172A" text-anchor="middle">compatibility check</text>
+<text x="857.0" y="621.0" font-size="11.5" fill="#64748B" text-anchor="middle" font-family="'JetBrains Mono', 'IBM Plex Mono', 'DejaVu Sans Mono', monospace">accelerator + runtime</text>
+<rect x="1014.0" y="573.0" width="218.0" height="66" rx="10" fill="#FFFFFF" stroke="#D3DAE6" stroke-width="1.4" stroke-dasharray="5,4" opacity="0.6"/>
+<text x="1123.0" y="601.0" font-size="14.5" font-weight="600" fill="#0F172A" text-anchor="middle">atomic activation</text>
+<text x="1123.0" y="621.0" font-size="11.5" fill="#64748B" text-anchor="middle" font-family="'JetBrains Mono', 'IBM Plex Mono', 'DejaVu Sans Mono', monospace">ref -&gt; digest</text>
+<path d="M 987.0 497.0 L 987.0 535 L 325.0 535 L 325.0 569.0" fill="none" stroke="#9AA6B8" stroke-width="1.6" stroke-dasharray="6,5" marker-end="url(#arw)"/>
+<line x1="438.0" y1="606.0" x2="476.0" y2="606.0" stroke="#9AA6B8" stroke-width="1.6" stroke-dasharray="6,5" marker-end="url(#arw)"/>
+<line x1="704.0" y1="606.0" x2="742.0" y2="606.0" stroke="#9AA6B8" stroke-width="1.6" stroke-dasharray="6,5" marker-end="url(#arw)"/>
+<line x1="970.0" y1="606.0" x2="1008.0" y2="606.0" stroke="#9AA6B8" stroke-width="1.6" stroke-dasharray="6,5" marker-end="url(#arw)"/>
+<path d="M 1123.0 639.0 L 1123.0 692.0 L 591.0 692.0 L 591.0 643.0" fill="none" stroke="#9AA6B8" stroke-width="1.6" stroke-dasharray="6,5" marker-end="url(#arw)"/>
+<text x="857.0" y="709.0" font-size="11" fill="#64748B" text-anchor="middle" font-weight="600">rollback: re-point the ref at the previous digest, already in the store</text>
+<text x="48" y="748" font-size="12" fill="#94A3B8">Rollback never re-downloads and never re-extracts: the previous digest stays in the store, so reverting is the same atomic reference switch as activating.</text>
+</svg>
