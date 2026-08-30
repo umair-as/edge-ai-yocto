@@ -40,7 +40,7 @@ From the repo root:
 
 ```sh
 source scripts/env.sh
-kas shell kas/local.yml -c 'bitbake drpai-tvm-runner'
+kas shell kas/local.yml -c 'bitbake drpai-tvm-runner'   # or use the copy in the image
 BIN=$(find build/tmp/work -path '*drpai-tvm-runner*/image/usr/bin/drpai-runner' | head -1)
 echo "$BIN"
 ```
@@ -182,8 +182,8 @@ trust a latency estimate for a new model without this profile.
 ## Status
 
 The build → deploy → measure → profile flow is **proven** (it produced the table
-above). The `drpai-runner` recipe is in-tree but deliberately outside
-`packagegroup-edge-ai`: it is a benchmark/recon tool, deployed by hand for a
-measurement session, not the platform's production inference entry point. The
-shipped workload is still the ResNet18 classifier app. Measurement is latency +
+above). `drpai-runner` ships in **dev** images via `packagegroup-edge-ai-test`,
+alongside `drpai-classify` for real-input classification; prod images do not
+carry either. It remains a measurement tool rather than the platform's inference
+entry point: the shipped inference workload is still the ResNet18 classifier app. Measurement is latency +
 work-placement only; correctness/accuracy of model outputs is out of scope.

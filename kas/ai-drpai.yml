@@ -8,7 +8,8 @@
 # Flips EDGE_ENABLE_AI = 1, which adds packagegroup-edge-ai to the image: the
 # drpai and u-dma-buf kernel modules, the mmngr buffer providers, the prebuilt
 # DRP-AI TVM runtime, the inference app, the render-group udev rule, and the
-# edge-ctr rootless principal with its inference Quadlet.
+# edge-ctr rootless principal with its inference Quadlet. Dev images additionally
+# get packagegroup-edge-ai-test (drpai-classify, drpai-runner); prod does not.
 #
 # RZ/V2L ONLY — this fragment is not machine-safe. packagegroup-edge-ai is
 # COMPATIBLE_MACHINE = smarc-rzv2l, but the toggle that pulls it in is applied
