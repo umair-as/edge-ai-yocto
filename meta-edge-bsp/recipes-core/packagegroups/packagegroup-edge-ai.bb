@@ -1,8 +1,9 @@
 SUMMARY     = "DRP-AI inference enablement: kernel drivers + TVM runtime"
 DESCRIPTION = "On-device DRP-AI stack for RZ/V2L: the drpai kernel driver \
 (/dev/drpai0), the u-dma-buf and mmngr buffer providers, and the prebuilt \
-DRP-AI TVM (RUHMI) runtime that executes compiled models. Models are layered \
-on top separately."
+DRP-AI TVM (RUHMI) runtime that executes compiled models. ${PN}-test adds the \
+recon and measurement tools, for dev images only. Models are layered on top \
+separately."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "kernel"
 LICENSE     = "MIT"
@@ -13,6 +14,10 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda
 PACKAGE_ARCH = "${MACHINE_ARCH}"
 
 inherit packagegroup
+PACKAGES = " \
+    ${PN} \
+    ${PN}-test \
+"
 
 # DRP-AI is RZ/V2L-only SoC IP.
 COMPATIBLE_MACHINE = "smarc-rzv2l"
@@ -37,3 +42,9 @@ RDEPENDS:${PN} = " \
     edge-ctr-user \
     drpai-tvm-quadlet \
 "
+
+# Recon and measurement tools, kept out of the prod tier: drpai-classify (real
+# image in, decoded result out) and drpai-runner (latency and NPU placement,
+# which announces at runtime that its input is unbound). Bring-up and
+# measurement instruments, not the shipped inference path.
+RDEPENDS:${PN}-test = "drpai-tvm-runner"

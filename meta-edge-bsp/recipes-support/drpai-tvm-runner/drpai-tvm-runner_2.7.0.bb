@@ -18,9 +18,10 @@ SRCREV  = "${DRPAI_TVM_SRCREV}"
 
 COMPATIBLE_MACHINE = "smarc-rzv2l"
 
-# Recon and measurement tools, deliberately outside packagegroup-edge-ai: staged by
-# hand for a measurement session, not shipped in the image and not the production
-# inference path. drpai-classify handles classification only.
+# Shipped in dev images via packagegroup-edge-ai-test, not in prod: these are
+# measurement instruments. drpai-classify performs real-input classification;
+# drpai-runner measures latency and NPU placement and announces at runtime that
+# its input is unbound.
 
 # tvm/dlpack/dmlc/builtin_fp16.h from drpai-tvm-runtime -dev; linux/drpai.h from
 # kernel-module-drpai -dev; spdlog (external fmt) + asio for the runtime wrapper.
