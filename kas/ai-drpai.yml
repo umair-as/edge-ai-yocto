@@ -1,0 +1,35 @@
+# Capability fragment: DRP-AI inference stack (RZ/V2L accelerator).
+#
+# Self-contained: pure additive overlay, no `includes:` and no `repos:` (adds
+# no layers, only a local.conf toggle). Compose with the base+machine stack:
+#   kas build kas/base.yml:kas/machines/<board>.yml:kas/ai-drpai.yml
+#   make dev AI=1                                 # via Makefile flag
+#
+# Flips EDGE_ENABLE_AI = 1, which adds packagegroup-edge-ai to the image: the
+# drpai and u-dma-buf kernel modules, the mmngr buffer providers, the prebuilt
+# DRP-AI TVM runtime, the inference app, the render-group udev rule, and the
+# edge-ctr rootless principal with its inference Quadlet.
+#
+# RZ/V2L ONLY — this fragment is not machine-safe. packagegroup-edge-ai is
+# COMPATIBLE_MACHINE = smarc-rzv2l, but the toggle that pulls it in is applied
+# unconditionally, and BitBake does not fail-soft on a COMPATIBLE_MACHINE-
+# incompatible dependency: on any other machine the build fails with "Nothing
+# PROVIDES packagegroup-edge-ai". The render-group usermod for edge-ctr also runs
+# regardless of machine. Wiring a second board means machine-scoping the toggle
+# first, the way the OP-TEE packagegroup already is.
+#
+# Pair with VIRT=1 for the containerized path. Without meta-virtualization
+# there is no podman, so the Quadlet cannot run and only the native inference
+# binary is usable. Fragments compose explicitly rather than implying each
+# other: `make dev AI=1 VIRT=1`.
+#
+# The compiled model is not part of the image. The inference Quadlet reads its
+# payload from /data/drpai and skips cleanly when that path is absent, so a
+# fresh device builds and boots without one — and does not infer until a payload
+# is placed there.
+header:
+  version: 19
+
+local_conf_header:
+  ai_drpai: |
+    EDGE_ENABLE_AI = "1"

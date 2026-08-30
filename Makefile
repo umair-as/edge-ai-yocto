@@ -54,6 +54,7 @@ endif
 #
 #   make dev TPM=1         # add meta-secure-core TPM2 + IMA/EVM stack
 #   make dev VIRT=1        # add meta-virtualization (Podman/runc/crun)
+#   make dev AI=1          # add the DRP-AI inference stack (RZ/V2L)
 #   make dev SBOM_TUNE=1   # add SBOM/CVE per-build tuning knobs
 #   make dev JTAG=1        # KASLR off + kgdb + debug-safe (JTAG kernel labs)
 #   make dev BPF=1         # kernel BTF + bpftool (libbpf CO-RE labs; size-heavy)
@@ -71,6 +72,9 @@ ifeq ($(TPM),1)
 endif
 ifeq ($(VIRT),1)
   CAPABILITY_YMLS += kas/virtualization.yml
+endif
+ifeq ($(AI),1)
+  CAPABILITY_YMLS += kas/ai-drpai.yml
 endif
 ifeq ($(SBOM_TUNE),1)
   CAPABILITY_YMLS += kas/sbom-cve.yml
@@ -136,6 +140,7 @@ help:
 	@echo "Capability flags (composable; combine freely):"
 	@echo "  TPM=1                        + meta-secure-core (TPM2 + IMA/EVM userspace)"
 	@echo "  VIRT=1                       + meta-virtualization (Podman/runc/crun)"
+	@echo "  AI=1                         + DRP-AI inference stack (RZ/V2L; pair with VIRT=1)"
 	@echo "  SBOM_TUNE=1                  + kas/sbom-cve.yml tuning knobs"
 	@echo "  NETBOOT=1                    + U-Boot 'netboot' env macro (TFTP/NFS dev workflow)"
 	@echo "  JTAG=1                       + KASLR off, kgdb, debug-safe boot (JTAG kernel labs)"
