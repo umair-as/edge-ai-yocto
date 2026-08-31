@@ -1,0 +1,35 @@
+name: Repo lint
+
+# Text-only checks: no bitbake, no kas, no network fetches, seconds to run.
+# A Yocto parse or build is deliberately NOT run here — it needs the layer and
+# sstate caches that live on the build host, not a hosted runner.
+#
+# Not wired into the protect-main ruleset as a required check: this reports,
+# it does not gate. Make it required only if it proves stable and useful.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # trailer checks need the branch's commits
+
+      - name: Repository invariants
+        env:
+          # On a PR, scope commit-trailer checks to what the PR adds.
+          LINT_RANGE: ${{ github.event_name == 'pull_request' && format('{0}..HEAD', github.event.pull_request.base.sha) || 'HEAD~1..HEAD' }}
+        run: scripts/ci/repo-lint.sh
+
+      - name: Staged private-key guard (same hook as commit stage)
+        run: |
+          pipx install pre-commit >/dev/null 2>&1 || pip install --quiet pre-commit
+          pre-commit run forbid-private-keys --all-files
