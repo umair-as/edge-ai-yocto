@@ -50,7 +50,7 @@ EU Cyber Resilience Act, Annex I (essential cybersecurity requirements). This ta
 
 | Sub-requirement | Status | Implementation |
 |---|---|---|
-| 4.a — DM-VERITY rootfs (immutable) | ✅ | RAUC raw-writes `ext4.verity`; the signed slot FIT supplies the root hash and early `dm-mod.create`, mounting `/dev/dm-0` read-only. On-target validation remains required after the first build. |
+| 4.a — DM-VERITY rootfs (immutable) | ✅ | RAUC raw-writes `ext4.verity`; the signed slot FIT supplies the root hash and early `dm-mod.create`, mounting `/dev/dm-0` read-only. On-target flash, boot, deliberate corruption detection, and OTA replacement/rollback validation are complete. |
 | 4.b — `/data` LUKS encryption | 🟡 | `cryptsetup` (LUKS + `veritysetup`) userspace ships in `packagegroup-edge-security`. No wiring yet. Needs TPM2 chip on the board (RZ/V2L doesn't have internal TPM) OR PBKDF-derived key from per-device secret. |
 | 4.c — Key material protection | ⏸ | TPM-sealed LUKS key. Same blocker as 4.b. |
 
@@ -68,7 +68,7 @@ EU Cyber Resilience Act, Annex I (essential cybersecurity requirements). This ta
 |---|---|---|
 | 6.a — Signed boot chain | 🟡 | U-Boot verifies FIT configurations and RAUC verifies bundles, but TF-A has `TRUSTED_BOARD_BOOT=0`; BL2 through BL33 are not hardware-authenticated. |
 | 6.b — Signed FIT image | ✅ | `sha256,rsa2048:edge-fit-dev` covers the kernel and slot DTB, including the root hash. Interactive U-Boot commands can still bypass the managed boot macro. |
-| 6.c — DM-VERITY at runtime | ✅ | See 4.a; implementation is parse-checked but not yet on-target validated. |
+| 6.c — DM-VERITY at runtime | ✅ | See 4.a; the mapped root was validated on target through flash, boot, deliberate corruption detection, and OTA replacement/rollback. |
 | 6.d — Module signing | ✅ | `MODULE_SIG=y`, `MODULE_SIG_ALL=y`, and `MODULE_SIG_FORCE=y`; hand-installed Renesas modules use the shared signing include. |
 | 6.e — IMA appraisal | 🟡 | Kernel `CONFIG_IMA=y`, `IMA_LSM_RULES=y`. `ima_appraise=enforce` cmdline + signed policy deferred. |
 

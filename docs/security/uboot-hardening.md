@@ -298,8 +298,8 @@ the cmdline can only raise the level, never lower it. dmesg:
 [  828.203294] Lockdown: modprobe: unsigned module loading is restricted
 ```
 
-`lsmod` came back empty. The four meta-renesas out-of-tree modules
-(mmngr, mmngrbuf, vspm, vspm_if) are unsigned in the current build; all
+`lsmod` came back empty. In that Wave 3 build, the four meta-renesas out-of-tree
+modules (mmngr, mmngrbuf, vspm, vspm_if) were unsigned; all
 four were refused at every load attempt. Multimedia stack offline
 (no V4L2 capture, no vspmfilter, no DRP-AI pipeline downstream).
 
