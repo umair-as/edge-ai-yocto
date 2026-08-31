@@ -1,5 +1,5 @@
 SUMMARY     = "DRP-AI recon tools: model benchmark and real-input classifier"
-DESCRIPTION = "Two host-staged tools for any DRP-AI-compiled model directory: \
+DESCRIPTION = "Two recon tools for any DRP-AI-compiled model directory: \
 drpai-runner times inference with an NPU-IRQ witness and optional per-operator \
 profiling, drpai-classify feeds a real image and decodes a classification result."
 HOMEPAGE    = "https://github.com/renesas-rz/rzv_drp-ai_tvm"
