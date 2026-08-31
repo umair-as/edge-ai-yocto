@@ -82,9 +82,9 @@ yocto-security-tools corrector once wrote three `not-applicable-config`
 entries whose introduced-in-version claim contradicted the upstream
 advisories; all three were caught and removed only by that review. All six
 exit-12 claims checked in that audit were false; the three proposed rsync
-suppressions were removed, so none is a disposition.
-Any proposal derived from build metadata alone is `UNVERIFIED`, because reachability — is the service
-running, is the port open, is SELinux enforcing — is a fact about the
+suppressions were removed, so none is a disposition. Any proposal derived
+from build metadata alone is `UNVERIFIED`, because reachability — is the
+service running, is the port open, is SELinux enforcing — is a fact about the
 running device, not the build. Suppression is a security assertion and
 carries an owner.
 
@@ -243,8 +243,8 @@ kernel pin `6.12.59-cip14+git0+212f6e88b7`.
 The residual under the acceptance snapshot is therefore **58 Unpatched
 userland rows**, not a claim that the image has no remaining exposure. The six
 exit-12 corrector claims were independently checked against upstream material
-and shipped code: all six were false, and the three fabricated rsync
-suppressions were removed.
+and shipped code: all six were false, and the three unsupported proposed
+rsync suppressions were removed.
 
 For CVE-2016-7545, one product-level `fixed-version` status on
 `selinux-sandbox` produces eleven target `fixed-version` relationships because
@@ -265,9 +265,13 @@ close it — where a single concrete action would close one, it is named.
   `SELINUX=permissive`; moving to enforcing is an operator decision that gates
   the reachability of SELinux-enforcement CVEs. *Now settled:* a posture gate is
   a flag to investigate, not a verdict — a gated CVE can resolve
-  posture-independently (CVE-2016-7545 is `fixed-version` for the sandbox
-  recipe and `cpe-incorrect` for duplicate component matches; the acceptance
-  SPDX VEX records those relationships). The enforcing decision itself is open.
+  posture-independently. CVE-2016-7545 carries one product-level
+  `fixed-version` disposition, authored on `selinux-sandbox` because that is
+  the recipe shipping the affected launcher; the shared `CVE_PRODUCT` fans it
+  out to eleven target `fixed-version` relationships, of which ten are
+  duplicate package matches for the same product identity. No target
+  `cpe-incorrect` relationship exists for this CVE. The enforcing decision
+  itself is open.
 - **OQ-2 — Grype OS-package parity.** The measured run covered only the language
   layer because distro detection failed on `ID=edge-ai`, disabling the
   OS-package matchers. *Closes with:* a `grype --distro` re-run to establish
