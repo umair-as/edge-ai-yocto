@@ -60,7 +60,7 @@ hdr "INVARIANT: no AI Co-Authored-By trailer on new commits"
 # so a date filter on history is unreliable — the range is the honest scope.
 RANGE="${LINT_RANGE:-main..HEAD}"
 if git rev-parse --quiet --verify "${RANGE%%..*}" >/dev/null 2>&1; then
-    hits=$(git log "$RANGE" --format='%h %s%n%b' 2>/dev/null \
+    hits=$(git log --no-merges "$RANGE" --format='%h %s%n%b' 2>/dev/null \
            | grep -iE '^Co-Authored-By:.*(claude|codex|copilot|kiro|bot)' || true)
     if [ -n "$hits" ]; then echo "$hits" | sed 's/^/    /'; bad "AI Co-Authored-By trailer in $RANGE"
     else ok "none in $RANGE"; fi
@@ -71,7 +71,7 @@ fi
 hdr "INVARIANT: new commits carry an Assisted-by trailer"
 if git rev-parse --quiet --verify "${RANGE%%..*}" >/dev/null 2>&1; then
     missing=0
-    for c in $(git log "$RANGE" --format='%H' 2>/dev/null); do
+    for c in $(git log --no-merges "$RANGE" --format='%H' 2>/dev/null); do
         git log -1 --format='%(trailers:key=Assisted-by,valueonly)' "$c" | grep -q . \
             || { printf '    %s %s\n' "$(git log -1 --format=%h "$c")" "$(git log -1 --format=%s "$c")"; missing=1; }
     done
