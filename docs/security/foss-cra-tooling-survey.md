@@ -54,9 +54,8 @@ SPDX 3.0.1.
   dispositions — lands only after per-claim review
   ([`cve-triage.md`](cve-triage.md) rule 7,
   [`vuln-mgmt-architecture.md`](vuln-mgmt-architecture.md) D4).
-  The 2026-08-14 review of six exit-12 "vulnerable code absent" results found
-  that none was valid evidence for a disposition; every claim requires
-  independent per-claim
+  A review of six exit-12 "vulnerable code absent" results found that none was
+  valid evidence for a disposition; every claim requires independent per-claim
   verification against upstream material and shipped code.
 - **Grype** with `--vex` — consumes OpenVEX and moves `not_affected` / `fixed`
   findings to ignored (`--fail-on` overrides `--vex`). The only third-party
