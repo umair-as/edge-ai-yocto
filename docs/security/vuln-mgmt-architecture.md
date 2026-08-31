@@ -80,8 +80,10 @@ vulnerable-code claim checked against the shipped source or binary,
 independent of the tool that produced it. This is not hypothetical: the
 yocto-security-tools corrector once wrote three `not-applicable-config`
 entries whose introduced-in-version claim contradicted the upstream
-advisories; all three were caught and reverted only by that review. Any proposal derived from
-build metadata alone is `UNVERIFIED`, because reachability — is the service
+advisories; all three were caught and removed only by that review. All six
+exit-12 claims checked in that audit were false; the three proposed rsync
+suppressions were removed, so none is a disposition.
+Any proposal derived from build metadata alone is `UNVERIFIED`, because reachability — is the service
 running, is the port open, is SELinux enforcing — is a fact about the
 running device, not the build. Suppression is a security assertion and
 carries an owner.
@@ -222,6 +224,36 @@ fetched source artifacts (**100% carry a download URL**) · 223 licenses; 5 buil
 packages without a declared license. (Built packages have no download URL *by
 design* — SPDX 3.0 puts the URL on the `source`-purpose node, not the built one.)
 
+## Userland remediation under a pinned database snapshot
+
+These measurements come from `edge-image-dev` for `smarc-rzv2l`, with
+cvelistV5 revision `d34c26123e45e877be017cf361b64edc0eefc4b6` and
+nvd-json-data-feeds revision
+`b9056dbe8175514b36ed1720cd223fc73aa1796c`. They are separate stages of the
+userland campaign, not interchangeable totals. The acceptance image used
+kernel pin `6.12.59-cip14+git0+212f6e88b7`.
+
+| Stage | Userland Unpatched | Result |
+|---|---:|---|
+| Recipe-pin pass, 2026-08-13 | 242 → 137 | 81 rows became Patched, 23 left the affected range, 2 became Ignored, and 1 new curl row entered. |
+| Reviewed backports and dispositions, 2026-08-14 | 137 → 70 | 67 net rows cleared after per-claim review; the corrected rsync state trades one Ignored row for one Unpatched client-side row. |
+| Pinned pre-edit baseline, 2026-08-30 | 70 | Image ID `20260830163808`; all 4,619 userland rows were present before this tranche. |
+| Pinned acceptance build, 2026-08-31 | 58 | Image ID `20260831080643`; 12 verified metadata transitions, with no userland row additions or removals. |
+
+The residual under the acceptance snapshot is therefore **58 Unpatched
+userland rows**, not a claim that the image has no remaining exposure. The six
+exit-12 corrector claims were independently checked against upstream material
+and shipped code: all six were false, and the three fabricated rsync
+suppressions were removed.
+
+For target package rows, the acceptance SPDX VEX preserves one `fixed-version`
+relationship for `selinux-sandbox` and ten `cpe-incorrect` relationships for
+duplicate matches; native build counterparts are also represented in the full
+SPDX artifact.
+The CSV exporter collapses same-CVE per-recipe VEX relationships and renders
+all eleven as `Patched`; that presentation must not be read as evidence that
+the duplicate recipes ship the sandbox launcher.
+
 ## Open questions
 
 These are decisions and wiring not yet done. The work so far has been
@@ -232,20 +264,22 @@ close it — where a single concrete action would close one, it is named.
   `SELINUX=permissive`; moving to enforcing is an operator decision that gates
   the reachability of SELinux-enforcement CVEs. *Now settled:* a posture gate is
   a flag to investigate, not a verdict — a gated CVE can resolve
-  posture-independently (CVE-2016-7545 is `fixed-version`, the shipped userspace
-  carries the fix, regardless of posture). The enforcing decision itself is open.
+  posture-independently (CVE-2016-7545 is `fixed-version` for the sandbox
+  recipe and `cpe-incorrect` for duplicate component matches; the acceptance
+  SPDX VEX records those relationships). The enforcing decision itself is open.
 - **OQ-2 — Grype OS-package parity.** The measured run covered only the language
   layer because distro detection failed on `ID=edge-ai`, disabling the
   OS-package matchers. *Closes with:* a `grype --distro` re-run to establish
   OS-package behaviour before relying fully on Grype (D5).
-- **OQ-3 — the distro-wide suppression file.** The shared `CVE_STATUS` locus
-  (D2) is designed but does not exist; creating and wiring it is a build-config
-  change. Until then, family-wide decisions have nowhere to live.
+- **OQ-3 — the shared CVE metadata locus.** *Closed for the verified SELinux
+  family case.* The affected recipes' bbappends carry explicit statuses for
+  the shared unversioned SELinux CPE; there is no broad global suppression.
 - **OQ-4 — VEX completeness (`SPDX_INCLUDE_VEX` `current` vs `all`).**
-  *Closed.* `all` is set in `edge-floor.inc` and verified by differential
-  rescan (2026-08-13): the report honours `fixed-version` and every other
-  exportable disposition verbatim (`unknown` is skipped); 47 previously-dropped
-  rows moved to their
+  *Closed for SPDX generation.* `all` is set in `edge-floor.inc` and verified
+  by differential rescan (2026-08-13): the SPDX artifact carries
+  exportable dispositions (`unknown` is skipped). The CSV exporter can collapse
+  same-CVE per-recipe relationships; consumers must inspect SPDX VEX when the
+  distinction matters. 47 previously-dropped rows moved to their
   dispositioned status (43 expected + 4 discovered in the delta). See §"The CVE_STATUS propagation gap" (historical)
   and [`vex-and-cve-status.md`](vex-and-cve-status.md).
 - **OQ-5 — kernel config-reachability.** *Phase 0 measured* — the config-
