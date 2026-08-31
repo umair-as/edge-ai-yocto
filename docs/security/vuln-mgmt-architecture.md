@@ -238,7 +238,7 @@ kernel pin `6.12.59-cip14+git0+212f6e88b7`.
 | Recipe-pin pass, 2026-08-13 | 242 → 137 | 81 rows became Patched, 23 left the affected range, 2 became Ignored, and 1 new curl row entered. |
 | Reviewed backports and dispositions, 2026-08-14 | 137 → 70 | 67 net rows cleared after per-claim review; the corrected rsync state trades one Ignored row for one Unpatched client-side row. |
 | Pinned pre-edit baseline, 2026-08-30 | 70 | Image ID `20260830163808`; all 4,619 userland rows were present before this tranche. |
-| Pinned acceptance build, 2026-08-31 | 58 | Image ID `20260831080643`; 12 verified metadata transitions, with no userland row additions or removals. |
+| Pinned acceptance build, 2026-08-31 | 58 | Image ID `20260831090807`; 12 verified metadata transitions, with no userland row additions or removals. |
 
 The residual under the acceptance snapshot is therefore **58 Unpatched
 userland rows**, not a claim that the image has no remaining exposure. The six
@@ -246,13 +246,14 @@ exit-12 corrector claims were independently checked against upstream material
 and shipped code: all six were false, and the three fabricated rsync
 suppressions were removed.
 
-For target package rows, the acceptance SPDX VEX preserves one `fixed-version`
-relationship for `selinux-sandbox` and ten `cpe-incorrect` relationships for
-duplicate matches; native build counterparts are also represented in the full
-SPDX artifact.
-The CSV exporter collapses same-CVE per-recipe VEX relationships and renders
-all eleven as `Patched`; that presentation must not be read as evidence that
-the duplicate recipes ship the sandbox launcher.
+For CVE-2016-7545, one product-level `fixed-version` status on
+`selinux-sandbox` produces eleven target `fixed-version` relationships because
+the recipes share `CVE_PRODUCT`. The fixed code itself remains attributable
+only to the shipped sandbox launcher; the other ten rows are duplicate matches
+of the shared product identity. No target `cpe-incorrect` suppressions are
+used. The generated `yocto.json` already records all eleven rows as `Patched`;
+`scripts/cve-report.py` reads those flat package/issue rows and does not merge
+them. Consumers needing relationship detail must inspect the SPDX VEX artifact.
 
 ## Open questions
 
@@ -271,15 +272,18 @@ close it — where a single concrete action would close one, it is named.
   layer because distro detection failed on `ID=edge-ai`, disabling the
   OS-package matchers. *Closes with:* a `grype --distro` re-run to establish
   OS-package behaviour before relying fully on Grype (D5).
-- **OQ-3 — the shared CVE metadata locus.** *Closed for the verified SELinux
-  family case.* The affected recipes' bbappends carry explicit statuses for
-  the shared unversioned SELinux CPE; there is no broad global suppression.
+- **OQ-3 — the shared CVE metadata locus.** *Open.* The verified SELinux case
+  uses one product-level status on `selinux-sandbox`; the shared unversioned
+  CPE fans it out to duplicate target rows. The earlier attempt to express
+  family-wide identity mismatches with per-recipe `cpe-incorrect` bbappends
+  was inert and has been removed. A reusable family-level metadata pattern
+  still needs to be established without relying on that disproven shape.
 - **OQ-4 — VEX completeness (`SPDX_INCLUDE_VEX` `current` vs `all`).**
   *Closed for SPDX generation.* `all` is set in `edge-floor.inc` and verified
   by differential rescan (2026-08-13): the SPDX artifact carries
-  exportable dispositions (`unknown` is skipped). The CSV exporter can collapse
-  same-CVE per-recipe relationships; consumers must inspect SPDX VEX when the
-  distinction matters. 47 previously-dropped rows moved to their
+  exportable dispositions (`unknown` is skipped). The report exporter reads
+  flat package/issue rows; consumers must inspect SPDX VEX when relationship
+  detail matters. 47 previously-dropped rows moved to their
   dispositioned status (43 expected + 4 discovered in the delta). See §"The CVE_STATUS propagation gap" (historical)
   and [`vex-and-cve-status.md`](vex-and-cve-status.md).
 - **OQ-5 — kernel config-reachability.** *Phase 0 measured* — the config-
