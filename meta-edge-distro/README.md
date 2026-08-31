@@ -13,7 +13,7 @@ psplash assets.
 
 ## Maintainer
 
-Umair Ashraf <https://github.com/umair-as>
+Umair Ahmed Shah <https://github.com/umair-as>
 
 ## License
 
