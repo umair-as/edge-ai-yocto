@@ -61,6 +61,7 @@ EU Cyber Resilience Act, Annex I (essential cybersecurity requirements). This ta
 | 5.a — TLS client trust store | ✅ | `ca-certificates` (Mozilla bundle) in `packagegroup-edge-security`. |
 | 5.b — Modern SSH ciphers | ✅ | curve25519-sha256, chacha20-poly1305, aes-gcm only (`edge-sshd-hardening` → `sshd_config.d/99-edge-hardening.conf`). |
 | 5.c — TLS for OTA bundles | ✅ | `bundle-formats=verity` for integrity, plus mTLS transport: the `[streaming]` block in `system.conf` binds a client cert/key and CA, and the transfer runs as the unprivileged `ota` user. Hardware-validated on RZ/V2L — a 253 MB bundle streamed over HTTPS with client-certificate auth and installed to the inactive slot. Requires a per-device identity in `/etc/ota` (`EDGE_OTA_CERT_DIR`); not shipped by default. |
+| 5.d — OTA bundle payload confidentiality | 🟡 | RAUC `crypt` bundles (AES-256 payload, manifest CMS-enveloped to recipient certs) wired behind `EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION`, off by default. Kernel side verified present (`CONFIG_DM_CRYPT` and the AES/CBC deps are `=y` in the built config); recipient key generation, image provisioning and `bundle-formats` switching are wired but **not built and not hardware-validated**. Dev flow uses one shared fleet key with no revocation path. See [ota-updates.md](../dev/ota-updates.md). |
 
 ### 6. Integrity protection
 

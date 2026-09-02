@@ -200,6 +200,19 @@ RAUC_CERT_FILE      ?= "${TOPDIR}/../keys/dev/rauc/rauc-signer.cert.pem"
 RAUC_KEYRING_FILE   ?= "${TOPDIR}/../keys/dev/rauc/rauc-ca.cert.pem"
 RAUC_DEVICE_KEYRING ?= "${RAUC_KEYRING_FILE}"
 
+# ----- RAUC bundle encryption (crypt format, opt-in) ----------------------
+
+# Recipient PKI, independent of the signing PKI above: `rauc encrypt`
+# CMS-envelopes the manifest to the certs in the recipients PEM, and the
+# device decrypts with the matching private key. rauc-init-certs.sh emits all
+# three files; an empty *_SRC pair leaves the device key to a PKCS#11 token.
+#
+# Consumed by: edge-bundle-common.inc (recipients), ota-certs (device key
+# and cert), rauc-conf-edge (the [encryption] stanza that names them).
+EDGE_RAUC_BUNDLE_ENCRYPT_RECIPIENTS ?= "${TOPDIR}/../keys/dev/rauc/rauc-recipients.pem"
+EDGE_RAUC_DECRYPT_KEY_SRC           ?= "${TOPDIR}/../keys/dev/rauc/rauc-recipient.key"
+EDGE_RAUC_DECRYPT_CERT_SRC          ?= "${TOPDIR}/../keys/dev/rauc/rauc-recipient.cert.pem"
+
 # ----- Build identifier ---------------------------------------------------
 
 # NOT SOURCE_DATE_EPOCH: oe-core hard-pins that to 1302044400 (2011-04-05)

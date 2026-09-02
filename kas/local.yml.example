@@ -124,11 +124,39 @@ local_conf_header:
     # EDGE_RAUC_KEYRING_CERTS = ""
 
     # ---- Bundle encryption (crypt format) ----------------------------------
-    # Opt-in. Requires a key on device (file path or pkcs11: URI) and a
-    # recipients PEM at build time.
+    # Opt-in. The payload is AES-256 encrypted and the manifest is CMS-
+    # enveloped to the recipient certs; the device decrypts with the matching
+    # private key. Wired but not yet built or hardware-validated — see
+    # docs/dev/ota-updates.md.
+    #
+    # scripts/rauc-init-certs.sh generates the recipient keypair alongside
+    # the signing PKI, and edge-floor.inc defaults the three paths below to
+    # what it emits, so the single line is enough for the dev flow:
+    #
     # EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION = "1"
-    # EDGE_RAUC_ENCRYPTION_KEY = "/etc/rauc/encryption.key"
-    # EDGE_RAUC_BUNDLE_ENCRYPT_RECIPIENTS = "/path/to/recipients.pem"
+    #
+    # Everything else is override-only. Defaults, relative to the repo root:
+    # EDGE_RAUC_BUNDLE_ENCRYPT_RECIPIENTS = "${TOPDIR}/../keys/dev/rauc/rauc-recipients.pem"
+    # EDGE_RAUC_DECRYPT_KEY_SRC = "${TOPDIR}/../keys/dev/rauc/rauc-recipient.key"
+    # EDGE_RAUC_DECRYPT_CERT_SRC = "${TOPDIR}/../keys/dev/rauc/rauc-recipient.cert.pem"
+    #
+    # The *_SRC pair is copied into the image by ota-certs as
+    # /etc/ota/bundle-decrypt.{key,cert.pem} (root:ota, key 0640), and
+    # rauc-conf-edge names those paths in system.conf's [encryption] block.
+    # bundle-formats widens to "verity crypt" so an encrypted rollout can
+    # proceed over OTA. Narrow it once the whole fleet accepts crypt:
+    # EDGE_RAUC_BUNDLE_FORMATS = "crypt"
+    #
+    # First encrypted release ships an encryption-ready image inside a still-
+    # verity bundle, because fielded devices hold neither the key nor the
+    # widened allowlist. Drop this override for the release after that one:
+    # EDGE_RAUC_BUNDLE_FORMAT = "verity"
+    #
+    # PKCS#11-resident device key (OP-TEE, TPM2, YubiKey): leave the *_SRC
+    # pair empty so no file is installed, and name the token object instead.
+    # EDGE_RAUC_DECRYPT_KEY_SRC = ""
+    # EDGE_RAUC_DECRYPT_CERT_SRC = ""
+    # EDGE_RAUC_ENCRYPTION_KEY = "pkcs11:token=edge-ota;object=rauc-decrypt;type=private"
 
     # ---- Streaming mTLS key ------------------------------------------------
     # File mode (default): /etc/ota/device.key (managed by ota-certs).
