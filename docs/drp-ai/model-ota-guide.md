@@ -168,7 +168,16 @@ A model that is authentic can still be wrong for the device in front of it:
   knows how to decode classification output.
 
 Each of these produces a confusing runtime failure if unchecked, and a clear,
-actionable error if checked at activation time. The artifact should therefore declare
+actionable error if checked at activation time.
+
+**What this platform's schema can enforce, and what it deliberately cannot.** The
+accelerator target and the application contract — the decoder class, and for
+classification the label count against the compiled output element count — are
+declared and checked today. Runtime ABI is **deliberately absent**: the compiled
+artifact carries no compiler, runtime or ABI version, and the runtime's own
+introspection is unreliable, so a version field would be unenforceable decoration.
+It earns a place when an authoritative value exists. The resource envelope is
+likewise undeclared. See [ADR-0010](../adr/0010-model-artifact-delivery.md). The artifact should therefore declare
 what it expects, and the device should refuse a mismatch rather than discover it.
 
 A useful principle from this platform's measurements: **do not duplicate, in metadata,
@@ -228,6 +237,14 @@ The safest extractors decide the rules first — target directory, size ceiling,
 permitted entry types — and reject anything outside them, rather than trying to
 sanitise as they go.
 
+**Where this platform stands.** The host tooling that builds and inspects an
+artifact refuses path traversal, absolute paths, symlinks, device nodes and other
+special types, duplicate member names, and required members of the wrong type. It
+does **not** bound output size or entry count, so decompression bombs are not among
+its guarantees. And it is host-side: nothing on the device extracts a model today.
+A model store, when it exists, must invoke this tooling or reproduce its
+guarantees — inheriting them is not automatic.
+
 ---
 
 ## 9. What happens when things go wrong
@@ -259,12 +276,29 @@ describes the target and this describes today.
 - A signed model artifact accepted by the device's own stock tooling under a
   default-reject policy, with unsigned, wrong-key and corrupted variants each
   refused, and the corrupted one refused before extraction.
-- Reproducible compilation and reproducible packaging, as separate results.
+
+**Implemented as host tooling** — code in this repository, tested here, run on a
+build host with no device involvement
+
+- The artifact schema, frozen at version 1.0 and enforced: a validator, a
+  deterministic producer, and an inspector that recomputes every digest rather
+  than trusting the artifact's own metadata. Settled decisions are recorded in
+  [ADR-0010](../adr/0010-model-artifact-delivery.md).
+- Deterministic construction proven on three real compiled model classes, each
+  packed twice from independently created source copies with identical digests
+  and zero round-trip differences in both directions.
+- The extraction refusals listed in §8, minus the size and entry-count ceilings.
+- Reproducible compilation and reproducible packaging, as two separate results:
+  compiling the same source model twice gives byte-identical output, and packing
+  the same tree twice gives identical layer, config and manifest digests. Both
+  were measured on a build host; neither is a device result.
 
 **Not implemented**
 
-- The production artifact schema.
-- Hostile-archive-safe extraction (§8).
+- Any device-side consumer of the schema, and any device-side extraction.
+- Signing of an artifact built by the frozen contract — the hardware signature
+  proof above used an earlier prototype artifact.
+- Decompression-bomb bounds (§8).
 - The registry choice, including transport security.
 - The model store, activation and rollback lifecycle (§7).
 - Production decoders for detection and segmentation.
@@ -278,9 +312,14 @@ outcomes and the constraints discovered, is in [model-delivery.md](model-deliver
 
 ## 11. An illustrative manifest
 
-**Non-normative.** This shows the *shape* of a ModelPack manifest — it is not this
-project's schema, and the fields below are deliberately not frozen. Digests are
-placeholders.
+**Non-normative.** This shows the general *shape* of a ModelPack manifest, with
+placeholder digests. It is deliberately not this project's artifact: this platform's
+frozen schema and its exact layer shape are documented in
+[model-delivery.md](model-delivery.md) and settled in
+[ADR-0010](../adr/0010-model-artifact-delivery.md). Two differences are worth
+naming, because they are decisions rather than simplifications — the implemented
+artifact carries **exactly one** `tar+gzip` weight layer rather than the two layers
+below, and it carries **no runtime field**.
 
 ```jsonc
 {
@@ -324,6 +363,12 @@ labels, decoder parameters, and the accelerator the model targets:
 Deliberately absent: input shape and pre-processing settings, where the compiled
 artifact already carries them authoritatively (§6).
 
+The `runtime` line above is the one field this platform's schema deliberately does
+**not** have. It reads naturally, which is exactly the risk: a version string that
+nothing can check looks like a compatibility guarantee and is not one. This
+platform's compiled artifacts carry no authoritative runtime version, so the field
+is excluded until one exists (§6).
+
 ---
 
 ## Further reading
@@ -336,11 +381,13 @@ artifact already carries them authoritatively (§6).
 - [benchmarking-models.md](benchmarking-models.md) — latency and accelerator
   work-placement measurement
 - [DRP-AI on EDGE AI OS](README.md) — platform overview
+- [ADR-0010](../adr/0010-model-artifact-delivery.md) — the settled artifact format,
+  schema contract and delivery trust boundary
 - [OTA updates](../dev/ota-updates.md) — the firmware channel this one is separate from
 
 **Specifications and tools**
 
-- [ModelPack model specification](https://github.com/CloudNativeAI/model-spec)
+- [ModelPack model specification](https://github.com/modelpack/model-spec)
 - [OCI image specification](https://github.com/opencontainers/image-spec)
 - [OCI distribution specification](https://github.com/opencontainers/distribution-spec)
 - [Sigstore](https://www.sigstore.dev/) · [cosign](https://github.com/sigstore/cosign)

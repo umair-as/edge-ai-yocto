@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "1.0",
+  "name": "yolox-l",
+  "version": "1",
+  "accelerator": "drpai-v2l",
+  "model": {
+    "directory": "model"
+  },
+  "labels": {
+    "path": "labels/coco-80.txt",
+    "count": 80
+  },
+  "decoder": {
+    "class": "detection",
+    "scoreThreshold": 0.25,
+    "iouThreshold": 0.45,
+    "maxDetections": 300
+  }
+}

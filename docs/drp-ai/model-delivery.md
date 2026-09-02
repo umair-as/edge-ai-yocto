@@ -38,7 +38,7 @@ placement is durable. It is the *delivery* that is missing.
 ## Target architecture
 
 - **Model as a signed OCI artifact.** Package the compiled model as a
-  [ModelPack](https://github.com/CloudNativeAI/model-spec) artifact — an
+  [ModelPack](https://github.com/modelpack/model-spec) artifact — an
   [OCI image manifest](https://github.com/opencontainers/image-spec) carrying an
   `artifactType`, with the model payload in typed layers. This reuses registries,
   content addressing and signature tooling instead of inventing a format.
@@ -71,9 +71,10 @@ actually runs. What a runner cannot infer, and therefore what metadata has to
 carry, is the output decoder class, labels, decoder parameters, and the
 accelerator the model was compiled for.
 
-The final schema is not fixed by this document. If it retains descriptive input
-metadata, that metadata must be **validation-only** — checked against the compiled
-artifact rather than used to drive execution.
+That exclusion is now the standing rule rather than an open question: the frozen
+schema below rejects those fields by name. Descriptive metadata is admissible only
+as something to **validate against** the compiled artifact, never as something that
+drives execution.
 
 Verified by classifying a known image on-device with two different models through
 one unmodified binary, and cross-checking the result against the original ONNX run
@@ -123,6 +124,116 @@ Two separate claims, both checked, and worth keeping separate:
 This matters because a model is identified by its digest. If the digest changed on
 every rebuild, "is this the model that was approved?" would be unanswerable.
 
+## The artifact contract
+
+The config blob is the runner contract, and it is now frozen at **schema 1.0**
+and enforced by host tooling in `scripts/modelpack/`. The decisions behind it —
+the format, the schema, and the trust boundary separating model authenticity from
+firmware authenticity — are recorded in
+[ADR-0010](../adr/0010-model-artifact-delivery.md). Every field earns its place
+by having a consumer that can check it; nothing is carried for description alone.
+
+| Field | Consumer |
+|---|---|
+| `schemaVersion` | the validator and, later, the device-side loader |
+| `name` | the model store's named reference |
+| `version` | the `org.opencontainers.image.ref.name` tag in `index.json` |
+| `accelerator` | device-side target selection, mirrored to a manifest annotation so a device can select before fetching the config |
+| `model.directory` | the runner's model load and pre-processing load paths |
+| `labels.path` | the index-to-name mapping every decoder class needs |
+| `labels.count` | checked against the packed label file, and for classification against the compiled output element count |
+| `decoder.class` | decoder dispatch — nothing in the model directory declares it |
+| `decoder.*` | the decoder itself, as a closed per-class parameter set with bounds |
+
+Classification takes `topK`; detection takes `scoreThreshold`, `iouThreshold` and
+`maxDetections`; segmentation takes none, because an argmax over the class channel
+has nothing to tune. Unknown fields are rejected rather than ignored, so a
+misspelling fails loudly instead of silently disabling a setting.
+
+`labels.count` is the field worth explaining. Output count alone cannot tell a
+detector from a classifier — several models of both kinds report exactly one
+output head — so the classifier compares its output element count against the
+label list and refuses a mismatch. The compiled graph description carries that
+shape, which makes the count a real check against the artifact rather than a
+second copy of it. A label file with a trailing blank line, which is how the
+common ImageNet synset file ships, is counted correctly: blank lines do not
+become a class.
+
+**What the schema deliberately does not carry.** Input shape, layout, colour
+order, resize and normalization all live inside the compiled pre-processing
+object that actually executes. They are rejected by name, with a diagnostic
+saying why, rather than passed through. Runtime and compiler compatibility is
+also absent, and that is a decision rather than an oversight: the compiled
+artifact carries no compiler, runtime or ABI version, and the runtime's own
+introspection is known unreliable, so a version field would be unenforceable
+decoration. It returns when something can check it.
+
+### Building and checking one
+
+The tool is standard-library Python with no registry, network, signing key or
+BitBake dependency — signing consumes the resulting manifest digest afterwards.
+
+```bash
+scripts/modelpack/modelpack.py validate  --config C
+scripts/modelpack/modelpack.py pack      --config C --model-dir D --labels F --output LAYOUT
+scripts/modelpack/modelpack.py inspect   --layout LAYOUT
+scripts/modelpack/modelpack.py roundtrip --layout LAYOUT --model-dir D --labels F
+```
+
+`pack` writes an OCI image layout: `oci-layout`, `index.json`, and digest-named
+blobs for the config, the single `tar+gzip` weight layer and the manifest.
+Archive entries are sorted, with fixed ownership, modes and timestamps, gzip
+carries no name or timestamp, and the creation annotation is pinned rather than
+read from the clock.
+
+`inspect` trusts nothing the artifact says about itself. It recomputes every
+descriptor digest and size from the blobs on disk and checks that each blob's
+name equals the hash of its own content; it validates the OCI envelope itself —
+index and manifest schema versions and media types, the descriptor's artifact
+type, and the reference name against the config's own name and version — rather
+than only the blobs those fields point at; it validates the config; it confirms
+the config's references resolve inside the layer **with the right member type**,
+so a directory named `deploy.json` or a label path that is a directory fails; it
+rejects duplicate archive members, whose precedence differs between consumers;
+and it reports any blob the manifest graph does not reference.
+
+Checks fail closed. A semantic check that cannot run — a label file too large to
+read, a `deploy.json` above the inspection limit — is reported as unperformed
+rather than skipped, so a passing inspection never means "not checked".
+
+`roundtrip` extracts the layer — refusing absolute paths, traversal, symlinks,
+special files and duplicate members — and compares the source and unpacked trees
+in **both** directions on path, type, size, mode and SHA-256.
+
+### Contract evidence
+
+All three decoder classes were packed from real compiled artifacts, each twice
+from independently created source copies whose timestamps and modes were
+deliberately perturbed:
+
+| class | model | layer size | round-trip differences | independent packs agree |
+|---|---|---|---|---|
+| classification | MobileNetV2 | 13.6 MB | 0 of 14 entries | layer, config and manifest digests identical |
+| detection | YOLOX-L | 201.9 MB | 0 of 14 entries | layer, config and manifest digests identical |
+| segmentation | DeepLabV3-R50 | 148.3 MB | 0 of 14 entries | layer, config and manifest digests identical |
+
+YOLOX-L is the detection pack because it is the detector with measured evidence
+behind it (98 % accelerator placement). The newer-stem detection probe has not
+been run, and the other compiled detector is retained as the known
+CPU-fallback comparison anchor rather than promoted to a pack.
+
+88 host tests cover the schema, the producer and the inspector, including
+rejection of every negative case above: tampering with content or descriptor
+size at each level, malformed index and manifest envelopes, wrong media and
+artifact types, a mismatched reference name, a missing blob, an unreferenced
+blob, hostile and duplicate archive members, required members of the wrong type,
+non-UTF-8 labels, non-finite decoder parameters, and a config whose label count
+disagrees with either the packed file or the compiled output.
+
+```bash
+python3 scripts/modelpack/tests/test_modelpack.py
+```
+
 ## Constraints found by doing it
 
 **The signature must use the legacy attachment layout.** With **Cosign 3.1.2 as
@@ -164,9 +275,14 @@ installed, be refused when it should be, and produce a correct result.
 
 It is not a model update implementation. Still to be decided or built:
 
-- **Production artifact schema** — the config fields, frozen and versioned.
-- **Hostile-archive-safe extraction** — the prototype extraction is not hardened
-  against path traversal, symlink escape, or decompression bombs.
+- **On-device consumption of the contract** — the schema is frozen, versioned
+  and enforced by host tooling, but nothing on the device reads it yet.
+- **Hostile-archive-safe extraction on the device.** The host tooling refuses path
+  traversal, absolute paths, symlinks, device nodes and other special types,
+  duplicate members, and required members of the wrong type. It has **no
+  output-size or entry-count ceiling**, so decompression bombs are not among its
+  guarantees. None of it runs on the device: a model store must invoke this
+  tooling or reproduce its guarantees, and neither exists yet.
 - **Registry choice** — including transport security and authentication.
 - **Model store lifecycle** — layout, fetch, garbage collection, ordering against
   the persistence services.
@@ -188,6 +304,8 @@ It is not a model update implementation. Still to be decided or built:
 - [Benchmarking models](benchmarking-models.md) — measuring one on hardware
 - [OTA updates](../dev/ota-updates.md) — the firmware update channel this one is
   deliberately separate from
-- [ModelPack specification](https://github.com/CloudNativeAI/model-spec) ·
+- [ADR-0010](../adr/0010-model-artifact-delivery.md) — the settled artifact format,
+  schema contract and delivery trust boundary
+- [ModelPack specification](https://github.com/modelpack/model-spec) ·
   [OCI image spec](https://github.com/opencontainers/image-spec) ·
   [Sigstore](https://www.sigstore.dev/)
