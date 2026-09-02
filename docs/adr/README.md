@@ -28,3 +28,4 @@ and the reasoning behind them.
 - [ADR-0005](0005-image-class-ota-backend.md) — image class + OTA backend
 - [ADR-0006](0006-emmc-gpt-boot-target.md) — eMMC/GPT boot target
 - [ADR-0007](0007-conventional-commits-changelog.md) — Conventional Commits feeding automated release notes
+- [ADR-0008](0008-runtime-rootfs-verity.md) — runtime rootfs dm-verity
