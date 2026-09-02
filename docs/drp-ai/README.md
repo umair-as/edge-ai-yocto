@@ -117,7 +117,8 @@ the container-native, least-privilege, OTA-aware delivery is the durable part.**
 - **Measure any model on the NPU** → [benchmarking-models.md](benchmarking-models.md) —
   the `drpai-runner` benchmark, latency + NPU-vs-CPU split.
 - **Understand model updates** → [model-ota-guide.md](model-ota-guide.md) — the
-  architecture of model delivery, for readers new to OCI artifacts and ModelPack.
+  architecture of model delivery, for readers new to OCI artifacts and ModelPack;
+  the settled decisions are in [ADR-0010](../adr/0010-model-artifact-delivery.md).
 - **Deliver a model to the device** → [model-delivery.md](model-delivery.md) — a
   signed-artifact prototype: what is verified on hardware today, and what a real
   model update system still needs.
@@ -157,10 +158,15 @@ placed on `/data` by hand, so a freshly flashed device is not yet self-contained
 
 **🧭 Roadmap** — a reproducible model-compile environment; a baked, trust-pinned
 container base image; and a digest-addressed, signature-verified model artifact
-delivered independently of the firmware, replacing the hand-placed payload. The
-delivery half now has a hardware-verified prototype — signed artifact accepted,
-unsigned/wrong-key/corrupted refused — with the store and activation lifecycle
-still to build: [model-delivery.md](model-delivery.md).
+delivered independently of the firmware, replacing the hand-placed payload. Two
+halves of that are now done and one is not. The **artifact format, its schema
+contract and the delivery trust boundary are settled** and recorded in
+[ADR-0010](../adr/0010-model-artifact-delivery.md), with host tooling that builds
+and inspects a pack deterministically. The **transport** has a hardware-verified
+prototype — signed artifact accepted, unsigned/wrong-key/corrupted refused. The
+**store, activation and rollback** are still to build, and nothing on the device
+consumes the schema yet, so a model still arrives by hand:
+[model-delivery.md](model-delivery.md).
 
 ---
 

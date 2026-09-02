@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1.0",
+  "name": "deeplabv3-r50",
+  "version": "1",
+  "accelerator": "drpai-v2l",
+  "model": {
+    "directory": "model"
+  },
+  "labels": {
+    "path": "labels/voc-21.txt",
+    "count": 21
+  },
+  "decoder": {
+    "class": "segmentation"
+  }
+}

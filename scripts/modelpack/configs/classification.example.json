@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1.0",
+  "name": "mobilenetv2",
+  "version": "1",
+  "accelerator": "drpai-v2l",
+  "model": {
+    "directory": "model"
+  },
+  "labels": {
+    "path": "labels/imagenet-1k.txt",
+    "count": 1000
+  },
+  "decoder": {
+    "class": "classification",
+    "topK": 5
+  }
+}

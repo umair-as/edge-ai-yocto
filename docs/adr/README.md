@@ -30,3 +30,4 @@ and the reasoning behind them.
 - [ADR-0007](0007-conventional-commits-changelog.md) — Conventional Commits feeding automated release notes
 - [ADR-0008](0008-runtime-rootfs-verity.md) — runtime rootfs dm-verity
 - [ADR-0009](0009-rauc-encrypted-bundle-key-lifecycle.md) — RAUC encrypted-bundle recipient-key lifecycle
+- [ADR-0010](0010-model-artifact-delivery.md) — model artifact format, schema contract and delivery trust boundary
