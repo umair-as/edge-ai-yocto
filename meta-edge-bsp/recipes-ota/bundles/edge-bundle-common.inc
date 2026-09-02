@@ -26,10 +26,18 @@ RAUC_SLOT_rootfs[adaptive] = "${@bb.utils.contains('EDGE_RAUC_ADAPTIVE','1','blo
 
 # Bundle format: verity by default; crypt when encryption is opted-in. The
 # device's system.conf [encryption] block must point at a matching key
-# (file or pkcs11: URI), wired via EDGE_RAUC_ENCRYPTION_KEY in rauc-conf-edge.
+# (file or pkcs11: URI), wired via EDGE_RAUC_ENCRYPTION_KEY in rauc-conf-edge,
+# and its bundle-formats allowlist must include crypt or the install is
+# refused. Both are rendered by rauc-conf-edge off the same toggle.
+#
+# RAUC_BUNDLE_FORMAT is singular: one build emits one format. The override
+# exists for the first step of an encrypted rollout, where the image must
+# already be encryption-ready but the bundle delivering it must still be
+# verity, because fielded devices do not yet accept crypt.
 EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION ?= "0"
 EDGE_RAUC_BUNDLE_ENCRYPT_RECIPIENTS ?= ""
-RAUC_BUNDLE_FORMAT = "${@bb.utils.contains('EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION', '1', 'crypt', 'verity', d)}"
+EDGE_RAUC_BUNDLE_FORMAT ?= "${@bb.utils.contains('EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION', '1', 'crypt', 'verity', d)}"
+RAUC_BUNDLE_FORMAT = "${EDGE_RAUC_BUNDLE_FORMAT}"
 
 # Manifest metadata. bundle.bbclass auto-populates these from PV/SUMMARY/DATETIME
 # by default; override so the bundle's [update] section reads correctly on the
@@ -86,13 +94,26 @@ edge_bundle_substitute_fit_names() {
 BUNDLE_BASENAME = "${BUNDLE_IMAGE}-bundle"
 BUNDLE_NAME     = "${BUNDLE_BASENAME}"
 
-# Post-bundle encryption pass. When EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION = 1,
-# the bundle was built as crypt format (encrypted manifest); this re-runs
-# `rauc encrypt` against EDGE_RAUC_BUNDLE_ENCRYPT_RECIPIENTS to add
-# recipient-bound AES key wrappings (one per device or per group).
+# Post-bundle encryption pass. `rauc bundle --format=crypt` leaves the
+# payload AES key in a cleartext manifest; `rauc encrypt` CMS-envelopes that
+# manifest to the recipient certs. The result replaces bundle.raucb in place
+# rather than deploying alongside it (bundle.bbclass' RAUC_ENCRYPT_CRYPT_BUNDLE
+# path), so the key-bearing intermediate never reaches DEPLOY_DIR_IMAGE.
+#
+# The gate is the emitted format, not the toggle: `rauc encrypt` refuses an
+# input bundle that is not already 'crypt', so the transition build (encryption
+# enabled, format pinned to verity) must skip this pass entirely.
+#
+# Recipient rotation must invalidate the task; the PEM is not in SRC_URI, so
+# hash it explicitly. A ":False" entry is dropped by bb.checksum without being
+# read, so the entry is emitted only when this build actually encrypts.
+do_bundle[file-checksums] += "${@d.getVar('EDGE_RAUC_BUNDLE_ENCRYPT_RECIPIENTS') + ':True' if d.getVar('RAUC_BUNDLE_FORMAT') == 'crypt' and d.getVar('EDGE_RAUC_BUNDLE_ENCRYPT_RECIPIENTS') else ''}"
 do_bundle:append() {
-    if [ "${EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION}" != "1" ]; then
-        exit 0
+    if [ "${RAUC_BUNDLE_FORMAT}" != "crypt" ]; then
+        if [ "${EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION}" = "1" ]; then
+            bbnote "Bundle encryption is enabled but the bundle format is '${RAUC_BUNDLE_FORMAT}': emitting an unencrypted bundle carrying the encryption-ready image."
+        fi
+        return 0
     fi
     if [ -z "${EDGE_RAUC_BUNDLE_ENCRYPT_RECIPIENTS}" ]; then
         bbfatal "'EDGE_RAUC_BUNDLE_ENCRYPT_RECIPIENTS' not set while encrypted bundle mode is enabled"

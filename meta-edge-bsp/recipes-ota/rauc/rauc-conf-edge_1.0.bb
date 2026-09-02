@@ -53,15 +53,32 @@ EDGE_RAUC_ALLOWED_SIGNER_CNS  ?= ""
 EDGE_RAUC_CHECK_PURPOSE       ?= "codesign"
 
 # ----- Bundle encryption (crypt format) ---------------------------------
+# bundle-formats is an allowlist: a crypt bundle is rejected at install
+# unless "crypt" appears in it. Enabling encryption widens the list rather
+# than replacing it, so a fielded device still accepts the verity bundle that
+# carries the transition image. Narrowing to "crypt" alone is a later
+# hardening step, valid only once every device already accepts crypt.
 EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION ?= "0"
-EDGE_RAUC_ENCRYPTION_KEY  ?= ""
-EDGE_RAUC_ENCRYPTION_CERT ?= ""
+EDGE_RAUC_BUNDLE_FORMATS ?= "${@bb.utils.contains('EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION', '1', 'verity crypt', 'verity', d)}"
+
+# On-device locations of the recipient key/cert. The literal paths are the
+# ones ota-certs installs from EDGE_RAUC_DECRYPT_{KEY,CERT}_SRC; the two
+# recipes must agree. Empty *_SRC means nothing is installed, so the stanza
+# is left unset and the guard below fires unless the operator supplies a
+# PKCS#11 URI.
+EDGE_RAUC_ENCRYPTION_KEY  ?= "${@'/etc/ota/bundle-decrypt.key' if d.getVar('EDGE_RAUC_DECRYPT_KEY_SRC') else ''}"
+EDGE_RAUC_ENCRYPTION_CERT ?= "${@'/etc/ota/bundle-decrypt.cert.pem' if d.getVar('EDGE_RAUC_DECRYPT_CERT_SRC') else ''}"
 
 do_install() {
     install -d ${D}${sysconfdir}/rauc
 
+    if [ -z "${EDGE_RAUC_BUNDLE_FORMATS}" ]; then
+        bbfatal "EDGE_RAUC_BUNDLE_FORMATS is empty; system.conf would accept no bundle format."
+    fi
+
     sed -e "s|@COMPATIBLE@|${RAUC_BUNDLE_COMPATIBLE}|g" \
         -e "s|@TLS_KEY@|${EDGE_RAUC_STREAMING_TLS_KEY}|g" \
+        -e "s|@BUNDLE_FORMATS@|${EDGE_RAUC_BUNDLE_FORMATS}|g" \
         ${UNPACKDIR}/system.conf > ${D}${sysconfdir}/rauc/system.conf
 
     # Keyring locator: directory mode (multi-cert + hashed dir) when
@@ -95,8 +112,24 @@ do_install() {
     # Encryption: append [encryption] block when opt-in flag is on.
     if [ "${EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION}" = "1" ]; then
         if [ -z "${EDGE_RAUC_ENCRYPTION_KEY}" ]; then
-            bbfatal "EDGE_RAUC_ENCRYPTION_KEY is required when encrypted bundle mode is enabled."
+            bbfatal "EDGE_RAUC_ENCRYPTION_KEY is required when encrypted bundle mode is enabled. Set EDGE_RAUC_DECRYPT_KEY_SRC to a recipient private key, or set EDGE_RAUC_ENCRYPTION_KEY to a pkcs11: URI."
         fi
+        case "${EDGE_RAUC_BUNDLE_FORMATS}" in
+            *crypt*) ;;
+            *) bbfatal "EDGE_RAUC_BUNDLE_FORMATS ('${EDGE_RAUC_BUNDLE_FORMATS}') omits 'crypt'; the device would reject every bundle this build produces." ;;
+        esac
+        # A filesystem path in key= only resolves on the device if something
+        # installs it. ota-certs does that from EDGE_RAUC_DECRYPT_KEY_SRC;
+        # a PKCS#11 URI needs no file.
+        case "${EDGE_RAUC_ENCRYPTION_KEY}" in
+            pkcs11:*) ;;
+            /*)
+                if [ -z "${EDGE_RAUC_DECRYPT_KEY_SRC}" ]; then
+                    bbfatal "EDGE_RAUC_ENCRYPTION_KEY points at '${EDGE_RAUC_ENCRYPTION_KEY}' but EDGE_RAUC_DECRYPT_KEY_SRC is unset, so no key is installed into the image."
+                fi
+                ;;
+            *) bbfatal "EDGE_RAUC_ENCRYPTION_KEY must be an absolute path or a pkcs11: URI, got '${EDGE_RAUC_ENCRYPTION_KEY}'." ;;
+        esac
         {
             echo ""
             echo "[encryption]"
