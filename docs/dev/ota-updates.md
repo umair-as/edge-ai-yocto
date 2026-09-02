@@ -165,6 +165,129 @@ Notes:
   files land in `/etc/ota` as `root:ota`, with the key at `0640` so the
   sandboxed transfer user can read it.
 
+## Encrypted bundles (crypt format)
+
+**Status: wired and recipe-verified, not hardware-validated.** The image side is
+built and inspected: with encryption enabled the rendered `system.conf` carries
+`bundle-formats=verity crypt` and an `[encryption]` block, and the recipient key
+installs as `/etc/ota/bundle-decrypt.key` with mode `0640`. The kernel side was
+verified against a built config. **No encrypted bundle has been produced from
+this tree and no device has installed one** — every claim below about install
+behaviour describes intended behaviour, not measured behaviour.
+
+Default bundles are `verity` format: signed and integrity-protected, but the
+payload is readable by anyone holding the file. The `crypt` format adds
+confidentiality — RAUC encrypts the payload SquashFS with AES-256
+(`aes-cbc-plain64`) and CMS-envelopes the manifest carrying that key to a set
+of recipient certificates. The device decrypts with the matching private key,
+via the kernel's dm-crypt target stacked under the existing dm-verity mapping.
+
+The recipient PKI is independent of the bundle-signing PKI: signatures still
+chain to `/etc/rauc/ca.cert.pem`, and encryption is a separate set of
+certificates.
+
+### Enabling it
+
+Two device-side prerequisites gate a crypt install, and both ship *inside the
+image*: the recipient private key, and a `bundle-formats` allowlist naming
+`crypt`. A device running an older image has neither, so the first encrypted
+bundle it is offered would be rejected. The rollout therefore delivers an
+encryption-ready image first, over an ordinary verity bundle, and only then
+switches the bundle format. No reflash is required.
+
+1. Generate the dev PKI (idempotent; adds the recipient keypair to the
+   signing CA and leaf it already emits):
+
+   ```bash
+   scripts/rauc-init-certs.sh
+   ```
+
+2. **Transition release — encryption-ready image, still a verity bundle.**
+
+   ```
+   EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION = "1"
+   EDGE_RAUC_BUNDLE_FORMAT            = "verity"
+   ```
+
+   ```bash
+   make dev
+   make bundle
+   ```
+
+   The image now carries `/etc/ota/bundle-decrypt.key` and a
+   `bundle-formats=verity crypt` allowlist; the bundle is still verity, so
+   fielded devices accept it. Install it over the normal OTA path.
+
+   `edge-floor.inc` defaults the recipient paths to what the script wrote, so
+   nothing else is required for the dev flow. `kas/local.yml.example` lists
+   every override, including the PKCS#11 variant.
+
+3. **Once the fleet is on that image, drop the format override.** Bundles
+   become `crypt`; devices already hold the key and already accept the format.
+
+   ```
+   EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION = "1"
+   ```
+
+   ```bash
+   make bundle
+   ```
+
+4. **Optional later hardening.** Narrowing the allowlist stops a device
+   accepting unencrypted bundles at all:
+
+   ```
+   EDGE_RAUC_BUNDLE_FORMATS = "crypt"
+   ```
+
+   This is fail-closed and one-way in practice: a device that accepts only
+   `crypt` can no longer be reached by a verity bundle, so it is safe only
+   once every device in the fleet is past step 3. It also requires another
+   image update to take effect, since the allowlist ships in the image.
+
+The bundle keeps its usual filename — `rauc encrypt` runs in place, so the
+key-bearing intermediate (a crypt bundle whose manifest still holds the
+plaintext payload key) is never deployed.
+
+### What the operator supplies
+
+| Artifact | Default source | Lands on device as |
+|---|---|---|
+| Recipient certs, `rauc encrypt --to` | `keys/dev/rauc/rauc-recipients.pem` | not installed — build-host only |
+| Recipient private key | `keys/dev/rauc/rauc-recipient.key` | `/etc/ota/bundle-decrypt.key`, `root:ota`, `0640` |
+| Recipient cert | `keys/dev/rauc/rauc-recipient.cert.pem` | `/etc/ota/bundle-decrypt.cert.pem`, `root:ota`, `0644` |
+
+`cert=` is optional in RAUC's `[encryption]` block; it only speeds recipient
+lookup. `key=` is mandatory and may instead be a `pkcs11:` URI, in which case
+no key file is installed.
+
+Build-time guards fail the build rather than emit a bundle no device can
+install: a `bundle-formats` list without `crypt`, or an `[encryption] key=`
+filesystem path that nothing provisions into the image. On a build that
+actually emits a crypt bundle, a missing or unset recipients file is also
+fatal. The transition build of step 2 emits `verity`, so the encryption pass
+is skipped entirely — `rauc encrypt` refuses a non-crypt input — and the build
+logs a note saying the bundle it produced is unencrypted.
+
+### Known limits
+
+- One shared recipient key for the whole fleet in the dev flow. Planned
+  rotation is possible by encrypting to the old and new recipients during an
+  overlap window, but both A/B slots must migrate before the old recipient is
+  removed. A compromised shared key cannot be recovered securely over a bundle
+  it can decrypt; that case requires trusted reprovisioning or reflashing.
+  Per-device recipients require a build-external encryption step.
+- The recipient private key sits in the rootfs, protected by file permissions
+  and the read-only dm-verity mapping. Binding it to the device (PKCS#11 via
+  OP-TEE or TPM2) is the L5 work described in
+  [ADR-0003](../adr/0003-block-layer-integrity-confidentiality.md).
+- Adaptive updates (`EDGE_RAUC_ADAPTIVE`) have not been exercised against a
+  crypt bundle.
+
+The recipient-key lifecycle, including rotation, rollback-slot compatibility,
+and the production per-device direction, is recorded in
+[ADR-0009](../adr/0009-rauc-encrypted-bundle-key-lifecycle.md).
+
 ## References
 
 - [`ota-rollback-test-plan.md`](ota-rollback-test-plan.md) — failure-injection tests + results.
