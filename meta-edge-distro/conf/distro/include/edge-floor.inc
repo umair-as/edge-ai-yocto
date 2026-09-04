@@ -200,7 +200,7 @@ RAUC_CERT_FILE      ?= "${TOPDIR}/../keys/dev/rauc/rauc-signer.cert.pem"
 RAUC_KEYRING_FILE   ?= "${TOPDIR}/../keys/dev/rauc/rauc-ca.cert.pem"
 RAUC_DEVICE_KEYRING ?= "${RAUC_KEYRING_FILE}"
 
-# ----- RAUC bundle encryption (crypt format, opt-in) ----------------------
+# ----- RAUC bundle encryption (crypt format, on by default) ---------------
 
 # Recipient PKI, independent of the signing PKI above: `rauc encrypt`
 # CMS-envelopes the manifest to the certs in the recipients PEM, and the
