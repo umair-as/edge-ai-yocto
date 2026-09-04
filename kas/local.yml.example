@@ -112,7 +112,12 @@ local_conf_header:
   rauc_hardening: |
     # ---- Bundle signing PKI hygiene ----------------------------------------
     # check-purpose: enforce OpenSSL X.509 purpose on the signer chain.
-    # Our rauc-init-certs.sh emits codeSigning EKU; "codesign" is the default.
+    # Our rauc-init-certs.sh emits codeSigning + emailProtection EKU on the
+    # leaf; "codesign" is the default. emailProtection is there only so
+    # `rauc encrypt`'s config-less internal self-verify (which falls back to
+    # OpenSSL's default S/MIME-sign purpose check, not this check-purpose
+    # setting) accepts the cert it just used — RAUC's own codesign purpose
+    # check only requires codeSigning to be present, not exclusive.
     # Set empty to disable during a migration window with legacy certs.
     # EDGE_RAUC_CHECK_PURPOSE = "codesign"
     #
@@ -124,14 +129,19 @@ local_conf_header:
     # EDGE_RAUC_KEYRING_CERTS = ""
 
     # ---- Bundle encryption (crypt format) ----------------------------------
-    # Opt-in. The payload is AES-256 encrypted and the manifest is CMS-
-    # enveloped to the recipient certs; the device decrypts with the matching
-    # private key. Wired but not yet built or hardware-validated — see
+    # On by default (edge-features.inc): the shipping target is crypt-format
+    # bundles, hardware-validated end to end on 2026-09-04. The payload is
+    # AES-256 encrypted and the manifest is CMS-enveloped to the recipient
+    # certs; the device decrypts with the matching private key — see
     # docs/dev/ota-updates.md.
     #
     # scripts/rauc-init-certs.sh generates the recipient keypair alongside
-    # the signing PKI, and edge-floor.inc defaults the three paths below to
-    # what it emits, so the single line is enough for the dev flow:
+    # the signing PKI; edge-floor.inc defaults the three paths below to what
+    # it emits. A checkout with no keys/dev/rauc/ yet fails do_install
+    # (ota-certs) or do_bundle (edge-bundle) with a bbfatal pointing back at
+    # that script — run it before the first build. This line is redundant
+    # with the distro default; kept explicit so the local profile states its
+    # own posture rather than depending on a default a reader has to go find:
     #
     # EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION = "1"
     #
@@ -143,13 +153,18 @@ local_conf_header:
     # The *_SRC pair is copied into the image by ota-certs as
     # /etc/ota/bundle-decrypt.{key,cert.pem} (root:ota, key 0640), and
     # rauc-conf-edge names those paths in system.conf's [encryption] block.
-    # bundle-formats widens to "verity crypt" so an encrypted rollout can
-    # proceed over OTA. Narrow it once the whole fleet accepts crypt:
+    # bundle-formats widens to "verity crypt" whenever encryption is on, so a
+    # crypt bundle can install without narrowing the format first. Narrow it
+    # once the whole fleet accepts crypt and no verity-only fallback slot
+    # remains:
     # EDGE_RAUC_BUNDLE_FORMATS = "crypt"
     #
-    # First encrypted release ships an encryption-ready image inside a still-
-    # verity bundle, because fielded devices hold neither the key nor the
-    # widened allowlist. Drop this override for the release after that one:
+    # An already-fielded device on a pre-crypt image holds neither the
+    # recipient key nor the widened allowlist, so its first encrypted
+    # release must still ship an encryption-ready image inside a bundle
+    # pinned to the format that device already accepts, then a second
+    # release drops this override. A fresh flash of a crypt-default image
+    # needs no transition step — the key and allowlist are already on it:
     # EDGE_RAUC_BUNDLE_FORMAT = "verity"
     #
     # PKCS#11-resident device key (OP-TEE, TPM2, YubiKey): leave the *_SRC

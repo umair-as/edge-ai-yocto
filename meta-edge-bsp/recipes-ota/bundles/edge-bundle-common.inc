@@ -24,18 +24,28 @@ RAUC_SLOT_rootfs[hooks]    = "pre-install;post-install"
 EDGE_RAUC_ADAPTIVE         ?= "0"
 RAUC_SLOT_rootfs[adaptive] = "${@bb.utils.contains('EDGE_RAUC_ADAPTIVE','1','block-hash-index','',d)}"
 
-# Bundle format: verity by default; crypt when encryption is opted-in. The
-# device's system.conf [encryption] block must point at a matching key
-# (file or pkcs11: URI), wired via EDGE_RAUC_ENCRYPTION_KEY in rauc-conf-edge,
-# and its bundle-formats allowlist must include crypt or the install is
+# Bundle format: crypt by default distro-wide (edge-features.inc), verity
+# only when encryption is explicitly overridden off. The device's
+# system.conf [encryption] block must point at a matching key (file or
+# pkcs11: URI), wired via EDGE_RAUC_ENCRYPTION_KEY in rauc-conf-edge, and
+# its bundle-formats allowlist must include crypt or the install is
 # refused. Both are rendered by rauc-conf-edge off the same toggle.
 #
-# RAUC_BUNDLE_FORMAT is singular: one build emits one format. The override
-# exists for the first step of an encrypted rollout, where the image must
-# already be encryption-ready but the bundle delivering it must still be
-# verity, because fielded devices do not yet accept crypt.
+# RAUC_BUNDLE_FORMAT is singular: one build emits one format. An explicit
+# EDGE_RAUC_BUNDLE_FORMAT = "verity" override exists for the first step of
+# an encrypted rollout to an already-fielded pre-crypt device, where the
+# image must already be encryption-ready but the bundle delivering it must
+# still be verity, because that device does not yet accept crypt. A fresh
+# flash of a crypt-default image needs no such step.
+#
+# The "0" below is only the recipe-local fallback if this recipe is ever
+# parsed outside the edge-features.inc distro config.
 EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION ?= "0"
 EDGE_RAUC_BUNDLE_ENCRYPT_RECIPIENTS ?= ""
+# Same expression as edge-features.inc's global default, which is what
+# actually applies in this distro; this line is only the standalone-recipe
+# fallback and, more importantly, a same-file reminder of the derivation
+# next to where RAUC_BUNDLE_FORMAT below consumes it.
 EDGE_RAUC_BUNDLE_FORMAT ?= "${@bb.utils.contains('EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION', '1', 'crypt', 'verity', d)}"
 RAUC_BUNDLE_FORMAT = "${EDGE_RAUC_BUNDLE_FORMAT}"
 
@@ -119,7 +129,7 @@ do_bundle:append() {
         bbfatal "'EDGE_RAUC_BUNDLE_ENCRYPT_RECIPIENTS' not set while encrypted bundle mode is enabled"
     fi
     if [ ! -f "${EDGE_RAUC_BUNDLE_ENCRYPT_RECIPIENTS}" ]; then
-        bbfatal "Encrypted bundle recipients file not found: ${EDGE_RAUC_BUNDLE_ENCRYPT_RECIPIENTS}"
+        bbfatal "Encrypted bundle recipients file not found: ${EDGE_RAUC_BUNDLE_ENCRYPT_RECIPIENTS}. Run scripts/rauc-init-certs.sh to generate the dev recipient keypair."
     fi
     keyring="${RAUC_KEYRING_FILE}"
     if [ -z "${keyring}" ] || [ ! -f "${keyring}" ]; then

@@ -167,46 +167,73 @@ Notes:
 
 ## Encrypted bundles (crypt format)
 
-**Status: wired and recipe-verified, not hardware-validated.** The image side is
-built and inspected: with encryption enabled the rendered `system.conf` carries
-`bundle-formats=verity crypt` and an `[encryption]` block, and the recipient key
-installs as `/etc/ota/bundle-decrypt.key` with mode `0640`. The kernel side was
-verified against a built config. **No encrypted bundle has been produced from
-this tree and no device has installed one** — every claim below about install
-behaviour describes intended behaviour, not measured behaviour.
+**Status: on by default, hardware-validated 2026-09-04.** A transition release
+(encryption-ready image, bundle still `verity`) and a crypt release both
+installed over ordinary OTA on RZ/V2L hardware — not a reflash — booted, and
+passed `edge-verity-check.sh`/`edge-smoke-test.sh` on both slots. `system.conf`
+carries `bundle-formats=verity crypt` and an `[encryption]` block, the
+recipient key installs as `/etc/ota/bundle-decrypt.key` with mode `0640`, and
+the kernel side is verified against a built config.
 
-Default bundles are `verity` format: signed and integrity-protected, but the
-payload is readable by anyone holding the file. The `crypt` format adds
-confidentiality — RAUC encrypts the payload SquashFS with AES-256
+Getting there surfaced a real defect, not just a missing test: `rauc
+encrypt`'s internal signature self-verify never loads `system.conf` (RAUC
+registers that subcommand with no config), so it falls back to OpenSSL's
+default S/MIME-sign purpose check rather than this project's
+`check-purpose=codesign` policy. The dev signer leaf's original
+codeSigning-only EKU failed that self-check unconditionally — no `crypt`
+bundle could have been built from the pre-fix PKI, regardless of image
+content. Fixed by widening the leaf EKU to `codeSigning,emailProtection`
+(`scripts/rauc-init-certs.sh`); RAUC's own on-device codesign purpose check
+only requires codeSigning to be present, not exclusive, so the on-device gate
+is unaffected. See `docs/adr/0009-rauc-encrypted-bundle-key-lifecycle.md`
+"Implementation status" for the full account.
+
+Bundles are `crypt` format by default: signed, integrity-protected, and the
+payload is confidential — RAUC encrypts the payload SquashFS with AES-256
 (`aes-cbc-plain64`) and CMS-envelopes the manifest carrying that key to a set
 of recipient certificates. The device decrypts with the matching private key,
 via the kernel's dm-crypt target stacked under the existing dm-verity mapping.
+`verity` format (signed and integrity-protected, payload readable by anyone
+holding the file) is available by explicit override, not the default.
 
 The recipient PKI is independent of the bundle-signing PKI: signatures still
 chain to `/etc/rauc/ca.cert.pem`, and encryption is a separate set of
 certificates.
 
-### Enabling it
+The bundle keeps its usual filename — `rauc encrypt` runs in place, so the
+key-bearing intermediate (a crypt bundle whose manifest still holds the
+plaintext payload key) is never deployed.
 
-Two device-side prerequisites gate a crypt install, and both ship *inside the
-image*: the recipient private key, and a `bundle-formats` allowlist naming
-`crypt`. A device running an older image has neither, so the first encrypted
-bundle it is offered would be rejected. The rollout therefore delivers an
-encryption-ready image first, over an ordinary verity bundle, and only then
-switches the bundle format. No reflash is required.
+### First build: generate the dev PKI
 
-1. Generate the dev PKI (idempotent; adds the recipient keypair to the
-   signing CA and leaf it already emits):
+Every default build now depends on it — `ota-certs`' `do_install` and
+`edge-bundle`'s `do_bundle` both `bbfatal` with a pointer back to this script
+if `keys/dev/rauc/` doesn't have the recipient key yet (`make base`/`dev`/
+`prod`/`bundle` all print an advisory heads-up first if it's missing):
 
-   ```bash
-   scripts/rauc-init-certs.sh
+```bash
+scripts/rauc-init-certs.sh
+```
+
+Idempotent: verifies every existing artifact's pairing on every run (a
+partial deletion — only the signer key removed, say — regenerates just that
+one file and re-checks the pair; a fully-present set is checked for pairing,
+not skipped) rather than only generating what's absent and trusting the rest.
+
+### Rolling out to an already-fielded pre-crypt device
+
+A device already in the field on an older, pre-crypt image has neither the
+recipient key nor the widened `bundle-formats` allowlist, so the first
+encrypted bundle it is offered would be rejected. That rollout needs the
+two-step sequence below. **A fresh flash of a current, crypt-default image
+needs none of this** — the key and allowlist are already on it, and the first
+bundle it is ever offered can be `crypt` immediately.
+
+1. **Transition release — encryption-ready image, bundle pinned to the
+   format the device already accepts.**
+
    ```
-
-2. **Transition release — encryption-ready image, still a verity bundle.**
-
-   ```
-   EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION = "1"
-   EDGE_RAUC_BUNDLE_FORMAT            = "verity"
+   EDGE_RAUC_BUNDLE_FORMAT = "verity"
    ```
 
    ```bash
@@ -216,38 +243,41 @@ switches the bundle format. No reflash is required.
 
    The image now carries `/etc/ota/bundle-decrypt.key` and a
    `bundle-formats=verity crypt` allowlist; the bundle is still verity, so
-   fielded devices accept it. Install it over the normal OTA path.
+   the fielded device accepts it. Install it over the normal OTA path.
 
-   `edge-floor.inc` defaults the recipient paths to what the script wrote, so
-   nothing else is required for the dev flow. `kas/local.yml.example` lists
-   every override, including the PKCS#11 variant.
-
-3. **Once the fleet is on that image, drop the format override.** Bundles
-   become `crypt`; devices already hold the key and already accept the format.
-
-   ```
-   EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION = "1"
-   ```
+2. **Once the device is on that image, drop the override.** Bundles become
+   `crypt`; the device already holds the key and already accepts the format.
 
    ```bash
    make bundle
    ```
 
-4. **Optional later hardening.** Narrowing the allowlist stops a device
-   accepting unencrypted bundles at all:
+3. **Optional later hardening**, once no device in the fleet still needs a
+   verity fallback slot. Narrowing the allowlist stops a device accepting
+   unencrypted bundles at all:
 
    ```
    EDGE_RAUC_BUNDLE_FORMATS = "crypt"
    ```
 
+   `rauc-conf-edge`'s `do_install` cross-checks this against the bundle
+   format actually being built and `bbfatal`s if they disagree — e.g. a
+   narrowed `FORMATS = "crypt"` left in place alongside a stray
+   `EDGE_RAUC_BUNDLE_FORMAT = "verity"` transition override from step 1.
+
    This is fail-closed and one-way in practice: a device that accepts only
    `crypt` can no longer be reached by a verity bundle, so it is safe only
-   once every device in the fleet is past step 3. It also requires another
-   image update to take effect, since the allowlist ships in the image.
+   once every device in the fleet is past step 2 above. It also requires
+   another image update to take effect, since the allowlist ships in the
+   image.
 
-The bundle keeps its usual filename — `rauc encrypt` runs in place, so the
-key-bearing intermediate (a crypt bundle whose manifest still holds the
-plaintext payload key) is never deployed.
+### Turning it off
+
+`EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION = "0"` opts back out to the old
+verity-only, unencrypted-by-default posture. `edge-floor.inc` defaults the
+recipient paths to what `rauc-init-certs.sh` wrote, so no other override is
+required for the dev flow either way; `kas/local.yml.example` lists every
+override, including the PKCS#11 variant.
 
 ### What the operator supplies
 
@@ -262,12 +292,14 @@ lookup. `key=` is mandatory and may instead be a `pkcs11:` URI, in which case
 no key file is installed.
 
 Build-time guards fail the build rather than emit a bundle no device can
-install: a `bundle-formats` list without `crypt`, or an `[encryption] key=`
-filesystem path that nothing provisions into the image. On a build that
-actually emits a crypt bundle, a missing or unset recipients file is also
-fatal. The transition build of step 2 emits `verity`, so the encryption pass
-is skipped entirely — `rauc encrypt` refuses a non-crypt input — and the build
-logs a note saying the bundle it produced is unencrypted.
+install: a `bundle-formats` list without `crypt`, a `bundle-formats` list that
+disagrees with the format the bundle recipe is actually building, or an
+`[encryption] key=` filesystem path that nothing provisions into the image.
+On a build that actually emits a crypt bundle, a missing or unset recipients
+file is also fatal. The transition build (step 1 above) emits `verity`, so
+the encryption pass is skipped entirely — `rauc encrypt` refuses a non-crypt
+input — and the build logs a note saying the bundle it produced is
+unencrypted.
 
 ### Known limits
 

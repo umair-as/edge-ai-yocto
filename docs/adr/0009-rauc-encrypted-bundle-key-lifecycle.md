@@ -136,13 +136,32 @@ data encryption, or boot-chain anti-rollback. Those remain separate controls.
 ## Implementation status
 
 - File-backed shared recipient key provisioning is wired behind
-  `EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION`.
+  `EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION`, on by default since 2026-09-04.
 - The `verity` transition override and `verity crypt` device allowlist are
   wired.
-- Build-time CMS encryption accepts a PEM containing multiple recipients.
-- Encrypted bundles have not yet completed build and on-target validation.
+- Build-time CMS encryption accepts a PEM containing multiple recipients;
+  the rotation-overlap tooling to actually populate a second recipient
+  without a manual `cat` is not implemented (task board).
+- Encrypted bundles completed build and on-target validation 2026-09-04: a
+  transition release (encryption-ready, format still `verity`) and a crypt
+  release both installed over ordinary OTA on RZ/V2L hardware, booted, and
+  passed `edge-verity-check.sh`/`edge-smoke-test.sh` on both slots. The
+  gap this closed was a real defect, not just missing test coverage:
+  `rauc encrypt`'s internal signature self-verify never loads
+  `system.conf`, so it falls back to OpenSSL's default S/MIME-sign purpose
+  check rather than this project's `check-purpose=codesign` policy, and
+  the dev signer leaf's original codeSigning-only EKU failed that
+  self-check unconditionally — no crypt bundle could have been built from
+  the pre-fix PKI regardless of image content. Fixed by widening the leaf
+  EKU to `codeSigning,emailProtection` (`scripts/rauc-init-certs.sh`).
 - Hardware-backed per-device key provisioning and fleet publication are not
-  implemented.
+  implemented. The shared file-backed recipient key remains the only
+  option, and the default flip makes that the default rather than an
+  opt-in choice — every default image now carries the same key, so
+  offline image access or a root compromise on any one device discloses it
+  for the whole fleet. Acceptable for the current single-board tree; the
+  "first production fleet" revisit trigger below still applies to closing
+  this gap specifically, not to whether encryption is on.
 
 ## Revisit triggers
 
