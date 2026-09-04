@@ -8,7 +8,8 @@
 #   keys/dev/rauc/rauc-ca.cert.pem           — root CA cert (installed on
 #                                              device as /etc/rauc/ca.cert.pem)
 #   keys/dev/rauc/rauc-signer.key            — leaf signing private key
-#   keys/dev/rauc/rauc-signer.cert.pem       — leaf cert (codeSigning EKU)
+#   keys/dev/rauc/rauc-signer.cert.pem       — leaf cert (codeSigning +
+#                                              emailProtection EKU)
 #   keys/dev/rauc/rauc-recipient.key         — bundle decryption private key
 #   keys/dev/rauc/rauc-recipient.cert.pem    — matching recipient cert
 #   keys/dev/rauc/rauc-recipients.pem        — `rauc encrypt --to` input:
@@ -91,11 +92,21 @@ if [ ! -f "${LEAF_CRT}" ]; then
         -subj "/O=edge-ai-yocto/CN=edge-ai-rauc-dev-signer" \
         -out "${LEAF_CSR}"
 
-    # Extensions for the leaf: codeSigning EKU + non-CA
+    # Extensions for the leaf: non-CA, codeSigning (the on-device
+    # check-purpose=codesign gate) plus emailProtection. `rauc encrypt`
+    # re-verifies its own output bundle's signature via a CLI path that
+    # loads no system.conf (R_CONTEXT_CONFIG_MODE_NONE in rauc's main.c),
+    # so it falls through to OpenSSL's CMS_verify default purpose check
+    # (S/MIME signing), which requires emailProtection, anyExtendedKeyUsage,
+    # or no EKU at all. A codeSigning-only leaf fails that self-check with
+    # "unsuitable certificate purpose" and every crypt-format do_bundle
+    # aborts; emailProtection satisfies it without loosening the on-device
+    # codesign requirement (RAUC's custom codesign purpose only checks that
+    # codeSigning is present, not that it is exclusive).
     cat > "${EXT_FILE}" <<EOF
 basicConstraints = CA:false
 keyUsage = critical,digitalSignature
-extendedKeyUsage = codeSigning
+extendedKeyUsage = critical,codeSigning,emailProtection
 subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid,issuer
 EOF
