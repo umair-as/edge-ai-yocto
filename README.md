@@ -9,7 +9,7 @@
 
 </div>
 
-**EDGE AI OS** is a hardened, container-native edge-AI Linux platform built on Yocto 6.0 (wrynose) for the Renesas RZ/V2L SoC. It connects a measured boot chain — TF-A → OP-TEE → U-Boot → FIT-signed kernel — to rootless-container NPU inference, wires RAUC A/B over-the-air updates with signed verity bundles, and treats the whole system as a security product rather than a vendor demo kit. The board-agnostic architecture makes RZ/V2L the first target, not the only one.
+**EDGE AI OS** is a hardened, container-native edge-AI Linux platform built on Yocto 6.0 (wrynose) for the Renesas RZ/V2L SoC. It connects a measured boot chain — TF-A → OP-TEE → U-Boot → FIT-signed kernel — to rootless-container NPU inference, wires RAUC A/B over-the-air updates with signed, encrypted-by-default bundles, and treats the whole system as a security product rather than a vendor demo kit. The board-agnostic architecture makes RZ/V2L the first target, not the only one.
 
 ---
 
@@ -19,7 +19,7 @@
 
 - 🔒 **Signed boot chain, end to end.** TF-A (Renesas CIP fork) → OP-TEE (secure world, BL32) → U-Boot → FIT image with RSA-2048 signature verified against a key embedded in the U-Boot control DTB. A file key covers the dev profile; the signing slot is designed for HSM/YubiKey-ROT in production.
 
-- 🔄 **RAUC A/B OTA with automatic rollback.** Signed verity bundles, atomic install, U-Boot boot-count fallback. Kernel/DTB and rootfs update paths both validated on hardware, as is mTLS HTTPS streaming install — a 253 MB bundle streamed from the update server straight into the inactive slot, with no local copy and the transfer running as an unprivileged user.
+- 🔄 **RAUC A/B OTA with automatic rollback.** Signed, encrypted-by-default (RAUC crypt format) bundles, atomic install, U-Boot boot-count fallback. Kernel/DTB and rootfs update paths both validated on hardware, as is mTLS HTTPS streaming install — a 253 MB bundle streamed from the update server straight into the inactive slot, with no local copy and the transfer running as an unprivileged user.
 
 - 🧱 **Board-agnostic from the first commit.** A second SoC joins the build with one kas machine fragment, one WKS file, and board-gated bbappends — distro, image recipes, and hardening are untouched. Designed for portability, not retrofitted after the fact.
 
@@ -40,11 +40,14 @@ Hardware-validated on RZ/V2L SMARC EVK: full boot chain, A/B OTA round-trip, roo
 cp kas/local.yml.example kas/local.yml
 $EDITOR kas/local.yml          # set EDGE_DEFAULT_PASSWORD_HASH (openssl passwd -6)
 
-# 2. Build
+# 2. Generate the dev RAUC PKI (required: bundle encryption is on by default)
+./scripts/rauc-init-certs.sh
+
+# 3. Build
 make base                      # edge-image-base  (~1–3 h cold cache; fast on warm sstate)
 make dev                       # edge-image-dev — adds shell tools, OP-TEE userspace
 
-# 3. Flash
+# 4. Flash
 sudo bmaptool copy \
   build/tmp/deploy/images/smarc-rzv2l/edge-image-base-smarc-rzv2l.wic.zst \
   /dev/sdX

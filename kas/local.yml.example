@@ -94,9 +94,11 @@ local_conf_header:
     # (same pattern as keys/dev/fit/ for FIT). keys/ is gitignored.
     # First-time setup:
     #     ./scripts/rauc-init-certs.sh
-    # Generates root CA (rauc-ca.{key,cert.pem}) + leaf with codeSigning EKU
-    # (rauc-signer.{key,cert.pem}). edge-floor.inc points the bundle build
-    # at these by default.
+    # Generates root CA (rauc-ca.{key,cert.pem}) + leaf with codeSigning +
+    # emailProtection EKU (rauc-signer.{key,cert.pem}) + a recipient
+    # keypair for crypt-format bundle encryption (on by default; see
+    # "Bundle encryption" below). edge-floor.inc points the bundle build
+    # at all of these by default.
     #
     # BUNDLE_IMAGE_NAME defaults to edge-image-dev. For prod bundles:
     # BUNDLE_IMAGE_NAME = "edge-image-prod"
