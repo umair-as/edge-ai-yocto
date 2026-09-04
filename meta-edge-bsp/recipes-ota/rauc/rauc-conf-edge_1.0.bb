@@ -46,8 +46,11 @@ EDGE_RAUC_STREAMING_TLS_KEY   = "${@bb.utils.contains('EDGE_RAUC_STREAMING_KEY_M
 # EDGE_RAUC_ALLOWED_SIGNER_CNS: semicolon-separated CN allowlist. Empty =
 #   no restriction (dev). Set on prod images to fence off legacy / dev leaves.
 # EDGE_RAUC_CHECK_PURPOSE: OpenSSL X.509 purpose enforced on the signer
-#   chain (e.g. "codesign"). Our own rauc-init-certs.sh emits a codeSigning
-#   EKU so "codesign" is the safe default.
+#   chain (e.g. "codesign"). Our own rauc-init-certs.sh emits a
+#   codeSigning + emailProtection EKU (the second is only for `rauc
+#   encrypt`'s own config-less internal self-verify; this check-purpose
+#   gate maps "codesign" to RAUC's custom purpose, which requires just
+#   codeSigning to be present) so "codesign" is the safe default.
 EDGE_RAUC_KEYRING_CERTS       ?= ""
 EDGE_RAUC_ALLOWED_SIGNER_CNS  ?= ""
 EDGE_RAUC_CHECK_PURPOSE       ?= "codesign"
@@ -58,6 +61,10 @@ EDGE_RAUC_CHECK_PURPOSE       ?= "codesign"
 # than replacing it, so a fielded device still accepts the verity bundle that
 # carries the transition image. Narrowing to "crypt" alone is a later
 # hardening step, valid only once every device already accepts crypt.
+#
+# On by default distro-wide (edge-features.inc); the "0" here is only the
+# recipe-local fallback if this recipe is ever parsed outside that distro
+# config.
 EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION ?= "0"
 EDGE_RAUC_BUNDLE_FORMATS ?= "${@bb.utils.contains('EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION', '1', 'verity crypt', 'verity', d)}"
 
@@ -74,6 +81,20 @@ do_install() {
 
     if [ -z "${EDGE_RAUC_BUNDLE_FORMATS}" ]; then
         bbfatal "EDGE_RAUC_BUNDLE_FORMATS is empty; system.conf would accept no bundle format."
+    fi
+
+    # EDGE_RAUC_BUNDLE_FORMAT (edge-features.inc, edge-bundle-common.inc)
+    # names the format the bundle recipe actually emits; the two default off
+    # the same toggle but can be overridden independently (a narrowed
+    # EDGE_RAUC_BUNDLE_FORMATS = "crypt" left in place alongside a
+    # transition-stage EDGE_RAUC_BUNDLE_FORMAT = "verity" override, say).
+    # Catch that combination here rather than let it build cleanly and fail
+    # on every device at install.
+    if [ -n "${EDGE_RAUC_BUNDLE_FORMAT}" ]; then
+        case " ${EDGE_RAUC_BUNDLE_FORMATS} " in
+            *" ${EDGE_RAUC_BUNDLE_FORMAT} "*) ;;
+            *) bbfatal "EDGE_RAUC_BUNDLE_FORMATS ('${EDGE_RAUC_BUNDLE_FORMATS}') does not include EDGE_RAUC_BUNDLE_FORMAT ('${EDGE_RAUC_BUNDLE_FORMAT}'); every bundle this build produces uses that format and every device would reject it." ;;
+        esac
     fi
 
     sed -e "s|@COMPATIBLE@|${RAUC_BUNDLE_COMPATIBLE}|g" \
@@ -170,6 +191,24 @@ do_install() {
         fi
     fi
 }
+
+# The keyring material do_install reads above -- every EDGE_RAUC_KEYRING_CERTS
+# entry in directory mode, or whichever of RAUC_DEVICE_KEYRING/RAUC_CERT_FILE
+# is used in legacy single-cert mode -- is a host path outside SRC_URI, so its
+# content is not otherwise in the task signature: rotating a CA at the same
+# path restores a stale keyring from sstate. Same class of bug already fixed
+# for the recipient key (ota-certs' EDGE_RAUC_DECRYPT_CHECKSUMS) and the
+# bundle recipe (edge-bundle-common.inc's do_bundle[file-checksums]); this
+# recipe's own keyring install had no equivalent.
+def _rauc_keyring_checksum_entries(d):
+    certs = (d.getVar('EDGE_RAUC_KEYRING_CERTS') or '').split()
+    if not certs:
+        single = d.getVar('RAUC_DEVICE_KEYRING') or d.getVar('RAUC_CERT_FILE') or ''
+        certs = [single] if single else []
+    return ' '.join(cert + ':True' for cert in certs)
+
+RAUC_KEYRING_CHECKSUMS = "${@_rauc_keyring_checksum_entries(d)}"
+do_install[file-checksums] += "${RAUC_KEYRING_CHECKSUMS}"
 
 FILES:${PN} = " \
     ${sysconfdir}/rauc/system.conf \

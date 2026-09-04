@@ -56,9 +56,30 @@ EDGE_DEV_NETBOOT ?= "0"
 # RAUC crypt-format bundles. When 1 the bundle payload is AES-256 encrypted
 # and the manifest is CMS-enveloped to EDGE_RAUC_BUNDLE_ENCRYPT_RECIPIENTS;
 # system.conf switches bundle-formats to crypt and gains an [encryption]
-# stanza. Recipient key paths default in edge-floor.inc. Off by default: a
-# device without the matching private key cannot install a crypt bundle.
-EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION ?= "0"
+# stanza. Recipient key paths default in edge-floor.inc. On by default: the
+# shipping target is crypt-format bundles. do_install in ota-certs and
+# do_bundle in edge-bundle-common.inc both bbfatal with a pointer to
+# scripts/rauc-init-certs.sh if the recipient key material under
+# keys/dev/rauc/ does not exist yet, so a fresh checkout's first build fails
+# fast and legibly rather than silently shipping an unencrypted image.
+#
+# Consequence of the default: every default image now carries the same
+# shared recipient private key at /etc/ota/bundle-decrypt.key. ADR-0009 is
+# explicit that this is a development/integration baseline, not a
+# per-device revocation design — offline image access or a root compromise
+# on any one device discloses the key for the whole fleet. Fine for the
+# current single-board tree; revisit before a real fleet rollout.
+EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION ?= "1"
+
+# Declared at this global scope, not just in edge-bundle-common.inc (which
+# also carries an identical, now-redundant ?= as a standalone-recipe
+# fallback), so that rauc-conf-edge -- a different recipe, with its own
+# isolated datastore -- can also read it. rauc-conf-edge's system.conf
+# allowlist (EDGE_RAUC_BUNDLE_FORMATS) must include whatever format the
+# bundle recipe actually emits (EDGE_RAUC_BUNDLE_FORMAT), or every bundle
+# this build produces is rejected on install; that cross-check needs both
+# variables visible from the same recipe.
+EDGE_RAUC_BUNDLE_FORMAT ?= "${@bb.utils.contains('EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION', '1', 'crypt', 'verity', d)}"
 
 # ----- Toggles declared at recipe scope (listed here for visibility) -------
 

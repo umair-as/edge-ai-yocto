@@ -120,6 +120,28 @@ define edge_build
 	$(KAS) shell -c 'BB_ENV_PASSTHROUGH_ADDITIONS="$$BB_ENV_PASSTHROUGH_ADDITIONS EDGE_PROFILE EDGE_OTA_BACKEND EDGE_BOOT_TARGET EDGE_KERNEL_DEV_FRAGMENTS" EDGE_PROFILE=$(1) $(BOOT_TARGET_ENV)bitbake $(2)' $(STACK)
 endef
 
+# EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION defaults to "1" (edge-features.inc), so
+# every image now pulls in ota-certs' encrypted-bundle key install, which
+# bbfatals deep inside do_install if keys/dev/rauc/ has no recipient key yet
+# (scripts/rauc-init-certs.sh not run). Advisory, not a gate: it greps the
+# composed $(STACK) files for an explicit override to "0" and stays silent
+# if it finds one — cheap, and covers the common case (kas/local.yml, a
+# capability fragment) without paying kas/bitbake's own startup cost. It
+# cannot see a shell-env override (BB_ENV_PASSTHROUGH_ADDITIONS), so it can
+# still misfire there; that is a known gap, not a claim of certainty. Its
+# job is only to turn a bbfatal several minutes into a cold build into a
+# one-line heads-up before kas even starts.
+define check_rauc_keys
+	@if [ ! -f keys/dev/rauc/rauc-recipient.key ] \
+	   && ! grep -lqE '^[[:space:]]*EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION[[:space:]]*=[[:space:]]*"0"' $(subst :, ,$(STACK)) 2>/dev/null; then \
+		echo "note: keys/dev/rauc/rauc-recipient.key not found."; \
+		echo "      Bundle encryption defaults on (EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION) and no"; \
+		echo "      composed kas file overrides it off, so this build will most likely fail"; \
+		echo "      at ota-certs' do_install. (A shell-env override is not checked here.)"; \
+		echo "      Run: ./scripts/rauc-init-certs.sh"; \
+	fi
+endef
+
 # kas refuses to run if KAS_WORK_DIR is set to a non-existent dir
 # (kas/context.py: os.path.abspath but no mkdir). Order-only prereq so
 # every kas-invoking target finds .kas/ already created on a fresh tree.
@@ -172,14 +194,17 @@ help:
 	@echo "See AGENTS.md for the full orientation."
 
 base: | $(KAS_WORK_DIR)
+	$(call check_rauc_keys)
 	@echo "==> Building edge-image-base (dev tier) [$(STACK)]"
 	$(call edge_build,dev,edge-image-base)
 
 dev: | $(KAS_WORK_DIR)
+	$(call check_rauc_keys)
 	@echo "==> Building edge-image-dev [$(STACK)]"
 	$(call edge_build,dev,edge-image-dev)
 
 prod: | $(KAS_WORK_DIR)
+	$(call check_rauc_keys)
 	@echo "==> Building edge-image-prod [$(STACK)]"
 	$(call edge_build,prod,edge-image-prod)
 
@@ -198,6 +223,7 @@ bundle: | $(KAS_WORK_DIR)
 		echo "Run: ./scripts/rauc-init-certs.sh"; \
 		exit 1; \
 	fi
+	$(call check_rauc_keys)
 	@echo "==> Building edge-bundle (EDGE_PROFILE=$(EDGE_PROFILE)) [$(STACK)]"
 	$(KAS) shell -c 'BB_ENV_PASSTHROUGH_ADDITIONS="$$BB_ENV_PASSTHROUGH_ADDITIONS EDGE_PROFILE EDGE_OTA_BACKEND BUNDLE_IMAGE_NAME EDGE_BOOT_TARGET EDGE_KERNEL_DEV_FRAGMENTS" EDGE_PROFILE=$(EDGE_PROFILE) $(BOOT_TARGET_ENV)bitbake edge-bundle' $(STACK)
 	@echo "==> Bundle artefacts:"
@@ -240,7 +266,7 @@ clean-lock:
 	    rm -f build/bitbake.lock; \
 	    echo "removed stale build/bitbake.lock"; \
 	else \
-	    holder=$$(cat build/bitbake.lock 2>/dev/null | tr -d '\\n'); \
+	    holder=$$(cat build/bitbake.lock 2>/dev/null | tr -d '\n'); \
 	    echo "build/bitbake.lock is held by $${holder:-another process (pid not recorded)}"; \
 	    echo "A bitbake server is live; removing the lock would make the next"; \
 	    echo "bitbake start a second server on this build directory."; \

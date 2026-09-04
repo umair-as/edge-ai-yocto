@@ -16,10 +16,12 @@ inherit allarch useradd
 EDGE_OTA_CERT_DIR ?= ""
 
 # RAUC crypt-bundle recipient key material, copied from the build host into
-# the same credential store. Installed only when bundle encryption is on;
-# empty source means the device key is expected elsewhere (PKCS#11 token,
-# first-boot provisioning). The install paths below are the literals
-# rauc-conf-edge renders into the [encryption] stanza; the two must match.
+# the same credential store. Installed only when bundle encryption is on
+# (on by default distro-wide, edge-features.inc; the "0" below is only the
+# recipe-local fallback outside that config); empty source means the
+# device key is expected elsewhere (PKCS#11 token, first-boot
+# provisioning). The install paths below are the literals rauc-conf-edge
+# renders into the [encryption] stanza; the two must match.
 EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION ?= "0"
 EDGE_RAUC_DECRYPT_KEY_SRC  ?= ""
 EDGE_RAUC_DECRYPT_CERT_SRC ?= ""
