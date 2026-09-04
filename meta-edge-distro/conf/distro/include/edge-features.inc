@@ -55,8 +55,10 @@ EDGE_DEV_NETBOOT ?= "0"
 
 # RAUC crypt-format bundles. When 1 the bundle payload is AES-256 encrypted
 # and the manifest is CMS-enveloped to EDGE_RAUC_BUNDLE_ENCRYPT_RECIPIENTS;
-# system.conf switches bundle-formats to crypt and gains an [encryption]
-# stanza. Recipient key paths default in edge-floor.inc. On by default: the
+# system.conf widens bundle-formats to "verity crypt" (an allowlist, not a
+# replacement -- a fielded device must keep accepting verity through its
+# own transition bundle) and gains an [encryption] stanza. Recipient key
+# paths default in edge-floor.inc. On by default: the
 # shipping target is crypt-format bundles. do_install in ota-certs and
 # do_bundle in edge-bundle-common.inc both bbfatal with a pointer to
 # scripts/rauc-init-certs.sh if the recipient key material under

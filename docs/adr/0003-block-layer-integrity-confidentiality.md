@@ -40,7 +40,7 @@ enabler, and wiring path; fragments are named after the layer they wire
 |-------|------|-------------|-------------------------|
 | **L0** Hardware crypto + entropy | Throughput and entropy quality for everything above | `CONFIG_CRYPTO_*ARM64_CE*` (instruction acceleration), `CONFIG_HW_RANDOM_*` (HWRNG drivers — OP-TEE, TPM, vendor SoC) | HWRNG devices register at runtime and feed the kernel entropy pool. Device-tree bootloader RNG input uses `/chosen/rng-seed`; Linux 6.12 credits it by default, with `random.trust_bootloader=off` as the policy override. `/chosen/kaslr-seed` is consumed independently by KASLR. |
 | **L1** Boot-chain authenticity | "The kernel that runs is the one we signed" | FIT image signing (verified by U-Boot / TF-A) | Outside dm-* scope. Covered by FIT signing + bootloader policy. |
-| **L2** Bundle integrity at install | "What we just received and are about to commit isn't tampered" | `CONFIG_DM_VERITY` (+`BLK_DEV_DM`, `DM_BUFIO`) | RAUC `bundle-formats=verity` in `system.conf`. RAUC verifies the verity-protected bundle artifact *before installing it into a slot*. |
+| **L2** Bundle integrity at install | "What we just received and are about to commit isn't tampered" | `CONFIG_DM_VERITY` (+`BLK_DEV_DM`, `DM_BUFIO`) | RAUC's `bundle-formats` allowlist in `system.conf` names which format(s) it accepts (`verity`, `crypt`, or both — crypt wraps the same verity-protected artifact in a CMS-encrypted envelope, so this property holds either way). RAUC verifies the verity-protected bundle artifact *before installing it into a slot*. |
 | **L3** Runtime rootfs verity | "The rootfs blocks I'm reading *right now* haven't been mutated since install" | same as L2 (verity itself is one feature; this layer reuses it) | Distinct wiring: RAUC writes a self-contained `ext4.verity` image to a `type=raw` slot, and a signed slot FIT carries the root hash and `dm-mod.create` table. **Not provided by L2.** |
 | **L4** Block-device encryption | Confidentiality (+ optional integrity) of writable data partitions | `CONFIG_DM_CRYPT`, `CONFIG_DM_INTEGRITY`, `CONFIG_CRYPTO_XTS`, `CONFIG_CRYPTO_ESSIV`, `CONFIG_CRYPTO_USER_API_{SKCIPHER,HASH,AEAD}` (cryptsetup needs the AF_ALG sockets even when ciphers are in-kernel) | LUKS2 `cryptsetup luksFormat` of the writable partition, `/etc/crypttab` entry that systemd-cryptsetup-generator instantiates, mount via `/etc/fstab`. Requires an L5 key source. |
 | **L5** Sealed key store | "The key that unlocks L4 is bound to *this* device and *this* boot state" | `CONFIG_TCG_TPM2_*` (if TPM present), or OP-TEE driver (`CONFIG_TEE`, `CONFIG_OPTEE`) | TPM2 PCR-sealed blob via `clevis`/`systemd-cryptenroll`, or OP-TEE TA that wraps/unwraps a key bound to chip-fused material. **Devices without either lose the unattended-boot story for L4** — only passphrase or boot-token unlock remains. |
@@ -66,10 +66,13 @@ and requires.
   not available" and no other hint. Not implied by `DM_CRYPT=y`, silently
   absent from many vendor defconfigs — verify on every kernel base; it
   belongs in L4.
-- **`bundle-formats=verity` is L2, not L3.** It protects the bundle
-  artifact during install; the running slot is whatever the slot type says
-  (`type=ext4` = plain ext4, no runtime integrity). RAUC has no `type=verity`
-  slot type; its documented offline-image flow uses `type=raw`.
+- **Bundle-artifact verity is L2, not L3**, regardless of whether the
+  bundle format is `verity` or `crypt` (both carry the same
+  verity-protected artifact; `crypt` additionally encrypts it). It
+  protects the bundle artifact during install; the running slot is
+  whatever the slot type says (`type=ext4` = plain ext4, no runtime
+  integrity). RAUC has no `type=verity` slot type; its documented
+  offline-image flow uses `type=raw`.
 - **Sealed key store (L5) is a layer, not a footnote.** L4 without L5 is an
   encrypted partition you can't unlock unattended — a non-feature for an
   embedded device. Making "have we wired L5?" explicit forces every L4
