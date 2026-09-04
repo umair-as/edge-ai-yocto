@@ -51,15 +51,22 @@ RCPT_PEM="${KEY_DIR}/rauc-recipients.pem"
 mkdir -p "${KEY_DIR}"
 chmod 700 "${KEY_DIR}"
 
+# Deliberately does not exit early when every file is present: a partial
+# deletion (e.g. only rauc-signer.key removed) regenerates just that one
+# artifact below and must still reach the pairing checks near the end of
+# this script, and an already-complete but silently mismatched set (any
+# cause — manual copy, a previous run of a buggy version of this script)
+# must be caught on every invocation, not only when something was missing.
 if [ -f "${LEAF_CRT}" ] && [ -f "${LEAF_KEY}" ] && [ -f "${CA_CRT}" ] \
    && [ -f "${RCPT_CRT}" ] && [ -f "${RCPT_KEY}" ] && [ -f "${RCPT_PEM}" ]; then
-    echo "RAUC dev keys already present at ${KEY_DIR}; nothing to do."
+    echo "RAUC dev keys already present at ${KEY_DIR}; verifying pairing."
     echo "Delete the directory to regenerate (note: device CA cert and bundle"
     echo "decryption key will need re-flashing)."
-    exit 0
+else
+    echo "Generating RAUC dev PKI in ${KEY_DIR}"
 fi
 
-echo "Generating RAUC dev PKI in ${KEY_DIR}"
+RCPT_CRT_REGENERATED=0
 
 # --- Root CA ---------------------------------------------------------------
 
@@ -97,10 +104,13 @@ if [ ! -f "${LEAF_CRT}" ]; then
     # re-verifies its own output bundle's signature via a CLI path that
     # loads no system.conf (R_CONTEXT_CONFIG_MODE_NONE in rauc's main.c),
     # so it falls through to OpenSSL's CMS_verify default purpose check
-    # (S/MIME signing), which requires emailProtection, anyExtendedKeyUsage,
-    # or no EKU at all. A codeSigning-only leaf fails that self-check with
-    # "unsuitable certificate purpose" and every crypt-format do_bundle
-    # aborts; emailProtection satisfies it without loosening the on-device
+    # (S/MIME signing). That check requires emailProtection in the EKU, or
+    # no EKU at all — NOT anyExtendedKeyUsage, which OpenSSL's xku_reject
+    # does not treat as satisfying the S/MIME-sign purpose (measured on
+    # 3.0.13 and 3.5.7: codeSigning+anyExtendedKeyUsage still fails). A
+    # codeSigning-only leaf fails the self-check with "unsuitable
+    # certificate purpose" and every crypt-format do_bundle aborts;
+    # emailProtection satisfies it without loosening the on-device
     # codesign requirement (RAUC's custom codesign purpose only checks that
     # codeSigning is present, not that it is exclusive).
     cat > "${EXT_FILE}" <<EOF
@@ -142,11 +152,25 @@ if [ ! -f "${RCPT_CRT}" ]; then
         -addext "keyUsage=critical,keyEncipherment,dataEncipherment" \
         -addext "subjectKeyIdentifier=hash" \
         -out "${RCPT_CRT}"
+    RCPT_CRT_REGENERATED=1
 fi
 
 # `rauc encrypt --to` takes a PEM bundle of every recipient cert. One entry
-# for the dev flow; a fleet concatenates one cert per device or group.
-if [ ! -f "${RCPT_PEM}" ]; then
+# for the dev flow; a fleet concatenates one cert per device or group by
+# hand (this script only ever emits a single-cert PEM). A regenerated
+# RCPT_CRT invalidates whatever is already in RCPT_PEM even when the file
+# itself still exists — `rauc encrypt` would keep encrypting to the old
+# cert, and the mismatch would surface only on-device at install time
+# ("no usable recipient"), after the bundle has already been published. If
+# this overwrites a PEM that held more than the single regenerated cert
+# (a manually assembled multi-recipient rotation window), say so instead
+# of silently dropping the other entries.
+if [ ! -f "${RCPT_PEM}" ] || [ "${RCPT_CRT_REGENERATED}" = "1" ]; then
+    if [ -f "${RCPT_PEM}" ] && [ "$(grep -c '^-----BEGIN CERTIFICATE-----' "${RCPT_PEM}")" -gt 1 ]; then
+        echo "WARNING: ${RCPT_PEM} held more than one recipient certificate;" >&2
+        echo "         regenerating rauc-recipient.cert.pem overwrites it with a" >&2
+        echo "         single-cert PEM. Re-add any other recipients by hand." >&2
+    fi
     cat "${RCPT_CRT}" > "${RCPT_PEM}"
     chmod 644 "${RCPT_PEM}"
 fi
@@ -154,6 +178,19 @@ fi
 # --- Sanity check ---------------------------------------------------------
 
 openssl verify -CAfile "${CA_CRT}" "${LEAF_CRT}" >/dev/null
+
+# Chain verification alone does not catch a mismatched signer pair: a
+# partial deletion (only rauc-signer.key removed, say) regenerates the key
+# above while the existing cert is left alone, so the CA-chain check still
+# passes on the old cert even though it no longer matches the new key. Every
+# bundle built with that pair would sign successfully (openssl does not
+# check key/cert pairing at sign time) and fail on-device instead.
+leaf_key_mod="$(openssl rsa -in "${LEAF_KEY}" -noout -modulus)"
+leaf_crt_mod="$(openssl x509 -in "${LEAF_CRT}" -noout -modulus)"
+if [ "${leaf_key_mod}" != "${leaf_crt_mod}" ]; then
+    echo "ERROR: ${LEAF_KEY} does not match ${LEAF_CRT}" >&2
+    exit 1
+fi
 
 # The recipient key and cert must pair, or `rauc install` fails on the device
 # with no usable recipient rather than at build time.
@@ -164,7 +201,7 @@ if [ "${rcpt_key_mod}" != "${rcpt_crt_mod}" ]; then
     exit 1
 fi
 
-echo "RAUC dev PKI generated:"
+echo "RAUC dev PKI (pairing verified):"
 echo "  CA:         ${CA_CRT}"
 echo "  Signer:     ${LEAF_CRT}"
 echo "  Leaf EKU:   $(openssl x509 -in "${LEAF_CRT}" -noout -ext extendedKeyUsage 2>/dev/null | tail -1 | tr -d ' ')"
