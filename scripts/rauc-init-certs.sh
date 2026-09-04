@@ -51,6 +51,33 @@ RCPT_PEM="${KEY_DIR}/rauc-recipients.pem"
 mkdir -p "${KEY_DIR}"
 chmod 700 "${KEY_DIR}"
 
+# True if $1 (a PEM file, possibly holding more than one certificate --
+# rauc-recipients.pem's multi-recipient rotation-overlap form) contains a
+# certificate whose SHA-256 fingerprint matches $2. Portable pure
+# bash+openssl split, no csplit/mktemp: a `rauc encrypt --to` PEM is always
+# a plain concatenation of individual certs.
+pem_contains_cert() {
+    local pem="$1" cert="$2" want block="" in_cert=0
+    [ -f "${pem}" ] || return 1
+    want="$(openssl x509 -in "${cert}" -noout -fingerprint -sha256)"
+    while IFS= read -r line; do
+        if [ "${line}" = "-----BEGIN CERTIFICATE-----" ]; then
+            in_cert=1
+            block="${line}"$'\n'
+            continue
+        fi
+        [ "${in_cert}" = "1" ] || continue
+        block="${block}${line}"$'\n'
+        if [ "${line}" = "-----END CERTIFICATE-----" ]; then
+            in_cert=0
+            if [ "$(printf '%s' "${block}" | openssl x509 -in - -noout -fingerprint -sha256 2>/dev/null)" = "${want}" ]; then
+                return 0
+            fi
+        fi
+    done < "${pem}"
+    return 1
+}
+
 # Deliberately does not exit early when every file is present: a partial
 # deletion (e.g. only rauc-signer.key removed) regenerates just that one
 # artifact below and must still reach the pairing checks near the end of
@@ -65,8 +92,6 @@ if [ -f "${LEAF_CRT}" ] && [ -f "${LEAF_KEY}" ] && [ -f "${CA_CRT}" ] \
 else
     echo "Generating RAUC dev PKI in ${KEY_DIR}"
 fi
-
-RCPT_CRT_REGENERATED=0
 
 # --- Root CA ---------------------------------------------------------------
 
@@ -152,20 +177,23 @@ if [ ! -f "${RCPT_CRT}" ]; then
         -addext "keyUsage=critical,keyEncipherment,dataEncipherment" \
         -addext "subjectKeyIdentifier=hash" \
         -out "${RCPT_CRT}"
-    RCPT_CRT_REGENERATED=1
 fi
 
 # `rauc encrypt --to` takes a PEM bundle of every recipient cert. One entry
 # for the dev flow; a fleet concatenates one cert per device or group by
-# hand (this script only ever emits a single-cert PEM). A regenerated
-# RCPT_CRT invalidates whatever is already in RCPT_PEM even when the file
-# itself still exists — `rauc encrypt` would keep encrypting to the old
-# cert, and the mismatch would surface only on-device at install time
-# ("no usable recipient"), after the bundle has already been published. If
-# this overwrites a PEM that held more than the single regenerated cert
-# (a manually assembled multi-recipient rotation window), say so instead
-# of silently dropping the other entries.
-if [ ! -f "${RCPT_PEM}" ] || [ "${RCPT_CRT_REGENERATED}" = "1" ]; then
+# hand (this script only ever emits a single-cert PEM). Checked by content
+# (pem_contains_cert), not by "did this run just regenerate RCPT_CRT": an
+# earlier version of this check keyed on the latter and so never repaired a
+# PEM left stale by a run of the pre-fix script -- it only refreshed a PEM
+# it had itself just gone stale in the same invocation, missing the actual
+# migration case the fix was for. A PEM whose current entry does not match
+# RCPT_CRT is exactly the case where `rauc encrypt` would keep encrypting
+# to a cert no device holds, surfacing only on-device at install time ("no
+# usable recipient"), after the bundle has already been published. If this
+# overwrites a PEM that held more than the current recipient cert (a
+# manually assembled multi-recipient rotation window), say so instead of
+# silently dropping the other entries.
+if [ ! -f "${RCPT_PEM}" ] || ! pem_contains_cert "${RCPT_PEM}" "${RCPT_CRT}"; then
     if [ -f "${RCPT_PEM}" ] && [ "$(grep -c '^-----BEGIN CERTIFICATE-----' "${RCPT_PEM}")" -gt 1 ]; then
         echo "WARNING: ${RCPT_PEM} held more than one recipient certificate;" >&2
         echo "         regenerating rauc-recipient.cert.pem overwrites it with a" >&2
@@ -176,6 +204,19 @@ if [ ! -f "${RCPT_PEM}" ] || [ "${RCPT_CRT_REGENERATED}" = "1" ]; then
 fi
 
 # --- Sanity check ---------------------------------------------------------
+
+# The CA pair itself had no modulus check, unlike the signer and recipient
+# pairs below -- a deleted-then-regenerated CA_KEY with CA_CRT left in place
+# printed "pairing verified" over a broken CA. Not silently dangerous (the
+# next leaf issuance below would fail loudly: `openssl x509 -req` refuses to
+# sign against a CA cert whose key doesn't match), but the success banner at
+# the end of this script should not overclaim.
+ca_key_mod="$(openssl rsa -in "${CA_KEY}" -noout -modulus)"
+ca_crt_mod="$(openssl x509 -in "${CA_CRT}" -noout -modulus)"
+if [ "${ca_key_mod}" != "${ca_crt_mod}" ]; then
+    echo "ERROR: ${CA_KEY} does not match ${CA_CRT}" >&2
+    exit 1
+fi
 
 openssl verify -CAfile "${CA_CRT}" "${LEAF_CRT}" >/dev/null
 
