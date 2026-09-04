@@ -447,11 +447,29 @@ class InspectorTampering(TempCase):
         """Rewrite the manifest blob in place and repoint index.json at it."""
         digest, manifest = self.manifest_of(self.layout)
         mutate(manifest)
+        self.rewrite_manifest_blob(digest, manifest)
+
+    def rewrite_layer(self, raw_bytes):
+        """Replace the layer blob and cascade the digest change through the
+        manifest's layer descriptor, the manifest blob itself, and
+        index.json -- everything a real re-pack would also have to update.
+        """
+        digest, manifest = self.manifest_of(self.layout)
+        new_layer_digest = mp_oci.sha256_bytes(raw_bytes)
+        with open(self.blob("sha256:" + new_layer_digest), "wb") as handle:
+            handle.write(raw_bytes)
+        os.unlink(self.blob(manifest["layers"][0]["digest"]))
+        manifest["layers"][0]["digest"] = "sha256:" + new_layer_digest
+        manifest["layers"][0]["size"] = len(raw_bytes)
+        self.rewrite_manifest_blob(digest, manifest)
+
+    def rewrite_manifest_blob(self, old_digest, manifest):
+        """Write `manifest` as the new manifest blob and repoint index.json."""
         raw = mp_oci.canonical_json(manifest)
         new_digest = mp_oci.sha256_bytes(raw)
         with open(self.blob("sha256:" + new_digest), "wb") as handle:
             handle.write(raw)
-        os.unlink(self.blob(digest))
+        os.unlink(self.blob(old_digest))
         index = read_json(self.index_path)
         index["manifests"][0]["digest"] = "sha256:" + new_digest
         index["manifests"][0]["size"] = len(raw)
@@ -478,6 +496,32 @@ class InspectorTampering(TempCase):
         with open(path, "wb") as handle:
             handle.write(mp_oci.canonical_json(data))
         self.assert_problem("does not match its own name")
+
+    def test_unparseable_config_content_reports_not_crashes(self):
+        """A tampered blob that is not even valid JSON must not be parsed.
+
+        test_config_content_tampering above replaces the config blob's bytes
+        with something still valid JSON, so it cannot distinguish "the
+        mismatch was reported and the blob was never parsed" from "the
+        mismatch was reported but the blob was parsed anyway" -- both leave
+        the same problem message and no crash, because there is nothing
+        there to crash on. Garbage bytes are not valid JSON; only the fixed
+        behaviour survives them.
+        """
+        _, manifest = self.manifest_of(self.layout)
+        path = self.blob(manifest["config"]["digest"])
+        with open(path, "wb") as handle:
+            handle.write(b"\x00not json at all\xff")
+        summary, problems = mp_inspect.inspect_layout(self.layout)
+        joined = " | ".join(problems)
+        self.assertIn("does not match its own name", joined)
+        self.assertNotIn("name", summary)
+        self.assertEqual(
+            modelpack.main(["inspect", "--layout", self.layout]),
+            modelpack.EXIT_FAILED,
+            "a tampered artifact must exit EXIT_FAILED (a check failed), "
+            "not EXIT_USAGE (a usage/I/O error) -- the latter reads as an "
+            "operator mistake instead of a security finding")
 
     def test_manifest_descriptor_size_tampering(self):
         index = read_json(self.index_path)
@@ -522,6 +566,44 @@ class InspectorTampering(TempCase):
             handle.write(b"stray")
         self.assert_problem("is not referenced")
 
+    def test_hostile_layer_member_is_reported_by_inspect_layout(self):
+        """inspect_layout itself must report an unsafe member path -- not
+        just _layer_members returning it in a raw listing, which a prior
+        version of this test asserted instead (see SafeExtraction's
+        test_layer_members_lists_hostile_member_without_extracting) and
+        which would stay green even if the problem-reporting loop in
+        inspect_layout that walks `members` were deleted entirely."""
+        import gzip
+        import io
+        import tarfile
+
+        buffer = io.BytesIO()
+        with gzip.GzipFile(filename="", mode="wb", fileobj=buffer,
+                           mtime=0) as gz:
+            with tarfile.open(fileobj=gz, mode="w",
+                              format=tarfile.GNU_FORMAT) as tar:
+                info = tarfile.TarInfo("../../escape")
+                payload = b"pwned"
+                info.size = len(payload)
+                tar.addfile(info, io.BytesIO(payload))
+        self.rewrite_layer(buffer.getvalue())
+        self.assert_problem("unsafe member path")
+
+    def test_path_traversal_shaped_digest_is_refused(self):
+        """A 64-character digest naming a traversal path, not a hex value,
+        must be refused rather than reach os.path.join -- a bare
+        len(hex_digest) == 64 check (a prior version of _check_descriptor
+        used exactly that) does not catch this: the traversal string here
+        is deliberately padded to exactly 64 characters."""
+        hostile = "../" * 21 + "x"  # 3*21 + 1 == 64 characters exactly
+        self.assertEqual(len(hostile), 64)
+
+        def mutate(manifest):
+            manifest["layers"][0]["digest"] = "sha256:" + hostile
+
+        self.rewrite_manifest(mutate)
+        self.assert_problem("unsupported or malformed digest")
+
     def test_label_count_disagreeing_with_packed_file(self):
         """A config claiming more labels than the packed file carries."""
         root = self.work("src2")
@@ -532,7 +614,7 @@ class InspectorTampering(TempCase):
                            make_labels(root), "mismatch")
         _, problems = mp_inspect.inspect_layout(layout)
         joined = " | ".join(problems)
-        self.assertIn("non-empty lines", joined)
+        self.assertIn("holds 4 lines but labels.count is 3", joined)
 
     def test_label_count_disagreeing_with_compiled_output(self):
         """Labels file and config agree with each other but not with the model."""
@@ -695,7 +777,12 @@ class SafeExtraction(TempCase):
             mp_inspect.safe_extract(layout, digest,
                                     os.path.join(self.tmp, "dest4"))
 
-    def test_inspector_reports_hostile_member_without_extracting(self):
+    def test_layer_members_lists_hostile_member_without_extracting(self):
+        """_layer_members is the raw tar listing, used by inspect_layout's
+        own unsafe-path check (see InspectorTampering, which exercises that
+        check itself through inspect_layout rather than this lower-level
+        listing) -- it must surface the traversal name for that check to
+        see, without ever calling safe_extract/extractfile on it."""
         layout, digest = self._layout_with_hostile_layer("../../escape")
         members, _, _ = mp_inspect._layer_members(layout, digest)
         self.assertIn("../../escape", members)

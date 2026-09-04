@@ -11,6 +11,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import stat
 import tarfile
 
@@ -32,9 +33,23 @@ EPOCH_RFC3339 = "1970-01-01T00:00:00Z"
 IMAGE_LAYOUT_VERSION = "1.0.0"
 READ_CHUNK = 1024 * 1024
 
+_SHA256_HEX_RE = re.compile(r"[0-9a-f]{64}")
+
 
 class PackError(Exception):
     pass
+
+
+def is_valid_sha256_hex(hex_digest):
+    """True iff hex_digest is exactly 64 lowercase hex characters.
+
+    A digest with the right length but the wrong charset (e.g. containing
+    "/" or ".." segments) still passes a bare len() == 64 check and reaches
+    os.path.join in _blob_path below, which then resolves outside
+    blobs/sha256/ -- read/hash whatever the caller's own filesystem access
+    could already reach, but a path-traversal primitive regardless.
+    """
+    return bool(_SHA256_HEX_RE.fullmatch(hex_digest))
 
 
 def canonical_json(obj):
@@ -183,6 +198,13 @@ def build_index(manifest_desc):
 
 
 def _blob_path(layout_dir, digest_hex):
+    # The chokepoint every blob access goes through, so the charset check
+    # lives here rather than trusting each caller to have validated first:
+    # digest_hex reaches os.path.join unescaped, and a value shaped like a
+    # traversal (".." segments, "/") but the right length silently resolves
+    # outside blobs/sha256/.
+    if not is_valid_sha256_hex(digest_hex):
+        raise PackError("invalid sha256 hex digest %r" % digest_hex)
     return os.path.join(layout_dir, "blobs", "sha256", digest_hex)
 
 
