@@ -174,6 +174,36 @@ def _validate_envelope(index, manifest, config, problems):
              % manifest.get("schemaVersion"), problems)
 
 
+# Distinguishes "the blob failed to parse" from "the blob parsed to the
+# JSON value null" -- json.loads("null") legitimately returns Python None,
+# so using None itself as the failure signal from _load_json_blob would
+# make the two indistinguishable, and a caller that treats None as
+# "already reported, just return" would silently swallow the null case
+# with zero problems recorded instead of reaching the isinstance(dict)
+# check below it that would otherwise catch it.
+_PARSE_FAILED = object()
+
+
+def _load_json_blob(layout_dir, hex_digest, label, problems):
+    """Read and parse a blob already confirmed to match its own digest.
+
+    Matching its digest only proves the blob is what its name claims it is,
+    not that the bytes are valid JSON -- a tamperer who recomputes the
+    digest after corrupting the content produces exactly this: a
+    self-consistent blob that still is not parseable. Reported as a
+    problem, not left to raise ValueError/UnicodeDecodeError past the
+    caller (both are ValueError subclasses; modelpack.py's top-level
+    handler maps an uncaught one to EXIT_USAGE, misreporting a check
+    failure as an operator/usage error). Returns _PARSE_FAILED, not None,
+    on failure -- see that sentinel's own docstring for why.
+    """
+    try:
+        return json.loads(mp_oci.read_blob(layout_dir, "sha256:" + hex_digest))
+    except ValueError as exc:
+        problems.append("%s: not valid JSON (%s)" % (label, exc))
+        return _PARSE_FAILED
+
+
 def _check_member(members, path, expected_kind, why, problems):
     meta = members.get(path)
     if meta is None:
@@ -217,7 +247,14 @@ def inspect_layout(layout_dir):
         return summary, problems
     summary["manifestDigest"] = "sha256:" + manifest_hex
 
-    manifest = json.loads(mp_oci.read_blob(layout_dir, "sha256:" + manifest_hex))
+    manifest = _load_json_blob(layout_dir, manifest_hex,
+                               "index.json manifest descriptor", problems)
+    if manifest is _PARSE_FAILED:
+        return summary, problems
+    if not isinstance(manifest, dict):
+        problems.append("index.json manifest descriptor: content must be a "
+                        "JSON object, got %s" % type(manifest).__name__)
+        return summary, problems
 
     annotations = manifest.get("annotations") or {}
     _require(mp_schema.CREATED_ANNOTATION in annotations,
@@ -249,12 +286,27 @@ def inspect_layout(layout_dir):
     if config_hex is None or layer_hex is None:
         return summary, problems
 
-    config = json.loads(mp_oci.read_blob(layout_dir, "sha256:" + config_hex))
+    config = _load_json_blob(layout_dir, config_hex,
+                             "manifest config descriptor", problems)
+    if config is _PARSE_FAILED:
+        return summary, problems
+    # mp_schema.validate_config itself handles a non-dict config (and a
+    # non-dict config["decoder"]) without crashing -- it is what the rest of
+    # inspect_layout below did not do consistently with. A non-dict config
+    # cannot be indexed further, so this must return; a non-dict decoder
+    # already produced a "decoder: must be an object" problem from
+    # validate_config below and only needs a safe read here, not a return.
+    if not isinstance(config, dict):
+        problems.append("manifest config descriptor: content must be a "
+                        "JSON object, got %s" % type(config).__name__)
+        return summary, problems
     for error in mp_schema.validate_config(config):
         problems.append("config: %s" % error)
     summary["name"] = config.get("name")
     summary["version"] = config.get("version")
-    summary["decoder"] = (config.get("decoder") or {}).get("class")
+    decoder_field = config.get("decoder")
+    summary["decoder"] = (decoder_field.get("class")
+                          if isinstance(decoder_field, dict) else None)
 
     _validate_envelope(index, manifest, config, problems)
 
