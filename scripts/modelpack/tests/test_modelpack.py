@@ -476,6 +476,36 @@ class InspectorTampering(TempCase):
         with open(self.index_path, "wb") as handle:
             handle.write(mp_oci.canonical_json(index))
 
+    def rewrite_manifest_raw_bytes(self, raw_bytes):
+        """Replace the manifest blob with arbitrary bytes and repoint
+        index.json -- unlike rewrite_manifest, `raw_bytes` need not decode
+        to a dict (or even to JSON at all), for testing what inspect_layout
+        does with a self-consistent but structurally-wrong manifest blob."""
+        digest, _ = self.manifest_of(self.layout)
+        new_digest = mp_oci.sha256_bytes(raw_bytes)
+        with open(self.blob("sha256:" + new_digest), "wb") as handle:
+            handle.write(raw_bytes)
+        os.unlink(self.blob(digest))
+        index = read_json(self.index_path)
+        index["manifests"][0]["digest"] = "sha256:" + new_digest
+        index["manifests"][0]["size"] = len(raw_bytes)
+        with open(self.index_path, "wb") as handle:
+            handle.write(mp_oci.canonical_json(index))
+
+    def rewrite_config_raw_bytes(self, raw_bytes):
+        """Replace the config blob with arbitrary bytes and cascade the
+        digest change through the manifest's config descriptor, the
+        manifest blob itself, and index.json. `raw_bytes` need not decode
+        to a dict (or even to JSON at all)."""
+        digest, manifest = self.manifest_of(self.layout)
+        new_digest = mp_oci.sha256_bytes(raw_bytes)
+        with open(self.blob("sha256:" + new_digest), "wb") as handle:
+            handle.write(raw_bytes)
+        os.unlink(self.blob(manifest["config"]["digest"]))
+        manifest["config"]["digest"] = "sha256:" + new_digest
+        manifest["config"]["size"] = len(raw_bytes)
+        self.rewrite_manifest_blob(digest, manifest)
+
     def assert_problem(self, needle):
         _, problems = mp_inspect.inspect_layout(self.layout)
         joined = " | ".join(problems)
@@ -522,6 +552,65 @@ class InspectorTampering(TempCase):
             "a tampered artifact must exit EXIT_FAILED (a check failed), "
             "not EXIT_USAGE (a usage/I/O error) -- the latter reads as an "
             "operator mistake instead of a security finding")
+
+    def test_decoder_wrong_type_reports_not_crashes(self):
+        """A self-consistent config with decoder as a bare string, not an
+        object, must not crash -- decoder.get("class") on a str raised
+        AttributeError past a second independent review's probing before
+        this fix; mp_schema.validate_config already reported it correctly,
+        but inspect_layout's own separate summary["decoder"] derivation did
+        not check the type before calling .get() on it."""
+        _, manifest = self.manifest_of(self.layout)
+        config = json.loads(mp_oci.read_blob(self.layout, manifest["config"]["digest"]))
+        config["decoder"] = "classification"
+        self.rewrite_config_raw_bytes(mp_oci.canonical_json(config))
+        summary, problems = mp_inspect.inspect_layout(self.layout)
+        joined = " | ".join(problems)
+        self.assertIn("decoder: must be an object", joined)
+        self.assertIsNone(summary.get("decoder"))
+
+    def test_config_wrong_json_type_reports_not_crashes(self):
+        """A self-consistent config blob that is valid JSON but not a JSON
+        object (an array, a string, or null) must not crash. Each of these
+        reached a bare `config.get(...)` in inspect_layout uncaught before
+        this fix; mp_schema.validate_config's own non-dict guard doesn't
+        help, because inspect_layout calls config.get() again itself for
+        name/version/decoder regardless of what validate_config found."""
+        for label, value in (("array", [1, 2, 3]), ("string", "oops"),
+                             ("null", None)):
+            with self.subTest(label=label):
+                _, manifest = self.manifest_of(self.layout)
+                self.rewrite_config_raw_bytes(mp_oci.canonical_json(value))
+                summary, problems = mp_inspect.inspect_layout(self.layout)
+                self.assertEqual(len(problems), 1, problems)
+                self.assertIn("must be a JSON object", problems[0])
+                self.assertEqual(
+                    modelpack.main(["inspect", "--layout", self.layout]),
+                    modelpack.EXIT_FAILED)
+
+    def test_manifest_wrong_json_type_reports_not_crashes(self):
+        """Same as test_config_wrong_json_type_reports_not_crashes, one
+        level up: a self-consistent manifest blob that parses to a JSON
+        array must not crash on manifest.get("annotations")."""
+        self.rewrite_manifest_raw_bytes(mp_oci.canonical_json([1, 2, 3]))
+        summary, problems = mp_inspect.inspect_layout(self.layout)
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("must be a JSON object", problems[0])
+        self.assertEqual(
+            modelpack.main(["inspect", "--layout", self.layout]),
+            modelpack.EXIT_FAILED)
+
+    def test_unparseable_manifest_content_reports_not_crashes(self):
+        """The manifest-side counterpart of
+        test_unparseable_config_content_reports_not_crashes: a
+        self-consistent manifest blob that is not valid JSON at all."""
+        self.rewrite_manifest_raw_bytes(b"\x00not json at all\xff")
+        summary, problems = mp_inspect.inspect_layout(self.layout)
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("not valid JSON", problems[0])
+        self.assertEqual(
+            modelpack.main(["inspect", "--layout", self.layout]),
+            modelpack.EXIT_FAILED)
 
     def test_manifest_descriptor_size_tampering(self):
         index = read_json(self.index_path)
