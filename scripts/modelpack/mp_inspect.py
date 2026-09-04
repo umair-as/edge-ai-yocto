@@ -49,7 +49,7 @@ def _check_descriptor(layout_dir, desc, expected_media_type, label, problems):
     """Recompute the digest and size of the blob this descriptor points at."""
     digest = desc.get("digest", "")
     algorithm, _, hex_digest = digest.partition(":")
-    if algorithm != "sha256" or len(hex_digest) != 64:
+    if algorithm != "sha256" or not mp_oci.is_valid_sha256_hex(hex_digest):
         problems.append("%s: unsupported or malformed digest %r" % (label, digest))
         return None
     blob = os.path.join(layout_dir, "blobs", "sha256", hex_digest)
@@ -58,7 +58,8 @@ def _check_descriptor(layout_dir, desc, expected_media_type, label, problems):
         return None
 
     actual_digest = sha256_file(blob)
-    if actual_digest != hex_digest:
+    content_ok = actual_digest == hex_digest
+    if not content_ok:
         problems.append("%s: blob content does not match its own name "
                         "(name %s, content sha256:%s)"
                         % (label, hex_digest, actual_digest))
@@ -69,7 +70,15 @@ def _check_descriptor(layout_dir, desc, expected_media_type, label, problems):
     if desc.get("mediaType") != expected_media_type:
         problems.append("%s: mediaType must be %s, got %r"
                         % (label, expected_media_type, desc.get("mediaType")))
-    return hex_digest
+    # A content mismatch means hex_digest names bytes that are not what the
+    # descriptor's own digest says they are: untrusted content under a
+    # trusted-looking name. Every caller uses this return value to decide
+    # whether to go on and parse that blob as JSON/tar; returning it here
+    # anyway -- as a prior version of this function did -- let a tampered
+    # blob be parsed regardless of the problem just recorded above, and any
+    # resulting parse exception (not valid JSON, not valid UTF-8) propagated
+    # uncaught past the caller that was tracking `problems`.
+    return hex_digest if content_ok else None
 
 
 def _output_element_count(deploy):
@@ -310,14 +319,29 @@ def inspect_layout(layout_dir):
                 problems.append("labels: %r is not valid UTF-8 (%s)"
                                 % (labels_path, exc))
             else:
-                actual = sum(1 for line in text.splitlines() if line.strip())
+                # Every line counts, including a blank one: labels are
+                # positional (line N names class N), so a stray blank line
+                # anywhere -- not just trailing -- shifts every later
+                # label's index. Filtering blanks out (a prior version of
+                # this line did, via `if line.strip()`) can make a file with
+                # exactly that defect total to the expected labels.count by
+                # coincidence, passing a check meant to catch it.
+                actual = len(text.splitlines())
                 if actual != labels_count:
-                    problems.append("labels: %r holds %d non-empty lines but "
+                    problems.append("labels: %r holds %d lines but "
                                     "labels.count is %r"
                                     % (labels_path, actual, labels_count))
                 summary["labelLines"] = actual
 
-    if summary.get("decoder") == "classification" and isinstance(model_dir, str):
+    # Truthiness, not just isinstance: matches the two "wanted"/_check_member
+    # sites above. isinstance(model_dir, str) alone is True for "" too, and
+    # posixpath.join("", "deploy.json") == "deploy.json" would then look up a
+    # member the "wanted" pass never asked _layer_members to read into
+    # `contents` (that pass gated on the same truthiness check) -- if the
+    # layer happens to have an unrelated top-level "deploy.json" file, the
+    # json.loads(contents[deploy_path]) below raised an uncaught KeyError
+    # instead of the config-validation problem an empty directory should be.
+    if summary.get("decoder") == "classification" and isinstance(model_dir, str) and model_dir:
         deploy_path = posixpath.join(model_dir, "deploy.json")
         meta = members.get(deploy_path)
         if meta is not None and meta["kind"] == "file":
@@ -327,8 +351,17 @@ def inspect_layout(layout_dir):
                                 "count check did not run"
                                 % (deploy_path, meta["size"], MAX_INSPECT_BYTES))
             else:
-                count, shape = _output_element_count(
-                    json.loads(contents[deploy_path]))
+                try:
+                    count, shape = _output_element_count(
+                        json.loads(contents[deploy_path]))
+                except (InspectionError, ValueError) as exc:
+                    # InspectionError: _output_element_count's own "cannot
+                    # read the output shape" report. ValueError also covers
+                    # json.loads on a deploy.json that isn't valid JSON --
+                    # same "check cannot be performed" class of problem, not
+                    # a reason to crash the whole inspection.
+                    problems.append("classification: %s" % exc)
+                    return summary, problems
                 summary["outputShape"] = shape
                 if count != labels_count:
                     problems.append(
