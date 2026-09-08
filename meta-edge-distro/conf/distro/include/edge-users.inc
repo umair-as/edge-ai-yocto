@@ -109,12 +109,23 @@ EXTRA_USERS_PARAMS = " \
             -p '${EDGE_DEFAULT_PASSWORD_HASH}' devel; \
 "
 
-# AI images: the dedicated edge-ctr container principal (created by the
-# edge-ctr-user recipe via packagegroup-edge-ai) needs render-group membership
-# to pass /dev/drpai0 + /dev/udmabuf0 into its rootless container (keep-groups).
-# Added at image assembly, not in the recipe useradd: render is created by
-# another recipe and a recipe-level --groups render could race its creation.
-EXTRA_USERS_PARAMS:append = "${@bb.utils.contains('EDGE_ENABLE_AI', '1', ' usermod -aG render edge-ctr;', '', d)}"
+# Accelerator principal group membership. The accelerator's packagegroup
+# creates the principal (edge-ctr for DRP-AI) and the device groups; this adds
+# the memberships that let it pass the accelerator's device nodes into a
+# rootless container (keep-groups).
+#
+# Added at image assembly, not in the recipe useradd: the groups are created
+# by other recipes and a recipe-level --groups races their creation.
+#
+# EDGE_ACCEL_SUPPLEMENTARY_GROUPS is accelerator policy, supplied by the
+# accelerator fragment. Empty when no accelerator is selected, which is what
+# makes this safe on a machine that has none -- the previous form fired on
+# any machine whenever the AI toggle was on, against a user that only the
+# RZ/V2L-only packagegroup creates.
+# Entries are "group:user" -- the group to join and the principal joining it.
+# Format is validated in edge-image.bbclass; a malformed entry is a parse
+# error there rather than a silently skipped membership here.
+EXTRA_USERS_PARAMS:append = "${@''.join(' usermod -aG %s %s;' % (e.split(':', 1)[0], e.split(':', 1)[1]) for e in (d.getVar('EDGE_ACCEL_SUPPLEMENTARY_GROUPS') or '').split() if ':' in e)}"
 
 # optee-client creates the tee group owning /dev/tee0 (0660, no uaccess ACL);
 # devel joins it to open a TEE context without sudo. Machine-scoped append, not
@@ -122,7 +133,7 @@ EXTRA_USERS_PARAMS:append = "${@bb.utils.contains('EDGE_ENABLE_AI', '1', ' userm
 # machines, where -G tee would fail assembly. EDGE_ENABLE_OPTEE keys it for the
 # same reason — with the packagegroup dropped, the group is absent on this board
 # too, and usermod against a missing group fails the rootfs task.
-EXTRA_USERS_PARAMS:append:smarc-rzv2l = "${@bb.utils.contains('EDGE_ENABLE_OPTEE', '1', ' usermod -aG tee devel;', '', d)}"
+EXTRA_USERS_PARAMS:append = "${@bb.utils.contains('EDGE_ENABLE_OPTEE', '1', ' usermod -aG tee devel;', '', d) if 'packagegroup-edge-optee' in (d.getVar('EDGE_MACHINE_EXTRA_INSTALL') or '') else ''}"
 # Supplementary group choice for devel:
 #   wheel            sudo escalation (paired with edge-sudoers)
 #   systemd-journal  journalctl -f / read all messages without -q

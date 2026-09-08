@@ -1,0 +1,33 @@
+# Accelerator fragment: DRP-AI (Renesas RZ/V2L SoC-integrated NPU).
+#
+# Selects the accelerator; it adds no layer, because the DRP-AI recipes live
+# in meta-edge-bsp. A vendor whose stack needs its own layer adds a `repos:`
+# block here instead.
+#
+#   kas build kas/base.yml:kas/machines/rzv2l.yml:kas/accel/drpai.yml
+#   make dev ACCEL=drpai-v2l
+#
+# EDGE_ACCEL is checked against the machine's EDGE_ACCEL_SUPPORTED in
+# edge-image.bbclass. An unsupported pair is a parse error naming both, not a
+# quietly accelerator-less image.
+#
+# Pair with VIRT=1 for the containerised path: without meta-virtualization
+# there is no podman, so the Quadlet cannot run and only the native inference
+# binary is usable. Fragments compose explicitly rather than implying each
+# other: `make dev ACCEL=drpai-v2l VIRT=1`.
+#
+# The compiled model is not part of the image. The inference Quadlet reads its
+# payload from /data/drpai and skips cleanly when that path is absent, so a
+# fresh device builds and boots without one -- and does not infer until a
+# payload is placed there.
+header:
+  version: 19
+
+local_conf_header:
+  accel_drpai: |
+    EDGE_ACCEL = "drpai-v2l"
+
+    # The edge-ctr rootless principal needs render-group membership to pass
+    # /dev/drpai0 + /dev/udmabuf0 into its container (keep-groups). Applied at
+    # image assembly by edge-users.inc; "group:user" per entry.
+    EDGE_ACCEL_SUPPLEMENTARY_GROUPS = "render:edge-ctr"

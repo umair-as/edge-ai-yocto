@@ -83,12 +83,19 @@ python do_image_verity_fit() {
     def dts_quote(value):
         return value.replace("\\", "\\\\").replace('"', '\\"')
 
-    for slot, part, output_name in (
-            ("A", "2", d.getVar("EDGE_VERITY_FIT_A")),
-            ("B", "3", d.getVar("EDGE_VERITY_FIT_B"))):
+    for slot, device, output_name in (
+            ("A", d.getVar("EDGE_SLOT_A_DEVICE"), d.getVar("EDGE_VERITY_FIT_A")),
+            ("B", d.getVar("EDGE_SLOT_B_DEVICE"), d.getVar("EDGE_VERITY_FIT_B"))):
+        if not device:
+            bb.fatal(
+                "EDGE_SLOT_%s_DEVICE is unset for MACHINE = '%s'.\n"
+                "  The slot block device is written into the signed dm-verity\n"
+                "  table, so an empty or wrong value yields a correctly-signed\n"
+                "  image that cannot mount its own root. Set it in\n"
+                "  conf/machine/include/edge-board-%s.inc."
+                % (slot, d.getVar("MACHINE"), d.getVar("MACHINE")))
         slot_dtb = os.path.join(work, "verity-%s.dtb" % slot)
         shutil.copyfile(dtb, slot_dtb)
-        device = "/dev/mmcblk0p%s" % part
         table = (
             "vroot,,,ro,0 {sectors} verity 1 {dev} {dev} "
             "{data_bs} {hash_bs} {data_blocks} {data_blocks} "

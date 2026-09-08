@@ -24,14 +24,41 @@ EDGE_OTA_BACKEND ?= "rauc"
 # Display stack (wayland + opengl in DISTRO_FEATURES; weston in image).
 EDGE_ENABLE_DISPLAY ?= "1"
 
-# Container userspace. Kernel-side cgroup / overlay / netns support is
-# already on via kernel fragments; this toggle gates the userspace runtime.
-EDGE_ENABLE_CONTAINERS ?= "0"
+# Container userspace. Baseline for every image tier and every machine: the
+# accelerator runtimes ship Quadlet units, and a device that cannot run them
+# has the inference path present but dead. Kernel-side cgroup / overlay /
+# netns support is already on via kernel fragments; this gates the userspace
+# runtime and its principal.
+#
+# Left as a toggle rather than hardcoded so a product image that genuinely
+# runs no containers can drop the whole packagegroup, but 1 is the default
+# and prod is not an exception -- see ADR-0012.
+EDGE_ENABLE_CONTAINERS ?= "1"
 
-# DRP-AI accelerator stack (RZ/V2L only). Gates packagegroup-edge-ai: the
-# drpai kernel driver + u-dma-buf. Kernel-side CMA/DMABUF is already on via
-# ai-compute.cfg; the drpai DT node + reserved memory come from the BSP.
-EDGE_ENABLE_AI ?= "0"
+# Accelerator selection. Single-valued on purpose: one populated accelerator
+# per image is what the platform builds, and widening a single value to a list
+# later is a smaller change than un-picking a list nobody validated.
+#
+#   EDGE_ACCEL            what this image is built for; set by kas/accel/<name>.yml
+#   EDGE_ACCEL_SUPPORTED  what THIS machine can carry; set by the board include
+#
+# The pair is checked in edge-image.bbclass: an unsupported combination is a
+# parse error naming both values, never a quietly accelerator-less image.
+EDGE_ACCEL           ?= "none"
+EDGE_ACCEL_SUPPORTED ?= ""
+
+# Supplementary groups the accelerator's runtime principal needs. Applied at
+# image assembly by edge-users.inc, not by a recipe useradd: the groups are
+# created by other recipes and a recipe-level --groups races their creation.
+EDGE_ACCEL_SUPPLEMENTARY_GROUPS ?= ""
+
+# Derived, read-only compatibility alias for EDGE_ACCEL. Retained so
+# scripts/dev/edge-smoke-test.sh and the docs keep their meaning; deliberately
+# not writable, because two sources of truth for "is the accelerator on" is
+# how the machine-unscoped injection defect arose in the first place. Removed
+# from BB_ENV_PASSTHROUGH_ADDITIONS below for the same reason -- a shell
+# override would silently re-introduce the second source.
+EDGE_ENABLE_AI = "${@'0' if (d.getVar('EDGE_ACCEL') or 'none') == 'none' else '1'}"
 
 # OP-TEE normal-world userspace. On by default for boards that wire BL32 — the
 # secure world is unreachable from Linux without the client stack — but a build
@@ -96,7 +123,7 @@ EDGE_RAUC_BUNDLE_FORMAT ?= "${@bb.utils.contains('EDGE_ENABLE_RAUC_BUNDLE_ENCRYP
 # ----- Passthrough so operators can flip from the environment --------------
 
 BB_ENV_PASSTHROUGH_ADDITIONS .= " EDGE_PROFILE EDGE_OTA_BACKEND"
-BB_ENV_PASSTHROUGH_ADDITIONS .= " EDGE_ENABLE_DISPLAY EDGE_ENABLE_CONTAINERS EDGE_ENABLE_OBSERVABILITY EDGE_ENABLE_AI"
+BB_ENV_PASSTHROUGH_ADDITIONS .= " EDGE_ENABLE_DISPLAY EDGE_ENABLE_CONTAINERS EDGE_ENABLE_OBSERVABILITY EDGE_ACCEL"
 BB_ENV_PASSTHROUGH_ADDITIONS .= " EDGE_DEV_NETBOOT EDGE_DEV_DBG_PKGS EDGE_KERNEL_DEV_FRAGMENTS EDGE_ENABLE_JTAG_DEBUG EDGE_ENABLE_BTF_CORE_DEV"
 
 # RAUC / OTA knobs — declared in their respective recipes (rauc-conf-edge,
