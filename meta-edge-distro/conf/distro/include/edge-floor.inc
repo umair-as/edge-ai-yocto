@@ -134,13 +134,31 @@ RM_WORK_EXCLUDE += "edge-image-base edge-image-dev edge-image-prod"
 # currently edge-profile-dev.inc.
 LICENSE_FLAGS_ACCEPTED ?= ""
 
+# ----- Container runtime (baseline; see ADR-0012) -------------------------
+
+# virtualization gates meta-virtualization's own recipes. Distro scope, not a
+# capability fragment: every tier and every machine ships the runtime.
+DISTRO_FEATURES:append = " virtualization"
+
+# Runtime picks. crun over runc (C, smaller, faster start); netavark +
+# aardvark-dns are podman's current network stack. PODMAN_FEATURES cleared:
+# the defaults pull docker-compat and rootlesskit that this platform's
+# rootless-with-Quadlets model does not use.
+VIRTUAL-RUNTIME_container_runtime    ?= "crun"
+VIRTUAL-RUNTIME_container_networking ?= "netavark"
+VIRTUAL-RUNTIME_container_dns        ?= "aardvark-dns"
+PODMAN_FEATURES:pn-podman            ?= ""
+
 # ----- SBOM (SPDX 3.0) + CVE check ---------------------------------------
 
 # Non-negotiable: every edge-ai build emits an SBOM and runs the CVE check.
-# The sbom-cve-check fragment defaults the two CVE-DB fetch recipes to
-# AUTOREV; pin back to the .bb-shipped SRCREVs so the CVE DB is part of
-# the release record, not silent network-driven drift. Bump these with
-# the wrynose pin in kas/base.yml.
+# The sbom-cve-check fragment sets the two CVE-DB fetch recipes to AUTOREV
+# (conf/fragments/yocto/sbom-cve-check.conf); pin them so the CVE DB is part
+# of the release record rather than silent network-driven drift. These are
+# deliberately chosen revisions, not the .bb-shipped ones — the .bb values
+# trail the fragment. A pinned DB reports no CVE published after its date,
+# so the pin date is a security input: bump it deliberately and record the
+# date, do not let it age silently.
 #
 # IMAGE_CLASSES:append wires sbom-cve-check.bbclass directly. The
 # fragment's same line via OE_FRAGMENTS is unreliable in this wrynose
@@ -151,10 +169,30 @@ LICENSE_FLAGS_ACCEPTED ?= ""
 INHERIT       += "create-spdx"
 OE_FRAGMENTS  += "yocto/sbom-cve-check"
 IMAGE_CLASSES:append = " sbom-cve-check"
-# nvd-json-data-feeds @ 2026-06-16
-SRCREV:pn-sbom-cve-check-update-nvd-native     = "b9056dbe8175514b36ed1720cd223fc73aa1796c"
-# cvelistV5 @ 2026-06-16
-SRCREV:pn-sbom-cve-check-update-cvelist-native = "d34c26123e45e877be017cf361b64edc0eefc4b6"
+# nvd-json-data-feeds @ 2026-08-31
+SRCREV:pn-sbom-cve-check-update-nvd-native     = "16379bcc8b21d112542cc1946037cbe670aa4ae1"
+# cvelistV5 @ 2026-08-31
+SRCREV:pn-sbom-cve-check-update-cvelist-native = "690942529c4953e38803aa62215bd0519350919b"
+
+# Shallow-clone the two CVE databases. They are append-only auto-generated
+# data repositories -- ~6.7 GB of packed history between them (nvd 4.1 GB /
+# ~12k commits, cvelist 2.6 GB / ~76k commits) -- and only the pinned
+# revision's JSON is ever read. Nothing in the build inspects their history.
+#
+# This does NOT speed up a fetch into an empty DL_DIR: bb/fetch2/git.py uses
+# a shallow tarball only when one is already present, and generates it after
+# the clone. The payoff is the generated gitshallow_*.tar.gz, which makes
+# every later cold fetch (a CI runner, a new host) small. Pair it with a
+# shared DL_DIR or SOURCE_MIRROR_URL or it buys nothing.
+#
+# Depth must be non-zero or the fetcher silently disables shallow
+# (bb/fetch2/git.py: shallow off when depth == 0 and no explicit revs).
+# Both pinned SHAs are non-tip; GitHub allows SHA-specific shallow fetches
+# for both repositories, verified before enabling this.
+BB_GIT_SHALLOW:pn-sbom-cve-check-update-nvd-native           = "1"
+BB_GIT_SHALLOW_DEPTH:pn-sbom-cve-check-update-nvd-native     = "1"
+BB_GIT_SHALLOW:pn-sbom-cve-check-update-cvelist-native       = "1"
+BB_GIT_SHALLOW_DEPTH:pn-sbom-cve-check-update-cvelist-native = "1"
 
 # sbom-cve-check fragment hard-codes the SPDX compiled-sources flag for
 # linux-yocto; apply to linux-renesas so kernel CVE
