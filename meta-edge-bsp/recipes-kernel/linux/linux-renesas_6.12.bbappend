@@ -16,19 +16,10 @@ LINUX_VERSION = "6.12.59-cip14"
 
 # Kernel customisations on linux-renesas 6.12 (CIP base + Renesas RZ
 # enablement, sourced from rz_linux-cip.git at the branch pinned above).
-# Wires kconfig fragments for crypto/RNG, RAUC verity, containers, AI compute.
-
-SRC_URI:append = " \
-    file://cfg/rauc-verity.cfg \
-    file://cfg/hwcrypto-hwrng.cfg \
-    file://cfg/dm-crypt.cfg \
-    file://cfg/containers-cgroups.cfg \
-    file://cfg/container-storage-net.cfg \
-    file://cfg/ai-compute.cfg \
-    file://cfg/security-hardening.cfg \
-    file://cfg/pstore-persist.cfg \
-    file://cfg/surface-trim.cfg \
-"
+# The machine-neutral fragment set and the resolved-.config assertion are
+# provider-neutral policy and live in the include; this file adds only
+# what is specific to this provider or this board.
+require ${THISDIR}/edge-kernel-policy.inc
 
 # Dev-only fragments. Tier defaults live in edge-profile-{dev,prod}.inc;
 # this fallback keeps them on for builds that do not use the edge-ai distro.
@@ -80,8 +71,14 @@ do_compile:append() {
 # The full downstream chain (signed verity table for /dev/mmcblk0pN,
 # slot-udev KERNEL=="mmcblk0pN", /dev/disk/by-rauc-slot/*) assumes
 # mmcblk0 = sdhi0 = boot SDHI; the patch makes that hold by construction.
+#
+# surface-trim.cfg trims arm64 defconfig support for hardware this SoC
+# does not integrate; its every entry reasons from RZ/V2L specifically
+# (no PCIe, hence no NVMe; cortex-a55 as the only perf event source;
+# RENESAS_USBHS as the only gadget consumer). Board content, not policy.
 SRC_URI:append:smarc-rzv2l = " \
     file://cfg/display-rzv2l.cfg \
+    file://cfg/surface-trim.cfg \
     file://patches/0001-arm64-dts-rzg2l-smarc-som-add-mmc-aliases.patch \
     file://patches/0001-arm64-dts-rzv2l-smarc-include-ov5645-csi-camera-inline.patch \
     file://patches/0002-arm64-dts-rzg2l-smarc-add-watchdog-channel-id-bindings.patch \
@@ -97,11 +94,6 @@ SRC_URI:append:smarc-rzv2l = " \
 # SRC_URI:append:smarc-rzv2l = " file://patches/0004-arm64-dts-rzg2l-smarc-som-align-qspi-fip-partition-to-0x20000.patch"
 
 KERNEL_FEATURES:append = ""
-
-# Publish linux.bin + linux_comp into DEPLOY_DIR_IMAGE. Wrynose split FIT
-# generation into two stages: this kernel recipe publishes raw artifacts,
-# edge-kernel-fit consumes them to assemble and sign the FIT.
-KERNEL_CLASSES:append = " kernel-fit-extra-artifacts"
 
 # EDGE_FIT_LOADADDRESS / EDGE_FIT_ENTRYPOINT are set at conf level (from
 # kas/machines/<board>.yml's local_conf_header) so both this recipe and
