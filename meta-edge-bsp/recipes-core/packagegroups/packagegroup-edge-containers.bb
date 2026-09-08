@@ -22,4 +22,5 @@ RDEPENDS:${PN} = " \
     catatonit \
     skopeo \
     edge-containers-config \
+    edge-ctr-user \
 "

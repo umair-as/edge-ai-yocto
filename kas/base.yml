@@ -19,12 +19,6 @@
 
 header:
   version: 19
-  includes:
-    # kas/kernel.yml is distro policy. CIP is the kernel base for every
-    # edge board (consumed via the linux-renesas recipe = rz_linux-cip,
-    # see docs/adr/0001-kernel-base.md). TF-A and U-Boot forks are board
-    # policy and live in kas/machines/<board>.yml.
-    - kas/kernel.yml
 
 distro: edge-ai
 
@@ -50,13 +44,21 @@ repos:
     url: https://github.com/renesas-rz/meta-renesas
     branch: scarthgap/rz
     commit: b396a94cc9c0a1e491c3a0426416cb8a1dfcb04f
+    # One exception to the in-layer rule above: a layer-root wic/ dir is
+    # off WKS_SEARCH_PATH and is a hard sanity failure on a fresh build
+    # dir (sanity.bbclass check_sanity_version_change). No bbappend can
+    # move a directory, so this one is a kas patch.
+    patches:
+      wic-layout:
+        repo: edge-ai-yocto
+        path: kas/patches/meta-renesas/0001-meta-rz-bsp-move-wic-wks-into-files-wic.patch
     layers:
       meta-rz-bsp:
       meta-rz-distro:
-    # Scarthgap→wrynose port handled entirely in-layer (no kas-patches
-    # on meta-renesas). LAYERSERIES_COMPAT amendment lives in
-    # local_conf_header below; the do_unpack S = "${WORKDIR}/git"
-    # rejection is fixed via per-recipe bbappends
+    # Scarthgap→wrynose port is handled in-layer wherever a bbappend can
+    # reach: LAYERSERIES_COMPAT amendment lives in local_conf_header
+    # below; the do_unpack S = "${WORKDIR}/git" rejection is fixed via
+    # per-recipe bbappends
     # (meta-edge-bsp/recipes-bsp/{u-boot,trusted-firmware-a}/
     # {u-boot_2024.07.bbappend,trusted-firmware-a_%.bbappend,
     # bptool-native.bbappend}); audio-init/v4l2-init are not in the
@@ -137,6 +139,17 @@ repos:
     url: https://git.yoctoproject.org/meta-selinux
     branch: wrynose
     commit: 1c3a699f363167571ab39fecb0fe6f56691a4e20
+    layers:
+      .:
+
+  # --- Container runtime -------------------------------------------------
+  # Baseline, not a capability: every tier and every machine ships the
+  # container userspace (ADR-0012). meta-virtualization LAYERDEPENDS on
+  # core + openembedded-layer (meta-oe), both already composed above.
+  meta-virtualization:
+    url: https://git.yoctoproject.org/meta-virtualization
+    branch: wrynose
+    commit: 781735b97ae5013cacabbecd38e6da6b510cf3fb
     layers:
       .:
 
