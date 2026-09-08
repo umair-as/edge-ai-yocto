@@ -32,7 +32,8 @@ bitbake <recipe> -c <task> -f
 | Error | Likely cause |
 |---|---|
 | `Nothing PROVIDES` | Missing `DEPENDS`, or the layer isn't in the kas composition |
-| `do_fetch failed` | Bad URI, no network, or wrong `SRCREV`. CVE-DB recipes are AUTOREV and need network on first fetch |
+| `do_fetch failed` | Bad URI, no network, or wrong `SRCREV`. CVE-DB recipes need network on first fetch; their effective revision is pinned in `edge-floor.inc`, not in the recipe |
+| `do_fetch failed` on a checksum | Upstream re-rolled the tarball. A checksum mismatch is a **hard stop** — unlike a fetch failure it does *not* fall back to `MIRRORS`. Verify against an independent mirror before touching any `SRC_URI[sha256sum]` |
 | `QA Issue: -dev contains` | Missing `RDEPENDS` or `FILES` entries |
 | `multiple providers` | Need `PREFERRED_PROVIDER` in distro/machine conf |
 | `do_patch failed` | Patch base doesn't match current `SRCREV` — regenerate, don't rebase hunks |
@@ -82,8 +83,17 @@ and `wayland`; we opt out of the others (see `conf/distro/edge.conf`).
   `create-spdx` inherit. The explicit inherit in `edge.conf` is for
   visibility, not for function.
 - The CVE-DB recipes (`sbom-cve-check-update-nvd-native`,
-  `sbom-cve-check-update-cvelist-native`) use AUTOREV. The build host
-  needs network at first fetch.
+  `sbom-cve-check-update-cvelist-native`) are set to AUTOREV **by the
+  fragment** (`conf/fragments/yocto/sbom-cve-check.conf`), not by their
+  `.bb` files, which carry their own older SRCREVs. **`edge-floor.inc`
+  pins both back to a dated revision** — that pin, not the fragment and not
+  the `.bb`, is what a build actually fetches. Change the CVE DB date
+  there. The build host needs network at first fetch, and the clone is
+  multi-GB on a cold `DL_DIR`.
+- **The CVE-DB pin date is a security input, not a reproducibility
+  detail.** A pinned database reports no CVE published after its date, so
+  an un-bumped pin silently narrows the scan window as it ages. Bump it
+  deliberately and record the date in the same commit.
 
 ## U-Boot config
 
