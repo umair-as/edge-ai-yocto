@@ -53,8 +53,8 @@ endif
 # === Capability fragments (opt-in via make flags) ===
 #
 #   make dev TPM=1         # add meta-secure-core TPM2 + IMA/EVM stack
-#   make dev VIRT=1        # add meta-virtualization (Podman/runc/crun)
-#   make dev AI=1          # add the DRP-AI inference stack (RZ/V2L)
+#   (container userspace is baseline; VIRT=1 is a retained no-op)
+#   make dev ACCEL=drpai-v2l  # select an accelerator (AI=1 is the old spelling)
 #   make dev SBOM_TUNE=1   # add SBOM/CVE per-build tuning knobs
 #   make dev JTAG=1        # KASLR off + kgdb + debug-safe (JTAG kernel labs)
 #   make dev BPF=1         # kernel BTF + bpftool (libbpf CO-RE labs; size-heavy)
@@ -70,11 +70,26 @@ CAPABILITY_YMLS :=
 ifeq ($(TPM),1)
   CAPABILITY_YMLS += kas/tpm.yml
 endif
+# VIRT=1 is a no-op: container userspace is baseline (ADR-0012). Kept so
+# documented invocations keep working; warns rather than silently ignoring.
 ifeq ($(VIRT),1)
-  CAPABILITY_YMLS += kas/virtualization.yml
+  $(warning note: VIRT=1 is a no-op; container userspace is baseline since ADR-0012)
 endif
+# ACCEL=<name> selects the accelerator; maps to kas/accel/<name>.yml. An
+# unknown name fails at parse in edge-image.bbclass naming the machine's
+# supported set, not with a "Nothing PROVIDES" further down.
+ifneq ($(ACCEL),)
+  CAPABILITY_YMLS += kas/accel/$(ACCEL).yml
+endif
+# AI=1 is the deprecated spelling of ACCEL=drpai-v2l. Kept working because it
+# is documented in the README and in shipped help text; warns once per run.
 ifeq ($(AI),1)
-  CAPABILITY_YMLS += kas/ai-drpai.yml
+  ifeq ($(ACCEL),)
+    CAPABILITY_YMLS += kas/accel/drpai-v2l.yml
+    $(warning note: AI=1 is deprecated; use ACCEL=drpai-v2l)
+  else
+    $(warning note: AI=1 ignored because ACCEL=$(ACCEL) is set)
+  endif
 endif
 ifeq ($(SBOM_TUNE),1)
   CAPABILITY_YMLS += kas/sbom-cve.yml
@@ -161,8 +176,9 @@ help:
 	@echo ""
 	@echo "Capability flags (composable; combine freely):"
 	@echo "  TPM=1                        + meta-secure-core (TPM2 + IMA/EVM userspace)"
-	@echo "  VIRT=1                       + meta-virtualization (Podman/runc/crun)"
-	@echo "  AI=1                         + DRP-AI inference stack (RZ/V2L; pair with VIRT=1)"
+	@echo "  VIRT=1                       no-op; containers are baseline (ADR-0012)"
+	@echo "  ACCEL=<name>                 select accelerator: kas/accel/<name>.yml (drpai-v2l)"
+	@echo "  AI=1                         deprecated spelling of ACCEL=drpai-v2l"
 	@echo "  SBOM_TUNE=1                  + kas/sbom-cve.yml tuning knobs"
 	@echo "  NETBOOT=1                    + U-Boot 'netboot' env macro (TFTP/NFS dev workflow)"
 	@echo "  JTAG=1                       + KASLR off, kgdb, debug-safe boot (JTAG kernel labs)"

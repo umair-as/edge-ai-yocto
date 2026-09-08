@@ -22,7 +22,18 @@ selinux_set_labels() {
     if [ -f ${IMAGE_ROOTFS}/${sysconfdir}/selinux/config ]; then
         pol_type=$(sed -n -e "s&^SELINUXTYPE[[:space:]]*=[[:space:]]*\([0-9A-Za-z_]\+\)&\1&p" \
             ${IMAGE_ROOTFS}/${sysconfdir}/selinux/config)
-        if ! setfiles -m -r ${IMAGE_ROOTFS} \
+        # setfiles validates contexts against the build host's loaded policy
+        # whenever one exists, so a host running SELinux rejects target types
+        # absent from its own policy (refpolicy's mdadm_runtime_t, l2tpd_runtime_t
+        # against Fedora's targeted policy) while a host without SELinux loaded
+        # skips validation entirely and passes. -c pins validation to the target
+        # policy, making the result independent of the build host.
+        pol_bin=$(ls ${IMAGE_ROOTFS}/${sysconfdir}/selinux/${pol_type}/policy/policy.* \
+            2>/dev/null | sort -V | tail -1)
+        if [ -z "$pol_bin" ]; then
+            bbfatal "No SELinux policy binary under ${sysconfdir}/selinux/${pol_type}/policy/"
+        fi
+        if ! setfiles -m -r ${IMAGE_ROOTFS} -c "$pol_bin" \
             ${IMAGE_ROOTFS}/${sysconfdir}/selinux/${pol_type}/contexts/files/file_contexts \
             ${IMAGE_ROOTFS}; then
             bbfatal "SELinux image-time labelling failed; dm-verity forbids first-boot relabelling"
@@ -92,19 +103,74 @@ CORE_IMAGE_EXTRA_INSTALL += "${@bb.utils.contains('EDGE_ENABLE_OBSERVABILITY', '
 # the toggle is flipped (current consumers: dev images that opt in).
 CORE_IMAGE_EXTRA_INSTALL += "${@bb.utils.contains('EDGE_ENABLE_CONTAINERS', '1', ' packagegroup-edge-containers', '', d)}"
 
-# DRP-AI accelerator stack (drpai + u-dma-buf). Default off; RZ/V2L only.
-CORE_IMAGE_EXTRA_INSTALL += "${@bb.utils.contains('EDGE_ENABLE_AI', '1', ' packagegroup-edge-ai', '', d)}"
+# Board contract + accelerator selection, both fail-closed.
+#
+# The board check exists because a missing conf/machine/include/edge-board-
+# ${MACHINE}.inc is otherwise completely silent (bitbake logs a failed soft
+# include at debug2), and the values it carries -- slot devices written into
+# the signed verity table, FIP offsets, FIT load addresses -- fail as a
+# green build producing an unbootable image rather than as an error.
+#
+# The accelerator check refuses a machine/accelerator pair the board does not
+# declare. Building without the accelerator is deliberately NOT the fallback:
+# an image that silently lacks its accelerator is the failure this prevents.
+python () {
+    if not d.getVar('EDGE_BOARD_INC'):
+        bb.fatal(
+            "No board data for MACHINE = '%s'.\n"
+            "  Expected: conf/machine/include/edge-board-%s.inc in a composed layer\n"
+            "  (meta-edge-bsp owns these). It sets the slot devices, the\n"
+            "  accelerator allowlist and the machine's extra image content.\n"
+            "  A missing board file is silent in bitbake, hence this check."
+            % (d.getVar('MACHINE'), d.getVar('MACHINE')))
 
-# OP-TEE normal-world userspace, toggled by EDGE_ENABLE_OPTEE (on by default;
-# the packagegroup's own contents are individually selectable). The packagegroup
-# declares COMPATIBLE_MACHINE on itself, but BitBake does NOT fail-soft on a
-# COMPATIBLE_MACHINE-incompatible dependency — a non-rzv2l image listing this
-# packagegroup would error at parse with "Nothing provides
-# packagegroup-edge-optee". Hence the machine-conditional append at the image
-# level, with the toggle applied inside it.
-CORE_IMAGE_EXTRA_INSTALL:append:smarc-rzv2l = "${@bb.utils.contains('EDGE_ENABLE_OPTEE', '1', ' packagegroup-edge-optee', '', d)}"
+    for entry in (d.getVar('EDGE_ACCEL_SUPPLEMENTARY_GROUPS') or '').split():
+        if ':' not in entry or not all(entry.split(':', 1)):
+            bb.fatal(
+                "EDGE_ACCEL_SUPPLEMENTARY_GROUPS entry '%s' is malformed.\n"
+                "  Expected \"group:user\" per entry, space separated."
+                % entry)
 
-# mtd-utils brings flashcp/flash_erase/nandwrite for the BL2/FIP SPI flash
-# partitions exposed by mtd0/mtd1. Needed for in-place FIP updates without
-# pulling the SD card.
-CORE_IMAGE_EXTRA_INSTALL:append:smarc-rzv2l = " mtd-utils"
+    accel = (d.getVar('EDGE_ACCEL') or 'none').strip()
+    if accel == 'none':
+        return
+    supported = (d.getVar('EDGE_ACCEL_SUPPORTED') or '').split()
+    if accel not in supported:
+        bb.fatal(
+            "EDGE_ACCEL = '%s' is not supported on MACHINE = '%s'.\n"
+            "  This machine declares EDGE_ACCEL_SUPPORTED = '%s'.\n"
+            "  Either compose the matching machine, or drop the\n"
+            "  kas/accel/%s.yml fragment from the composition.\n"
+            "  Building without the accelerator is NOT the fallback: an image\n"
+            "  that silently lacks its accelerator is the failure this refuses."
+            % (accel, d.getVar('MACHINE'), ' '.join(supported), accel))
+}
+
+# Accelerator packagegroup, named by derivation so a new vendor needs no edit
+# here. Empty when EDGE_ACCEL is "none".
+CORE_IMAGE_EXTRA_INSTALL += "${@'' if (d.getVar('EDGE_ACCEL') or 'none') == 'none' else ' packagegroup-edge-accel-' + d.getVar('EDGE_ACCEL')}"
+
+# Every kernel module in the image must carry a signature trailer. The image
+# is built with MODULE_SIG_FORCE, so an unsigned .ko is a module that silently
+# fails to load on the target rather than a build failure. Two signing paths
+# feed the image -- Kbuild's MODULE_SIG_ALL for modules routed through
+# modules_install, and edge-sign-kernel-module.inc for recipes that hand-install
+# their .ko -- and neither proves the *image* is wholly signed. This does.
+ROOTFS_POSTPROCESS_COMMAND += "edge_check_modules_signed;"
+
+edge_check_modules_signed() {
+    unsigned=""
+    for ko in $(find ${IMAGE_ROOTFS}/lib/modules -name '*.ko' 2>/dev/null); do
+        if ! tail -c 40 "$ko" | grep -qa "Module signature appended"; then
+            unsigned="$unsigned $ko"
+        fi
+    done
+    if [ -n "$unsigned" ]; then
+        bbfatal "Unsigned kernel module(s) in the image; MODULE_SIG_FORCE would
+ reject these at load time:$unsigned"
+    fi
+}
+
+# Machine-specific image content, supplied by the board include. A distro
+# class must not name a board; the board names what it needs.
+CORE_IMAGE_EXTRA_INSTALL += " ${EDGE_MACHINE_EXTRA_INSTALL}"
