@@ -29,8 +29,8 @@
 #
 # No BBMASK workaround needed: edge does not load meta-security, so the
 # duplicate-tpm2-provider conflict (meta-security/meta-tpm vs
-# meta-secure-core/meta-tpm2) cannot arise. See the security-harvest
-# session for any future meta-security reintroduction policy.
+# meta-secure-core/meta-tpm2) cannot arise. Reintroducing meta-security
+# would require picking one provider.
 
 header:
   version: 19

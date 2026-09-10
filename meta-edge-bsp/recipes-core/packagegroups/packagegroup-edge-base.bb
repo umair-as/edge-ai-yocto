@@ -26,6 +26,5 @@ RDEPENDS:${PN} = " \
     packagegroup-edge-security \
     systemd-networkd \
     edge-network-units \
-    virtual-ota-uboot-env \
-    u-boot-fw-utils \
+    packagegroup-edge-containers \
 "

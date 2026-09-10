@@ -15,13 +15,17 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda
 # edge-ota-mender.inc. See ADR-0005.
 RPROVIDES:${PN} = "virtual-ota-uboot-env"
 
-inherit allarch systemd
+# Installs the board's raw env offsets and slot root devices, so the output is
+# machine-specific.
+PACKAGE_ARCH = "${MACHINE_ARCH}"
+
+inherit systemd
 
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
 SRC_URI = " \
-    file://fw_env.config \
-    file://rauc-uboot-env.defaults \
+    file://fw_env.config.in \
+    file://rauc-uboot-env.defaults.in \
     file://rauc-uboot-env-init.service \
     file://rauc-uboot-env-init.sh \
 "
@@ -38,8 +42,41 @@ RDEPENDS:${PN} = "u-boot-fw-utils bash"
 SYSTEMD_SERVICE:${PN} = "rauc-uboot-env-init.service"
 SYSTEMD_AUTO_ENABLE   = "enable"
 
+do_install[vardeps] += "EDGE_UBOOT_ENV_DEVICE EDGE_UBOOT_ENV_OFFSET \
+    EDGE_UBOOT_ENV_OFFSET_REDUND EDGE_UBOOT_ENV_SIZE EDGE_SLOT_A_DEVICE \
+    EDGE_SLOT_B_DEVICE"
+
 do_install() {
     install -d ${D}${sysconfdir}
+    # Board facts. Empty here means the board include did not declare its raw
+    # U-Boot env area, and a wrong or absent offset is invisible at boot:
+    # the device comes up, RAUC writes its boot-count to nothing, and the
+    # A/B state machine silently stops persisting.
+    [ -n "${EDGE_UBOOT_ENV_DEVICE}" ]        || bbfatal "EDGE_UBOOT_ENV_DEVICE is empty; set it in conf/machine/include/edge-board-${MACHINE}.inc"
+    [ -n "${EDGE_UBOOT_ENV_OFFSET}" ]        || bbfatal "EDGE_UBOOT_ENV_OFFSET is empty; set it in conf/machine/include/edge-board-${MACHINE}.inc"
+    [ -n "${EDGE_UBOOT_ENV_OFFSET_REDUND}" ] || bbfatal "EDGE_UBOOT_ENV_OFFSET_REDUND is empty; set it in conf/machine/include/edge-board-${MACHINE}.inc"
+    [ -n "${EDGE_UBOOT_ENV_SIZE}" ]          || bbfatal "EDGE_UBOOT_ENV_SIZE is empty; set it in conf/machine/include/edge-board-${MACHINE}.inc"
+    [ -n "${EDGE_SLOT_A_DEVICE}" ]           || bbfatal "EDGE_SLOT_A_DEVICE is empty; set it in conf/machine/include/edge-board-${MACHINE}.inc"
+    [ -n "${EDGE_SLOT_B_DEVICE}" ]           || bbfatal "EDGE_SLOT_B_DEVICE is empty; set it in conf/machine/include/edge-board-${MACHINE}.inc"
+
+    sed -e 's|@EDGE_UBOOT_ENV_DEVICE@|${EDGE_UBOOT_ENV_DEVICE}|g' \
+        -e 's|@EDGE_UBOOT_ENV_OFFSET@|${EDGE_UBOOT_ENV_OFFSET}|g' \
+        -e 's|@EDGE_UBOOT_ENV_OFFSET_REDUND@|${EDGE_UBOOT_ENV_OFFSET_REDUND}|g' \
+        -e 's|@EDGE_UBOOT_ENV_SIZE@|${EDGE_UBOOT_ENV_SIZE}|g' \
+        ${UNPACKDIR}/fw_env.config.in > ${UNPACKDIR}/fw_env.config
+
+    # Expanded once; both /etc/rauc-uboot-env.defaults and
+    # /etc/u-boot-initial-env are installed from this same file.
+    sed -e 's|@EDGE_SLOT_A_DEVICE@|${EDGE_SLOT_A_DEVICE}|g' \
+        -e 's|@EDGE_SLOT_B_DEVICE@|${EDGE_SLOT_B_DEVICE}|g' \
+        ${UNPACKDIR}/rauc-uboot-env.defaults.in > ${UNPACKDIR}/rauc-uboot-env.defaults
+
+    for f in ${UNPACKDIR}/fw_env.config ${UNPACKDIR}/rauc-uboot-env.defaults; do
+        if grep -q '@[A-Z_]*@' "$f"; then
+            bbfatal "Unexpanded @TOKEN@ left in $(basename $f)"
+        fi
+    done
+
     install -m 0644 ${UNPACKDIR}/fw_env.config           ${D}${sysconfdir}/fw_env.config
     install -m 0644 ${UNPACKDIR}/rauc-uboot-env.defaults ${D}${sysconfdir}/rauc-uboot-env.defaults
 

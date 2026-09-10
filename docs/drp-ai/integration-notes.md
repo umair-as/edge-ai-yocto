@@ -86,10 +86,16 @@ lingering user, not just the AI principal:
 
 The fix is one ordering directive: logind ordered **`After=var-lib-systemd.mount`**, so
 the markers are present when it scans. With that, the principal's user manager comes up
-at boot on its own, its Quadlet generates, and the inference runs — no human in the
-loop.
+at boot on its own and its Quadlet generates — no human in the loop.
 
-That closes the **fresh-flash** case. It does **not** yet close the **post-OTA** case:
+That gets the lingering user manager and its Quadlet running at boot on a fresh
+flash; it does not by itself get the container running there — a freshly flashed
+image separately shipped no `/etc/subuid`/`/etc/subgid` and no writable `podman
+pull` scratch directory, so the rootless unpack still failed even with the
+manager up. Both are fixed in the same change as this doc; see
+[Status & roadmap](README.md#status--roadmap) for that fix and its pending
+on-target re-validation. Independent of the container-unpack gap, the ordering
+fix above does **not** yet close the **post-OTA** case:
 after a RAUC slot switch, logind's linger enumeration fails on a `default_t`-labeled
 `/var/lib/systemd` (a `User enumeration failed` log plus an SELinux AVC), so `user@608`
 never starts and the Quadlet does not auto-run until the tree is relabelled. The ordering

@@ -5,22 +5,23 @@
 # faster disk and tune parallelism without editing the tracked KAS
 # composition.
 #
-# Image-agnostic: composes base + machine, NOT an image overlay. The
+# HOST OVERLAY ONLY. This file must NOT compose base or machine and must NOT
+# carry an `includes:` block: the Makefile composes
+# kas/base.yml:kas/machines/$(BOARD).yml:kas/local.yml, with this file last so
+# its local_conf_header wins. A host file that pulls in a machine would make a
+# gitignored, per-operator file decide which board is built, and BOARD= would
+# silently do nothing. Put only host facts here -- cache paths, parallelism,
+# credentials, cert dirs.
+#
+# Image-agnostic: NOT an image overlay. The
 # Makefile (or a manual `kas shell -c 'bitbake <target>'`) picks the
 # image at build time. Capability fragments (kas/tpm.yml,
-# kas/virtualization.yml, kas/sbom-cve.yml) are added at invocation,
-# either via Makefile flags (TPM=1, VIRT=1, SBOM_TUNE=1) or by
+# kas/accel/<name>.yml, kas/sbom-cve.yml) are added at invocation,
+# either via Makefile flags (TPM=1, ACCEL=<name>, SBOM_TUNE=1) or by
 # composing them onto the kas command line.
 
 header:
   version: 19
-  includes:
-    # Default entry for greenfield setups: kas/edge-autofetch.yml is a
-    # self-contained autofetch wrapper that includes base + machine and
-    # sets a default bitbake target. SHA pins still live in kas/base.yml.
-    # See docs/adr/0002-layer-hosting.md.
-    - kas/edge-autofetch.yml
-
 local_conf_header:
   paths: |
     # Point downloads + sstate at a shared, fast location. Adjust the
@@ -48,8 +49,8 @@ local_conf_header:
     # or:
     #     mkpasswd --method=sha-512 'your-password'
     # — both emit a $6$-prefixed sha-512 crypt(3) hash. Paste the FULL
-    # output unchanged; the parse-time check catches truncation and
-    # alphabet violations, but cannot detect hand-edited digest bytes
+    # output unchanged; the guards catch truncation and alphabet
+    # violations, but cannot detect hand-edited digest bytes
     # (the hash will parse and the image will boot, but no password will
     # authenticate — login fails silently).
     #
@@ -60,9 +61,10 @@ local_conf_header:
     # The resulting /etc/shadow entry looks plausible but decodes to no
     # known password — login fails silently after boot.
     #
-    # The value below is an intentionally-invalid placeholder so the
-    # parse-time validator in edge-users.inc fails loudly until you
-    # generate and paste a real $6$-prefixed hash. Do not "fix" by
+    # The value below is an intentionally-invalid placeholder. The three
+    # guards live in edge-image.bbclass: fatal in a do_rootfs prefunc (no
+    # image is assembled without a managed hash) plus a warning when the
+    # image recipe is parsed. Replace it with a real $6$-prefixed hash. Do not "fix" by
     # making it parse; replace it with the output of `openssl passwd
     # -6 'your-password'` (with every `$` escaped as `\$`).
     EDGE_DEFAULT_PASSWORD_HASH = "REPLACE_ME_WITH_OUTPUT_OF_openssl_passwd_-6"
@@ -104,9 +106,9 @@ local_conf_header:
     # BUNDLE_IMAGE_NAME = "edge-image-prod"
     #
     # Build sequence after a code change:
-    #     make dev VIRT=1                  # builds image + bakes CA into rootfs
+    #     make dev                          # builds image + bakes CA into rootfs
     #     make bundle                       # signs + emits edge-image-*-bundle.raucb
-    #     scp build/tmp/deploy/images/smarc-rzv2l/*.raucb root@<device>:/tmp/
+    #     scp build/tmp/deploy/images/${MACHINE}/*.raucb root@<device>:/tmp/
     #     ssh root@<device> rauc install /tmp/*.raucb
     # First-time device flash needed once so /etc/rauc/ca.cert.pem matches
     # the new CA; subsequent updates ride the OTA path.
@@ -189,10 +191,11 @@ local_conf_header:
 
   edge_toggles: |
     # Operator-facing customisation surface. Every EDGE_* knob below is
-    # declared with ?= in meta-edge-distro/conf/distro/include/edge-features.inc
-    # and added to BB_ENV_PASSTHROUGH_ADDITIONS, so you can also set them
-    # in the shell (export EDGE_ENABLE_DISPLAY=0; bitbake ...) instead of
-    # editing this file.
+    # declared with ?= in meta-edge-distro/conf/distro/include/edge-features.inc.
+    # Set them here, or pass the corresponding make flag. A bare shell
+    # export does NOT work: bitbake filters the inherited environment at
+    # startup, so only the variables the Makefile puts on
+    # BB_ENV_PASSTHROUGH_ADDITIONS survive. See AGENTS.md §Build commands.
 
     # --- Tier profile -----------------------------------------------------
     # "prod" — locked-down image (package-management removed, observability
@@ -213,13 +216,6 @@ local_conf_header:
     # 1 (default) — wayland + opengl in DISTRO_FEATURES; weston in image.
     # 0           — headless. Drops wayland/opengl/weston wholesale.
     # EDGE_ENABLE_DISPLAY = "1"
-
-    # --- Container userspace ---------------------------------------------
-    # 0 (default) — kernel cgroup/overlay/netns support is on (kernel
-    #               fragments wire it), userspace runtime is not pulled.
-    # 1           — adds packagegroup-edge-containers to the image. (Recipe
-    #               lands when the runtime choice is committed.)
-    # EDGE_ENABLE_CONTAINERS = "0"
 
     # --- Observability ---------------------------------------------------
     # Profile-derived default: prod=0, dev=1. Override explicitly for a

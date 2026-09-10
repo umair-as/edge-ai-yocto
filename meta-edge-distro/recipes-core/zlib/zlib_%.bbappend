@@ -9,4 +9,10 @@ SRC_URI += "file://CVE-2026-85091.patch"
 # same PR fixes the upstream report the CVE was raised from (issue #1256).
 # No fixed release exists yet — upstream's newest tag is v1.3.2, which is
 # the affected version — so this is carried until a release includes it.
-CVE_STATUS[CVE-2026-85091] = "fix-file-included: carried madler/zlib PR #1281 commit bf3364d56678ae12892168d1ee22ac4e13ef80a3; no upstream release carries the fix yet"
+#
+# No CVE_STATUS here on purpose. The patch header carries `CVE: CVE-2026-85091`
+# and cve-check derives the patched status from that. An explicit CVE_STATUS
+# overrides the automatic detection, which means the shipped SBOM would report
+# our assertion instead of the evidence: if the patch were ever dropped from
+# SRC_URI, the override would keep claiming the CVE is fixed. Deriving it from
+# the patch fails in the safe direction -- the CVE reappears as Unpatched.

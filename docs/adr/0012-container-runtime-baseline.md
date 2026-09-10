@@ -27,7 +27,8 @@ something the platform's own components depend on.
 ## Decision
 
 **1. Container userspace is baseline for every image tier and every
-machine.** `EDGE_ENABLE_CONTAINERS` defaults to `1`.
+machine.** `edge-image.bbclass` installs `packagegroup-edge-containers`
+unconditionally. There is no flag.
 
 **2. `meta-virtualization` is a base layer**, composed from `kas/base.yml`
 alongside the other upstream layers, not from a capability fragment.
@@ -45,9 +46,14 @@ accelerator.** `edge-ctr-user` moves to `packagegroup-edge-containers`. It
 was previously installed by the DRP-AI packagegroup, which made a
 distro-level identity an artifact of one accelerator on one board.
 
-**6. `EDGE_ENABLE_CONTAINERS` stays a toggle.** A product image that
-genuinely runs no containers can still drop the packagegroup; the change
-is to the default, not to the mechanism.
+**6. There is no off-switch, and that is the point.** An earlier draft of
+this ADR kept `EDGE_ENABLE_CONTAINERS` as a toggle defaulting to `1`,
+changing the default but not the mechanism. That reintroduces the exact
+defect the ADR exists to remove: a platform dependency expressed as an
+operator-selected flag is a dependency that will eventually not be
+selected, and the resulting image fails on hardware rather than at build
+time. The variable is deleted, not defaulted. `VIRT=1` is retained as a
+warned no-op so existing invocations keep working.
 
 ## Rationale
 

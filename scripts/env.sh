@@ -24,7 +24,15 @@ export KAS_REPO_REF_DIR="${KAS_REPO_REF_DIR:-/mnt/yocto-nvme/layers-wrynose}"
 # Build dir at the traditional repo-root location. Without this, kas
 # defaults to ${KAS_WORK_DIR}/build (= .kas/build), which doesn't match
 # the universal Yocto convention.
-export KAS_BUILD_DIR="${KAS_BUILD_DIR:-${_EDGE_REPO_ROOT}/build}"
+# Mirror the Makefile's resolution exactly, or a standalone `kas shell` writes
+# to a different tree than `make` does for the same board. A pre-existing
+# single-dir build/ keeps being used (Yocto's TMPDIR is not relocatable);
+# otherwise the tree is per-board.
+if [ -d "${_EDGE_REPO_ROOT}/build/conf" ]; then
+    export KAS_BUILD_DIR="${KAS_BUILD_DIR:-${_EDGE_REPO_ROOT}/build}"
+else
+    export KAS_BUILD_DIR="${KAS_BUILD_DIR:-${_EDGE_REPO_ROOT}/build/${BOARD:-rzv2l}}"
+fi
 
 # kas refuses to start if KAS_WORK_DIR doesn't exist (kas/context.py:
 # os.path.abspath but no mkdir). Makefile creates it as an order-only

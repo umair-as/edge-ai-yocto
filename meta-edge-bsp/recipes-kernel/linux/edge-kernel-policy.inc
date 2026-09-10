@@ -48,7 +48,7 @@ python do_edge_kernel_policy_assert() {
         'CONFIG_DM_VERITY_VERIFY_ROOTHASH_SIG=y',
         'CONFIG_SECURITY_SELINUX=y',
         'CONFIG_SECURITY_LOCKDOWN_LSM=y',
-        'CONFIG_LSM="lockdown,yama,bpf,landlock,selinux"',
+        'CONFIG_LSM="lockdown,yama,landlock,selinux,bpf"',
     ]
     required += (d.getVar('EDGE_KERNEL_POLICY_EXTRA_CONFIG') or '').split()
 

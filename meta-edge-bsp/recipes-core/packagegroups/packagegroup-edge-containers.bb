@@ -21,6 +21,7 @@ RDEPENDS:${PN} = " \
     slirp4netns \
     catatonit \
     skopeo \
+    shadow-uidmap \
     edge-containers-config \
     edge-ctr-user \
 "

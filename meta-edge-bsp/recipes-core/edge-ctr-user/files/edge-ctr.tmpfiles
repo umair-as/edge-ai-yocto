@@ -3,6 +3,19 @@
 # by the static uid/gid 608.
 d /data/edge-ctr 0700 608 608 -
 
+# Pre-create the podman image-copy scratch dir. containers.conf sets
+# image_copy_tmp_dir = "storage" (edge-containers-config), which resolves to
+# <graphroot>/tmp on /data (eMMC), not tmpfs — a large image layer would
+# exhaust the 1.3G RAM otherwise. podman creates the graphroot on first run but
+# not this tmp subdir, and podman's default (/var/tmp) sits on the read-only
+# verity rootfs and is unwritable. Without this dir a rootless pull fails
+# "creating a temporary directory: ... no such file or directory".
+d /data/edge-ctr/.local 0700 608 608 -
+d /data/edge-ctr/.local/share 0700 608 608 -
+d /data/edge-ctr/.local/share/containers 0700 608 608 -
+d /data/edge-ctr/.local/share/containers/storage 0700 608 608 -
+d /data/edge-ctr/.local/share/containers/storage/tmp 0700 608 608 -
+
 # Linger enabled by design: the marker makes systemd-logind start edge-ctr's
 # user manager (and /run/user/608) at boot with no login session — fixes the
 # rootless XDG_RUNTIME_DIR gap at its root. /var/lib/systemd binds to

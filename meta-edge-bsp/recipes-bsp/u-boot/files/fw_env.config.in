@@ -13,5 +13,5 @@
 # Also requires: FIP in SPI NOR built without "env default -a" in CONFIG_BOOTCOMMAND.
 #
 # device         offset     env-size
-/dev/mmcblk0     0x1F0000   0x20000
-/dev/mmcblk0     0x210000   0x20000
+@EDGE_UBOOT_ENV_DEVICE@     @EDGE_UBOOT_ENV_OFFSET@   @EDGE_UBOOT_ENV_SIZE@
+@EDGE_UBOOT_ENV_DEVICE@     @EDGE_UBOOT_ENV_OFFSET_REDUND@   @EDGE_UBOOT_ENV_SIZE@

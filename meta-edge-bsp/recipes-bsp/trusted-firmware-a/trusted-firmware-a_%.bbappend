@@ -19,14 +19,18 @@ COMPATIBLE_MACHINE = "(rzg2h-family|rzg2l-family)"
 
 SRC_URI:append = " \
     file://0001-rz-common-bl2-parse-optee-header-for-BL32.patch \
-    file://0002-bl2-add-build-tag-banner.patch \
+    file://0002-bl2-print-edge-boot-marker.patch \
 "
 
-# Deterministic build tag visible on serial immediately after BL2 platform
-# setup. Override EDGE_BUILD_PROFILE per-build to record provenance.
+# Serial-visible boot marker, emitted right after BL2 platform setup so the
+# image identity reaches the console before anything else can fail. Built only
+# from cacheable values -- no DATETIME -- so the bootloaders stay sstate-
+# reusable; the exact per-build id lives in /etc/buildinfo.
 EDGE_BUILD_PROFILE ?= "local"
-EDGE_BUILD_TAG     ?= "edge-${EDGE_BUILD_PROFILE}"
-EXTRA_OEMAKE:append = " CFLAGS=\"-DBUILD_TAG=\\\"${EDGE_BUILD_TAG}\\\"\""
+EDGE_BOOT_VERSION  ?= "${DISTRO_VERSION}"
+EDGE_BOOT_PROFILE  ?= "${EDGE_PROFILE}"
+EDGE_BOOT_MACHINE  ?= "${MACHINE}"
+EXTRA_OEMAKE:append = " CFLAGS='-DEDGE_BOOT_VERSION=\"${EDGE_BOOT_VERSION}\" -DEDGE_BOOT_PROFILE=\"${EDGE_BOOT_PROFILE}\" -DEDGE_BOOT_MACHINE=\"${EDGE_BOOT_MACHINE}\"'"
 
 # OP-TEE as BL32. The TF-A FIP packs the OP-TEE Trusted OS via the SPD
 # (Secure Payload Dispatcher). meta-arm consumes TFA_SPD; BL32 path is

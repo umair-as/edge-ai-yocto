@@ -99,22 +99,101 @@ CORE_IMAGE_EXTRA_INSTALL += " packagegroup-edge-base"
 # EDGE_ENABLE_OBSERVABILITY (profile-keyed default: prod=0, dev=1).
 CORE_IMAGE_EXTRA_INSTALL += "${@bb.utils.contains('EDGE_ENABLE_OBSERVABILITY', '1', ' packagegroup-edge-observability', '', d)}"
 
-# Container userspace runtime. Default off; recipe to be added when
-# the toggle is flipped (current consumers: dev images that opt in).
-CORE_IMAGE_EXTRA_INSTALL += "${@bb.utils.contains('EDGE_ENABLE_CONTAINERS', '1', ' packagegroup-edge-containers', '', d)}"
+# Container userspace is NOT installed here. It is an unconditional RDEPENDS
+# of packagegroup-edge-base (installed above), so anything pulling the base
+# packagegroup gets the container runtime whether or not it came through this
+# class. One source, no second place to forget. See ADR-0012.
 
-# Board contract + accelerator selection, both fail-closed.
+# EDGE_DEFAULT_PASSWORD_HASH validation. Three guards, one is not enough --
+# past incidents proved each layer:
+#  1. presence: empty / unset.
+#  2. shell-escape: every `$` MUST be backslash-prefixed (`\$`).
+#     extrausers.bbclass interpolates EXTRA_USERS_PARAMS into a shell
+#     `var="…"` assignment; unescaped `$6$rounds=…$qO5…$Di…` has every `$X`
+#     token expanded as a shell var ref and silently deleted. The /etc/shadow
+#     entry parses but decodes to nothing.
+#  3. format-shape: after the backslashes are conceptually stripped, the value
+#     must match the sha512crypt grammar. This cannot catch "valid format but
+#     wrong digest bytes" -- that stays the operator's discipline -- but every
+#     other class of corruption is caught.
 #
+# Enforced as a do_rootfs prefunc rather than at parse. The guard's purpose is
+# that a default-credential image must not leave CI, and a prefunc delivers
+# exactly that: no rootfs is assembled without a managed hash. Enforcing it at
+# parse instead put a distro-scope bb.fatal in front of every recipe in the
+# tree, so the repo could not be parsed at all without an operator's private
+# kas/local.yml. The parse-time hook below warns so a missing hash is still
+# reported immediately, not hours later at do_rootfs.
+def edge_password_hash_problem(d):
+    import re
+    h = d.getVar('EDGE_DEFAULT_PASSWORD_HASH')
+    if not h:
+        return (
+            "EDGE_DEFAULT_PASSWORD_HASH is unset.\n"
+            "  Set it in kas/local.yml (operator-private; gitignored). See\n"
+            "  kas/local.yml.example for the template. Generate a hash with:\n"
+            "    openssl passwd -6 'your-password'\n"
+            "  Building an image without a managed password hash would leave\n"
+            "  default credentials in the artefact — refusing."
+        )
+    if re.search(r'(?<!\\)\$', h):
+        return (
+            "EDGE_DEFAULT_PASSWORD_HASH contains an unescaped '$' character.\n"
+            "  Got: %s\n"
+            "  Every '$' in the hash MUST be written as '\\$' so the shell\n"
+            "  doesn't expand it as a variable reference during image\n"
+            "  assembly. Example of CORRECT form:\n"
+            "    \\$6\\$rounds=656000\\$<salt>\\$<digest>\n"
+            "  See edge-users.inc for the full explanation." % h
+        )
+    stripped = h.replace('\\$', '$')
+    if not re.match(r'^\$6\$(rounds=\d+\$)?[A-Za-z0-9./]{1,16}\$[A-Za-z0-9./]{86}$', stripped):
+        return (
+            "EDGE_DEFAULT_PASSWORD_HASH is not a valid sha512crypt digest.\n"
+            "  Expected: \\$6\\$[rounds=N\\$]<salt 1-16>\\$<digest 86>\n"
+            "  Got:      %s\n"
+            "  Common mistakes:\n"
+            "    - hand-edited digest bytes from a placeholder (superficially\n"
+            "      looks valid, doesn't decode to any password — login fails\n"
+            "      silently after boot)\n"
+            "    - truncated digest segment (must be exactly 86 chars)\n"
+            "    - characters outside the crypt(3) alphabet [A-Za-z0-9./]\n"
+            "  Regenerate with:\n"
+            "    openssl passwd -6 'your-password'\n"
+            "  and paste the output with every '$' replaced by '\\$'." % h
+        )
+    return None
+
+python edge_check_password_hash() {
+    problem = edge_password_hash_problem(d)
+    if problem:
+        bb.fatal(problem)
+}
+do_rootfs[prefuncs] += "edge_check_password_hash"
+edge_check_password_hash[vardeps] += "EDGE_DEFAULT_PASSWORD_HASH"
+
 # The board check exists because a missing conf/machine/include/edge-board-
 # ${MACHINE}.inc is otherwise completely silent (bitbake logs a failed soft
 # include at debug2), and the values it carries -- slot devices written into
 # the signed verity table, FIP offsets, FIT load addresses -- fail as a
 # green build producing an unbootable image rather than as an error.
 #
+# Board contract + accelerator selection, both fail-closed.
+#
 # The accelerator check refuses a machine/accelerator pair the board does not
 # declare. Building without the accelerator is deliberately NOT the fallback:
 # an image that silently lacks its accelerator is the failure this prevents.
 python () {
+    # Reported here so a missing or malformed hash is visible at parse rather
+    # than only when do_rootfs is reached. Warn, not fatal: this class is
+    # parsed for the image recipes during a whole-tree `bitbake -p`, and a
+    # fatal here would make the repo unparseable without a private local.yml
+    # again. edge_check_password_hash is the enforcing copy.
+    problem = edge_password_hash_problem(d)
+    if problem:
+        bb.warn("%s\n  This is fatal at do_rootfs; the image will not build."
+                % problem)
+
     if not d.getVar('EDGE_BOARD_INC'):
         bb.fatal(
             "No board data for MACHINE = '%s'.\n"
@@ -131,9 +210,56 @@ python () {
                 "  Expected \"group:user\" per entry, space separated."
                 % entry)
 
+    # Boot-chain family. Only one is implemented; a board from another
+    # family (UEFI/extlinux, Jetson-class) must fail here naming the gap
+    # rather than build an image whose verity table is anchored to nothing.
+    EDGE_BOOT_CHAINS_IMPLEMENTED = ("uboot-fit",)
+    chain = (d.getVar('EDGE_BOOT_CHAIN') or '').strip()
+    if not chain:
+        bb.fatal(
+            "EDGE_BOOT_CHAIN is unset for MACHINE = '%s'.\n"
+            "  Set it in conf/machine/include/edge-board-%s.inc.\n"
+            "  Implemented: %s"
+            % (d.getVar('MACHINE'), d.getVar('MACHINE'),
+               ' '.join(EDGE_BOOT_CHAINS_IMPLEMENTED)))
+    if chain not in EDGE_BOOT_CHAINS_IMPLEMENTED:
+        bb.fatal(
+            "EDGE_BOOT_CHAIN = '%s' is not implemented (MACHINE = '%s').\n"
+            "  Implemented: %s\n"
+            "  The boot, signing and OTA-env recipes assume the U-Boot/FIT\n"
+            "  family; another family needs its own trust anchor and\n"
+            "  boot-count store, not a fallback."
+            % (chain, d.getVar('MACHINE'),
+               ' '.join(EDGE_BOOT_CHAINS_IMPLEMENTED)))
+
     accel = (d.getVar('EDGE_ACCEL') or 'none').strip()
     if accel == 'none':
-        return
+        # An accelerator-less image is not a supported product configuration:
+        # every board this distro targets carries an accelerator (DRP-AI in
+        # the RZ/V2L SoC, DX-M1 on PCIe for the RPi5), and an edge-ai image
+        # that cannot run inference has no purpose. This used to return
+        # quietly, which made "no accelerator" the silent default whenever a
+        # composition forgot the fragment.
+        if d.getVar('EDGE_ALLOW_NO_ACCEL') == '1':
+            bb.warn(
+                "Building MACHINE = '%s' with NO accelerator because "
+                "EDGE_ALLOW_NO_ACCEL = '1'.\n"
+                "  This is a bring-up composition only -- board boot before "
+                "its accelerator is integrated.\n"
+                "  The resulting image cannot run inference and must not be "
+                "treated as a product image."
+                % d.getVar('MACHINE'))
+            return
+        bb.fatal(
+            "No accelerator composed for MACHINE = '%s'.\n"
+            "  EDGE_ACCEL is unset. The machine fragment composes its\n"
+            "  accelerator (kas/machines/<board>.yml -> kas/accel/<name>.yml);\n"
+            "  this machine declares EDGE_ACCEL_SUPPORTED = '%s'.\n"
+            "  An image without its accelerator is refused rather than built:\n"
+            "  inference is the point of the platform, not a feature of it.\n"
+            "  For board bring-up before the accelerator is integrated, set\n"
+            "  EDGE_ALLOW_NO_ACCEL = \"1\" explicitly and accept the warning."
+            % (d.getVar('MACHINE'), d.getVar('EDGE_ACCEL_SUPPORTED') or ''))
     supported = (d.getVar('EDGE_ACCEL_SUPPORTED') or '').split()
     if accel not in supported:
         bb.fatal(
@@ -147,7 +273,8 @@ python () {
 }
 
 # Accelerator packagegroup, named by derivation so a new vendor needs no edit
-# here. Empty when EDGE_ACCEL is "none".
+# here. Empty only in the EDGE_ALLOW_NO_ACCEL bring-up case, which the gate
+# above has already warned about; every other path has a real accelerator.
 CORE_IMAGE_EXTRA_INSTALL += "${@'' if (d.getVar('EDGE_ACCEL') or 'none') == 'none' else ' packagegroup-edge-accel-' + d.getVar('EDGE_ACCEL')}"
 
 # Every kernel module in the image must carry a signature trailer. The image
@@ -156,20 +283,60 @@ CORE_IMAGE_EXTRA_INSTALL += "${@'' if (d.getVar('EDGE_ACCEL') or 'none') == 'non
 # feed the image -- Kbuild's MODULE_SIG_ALL for modules routed through
 # modules_install, and edge-sign-kernel-module.inc for recipes that hand-install
 # their .ko -- and neither proves the *image* is wholly signed. This does.
+#
+# Scope: this establishes that a signature trailer is PRESENT on every module.
+# It does not verify the signature cryptographically and does not prove the
+# target's keyring trusts it; the trailer is appended text, and a module signed
+# by the wrong key carries one too. Key trust is established at kernel build
+# time via the module signing key, not here.
 ROOTFS_POSTPROCESS_COMMAND += "edge_check_modules_signed;"
 
 edge_check_modules_signed() {
+    # No /lib/modules at all means no kernel packages landed. Note it and move
+    # on -- there is nothing to verify. This is NOT the monolithic-kernel case:
+    # kernel-base ships modules.order and modules.builtin under
+    # /lib/modules/${KERNEL_VERSION} even when no module is built
+    # (kernel.bbclass FILES:${KERNEL_PACKAGE_NAME}-base), so a module-free image
+    # reaches the empty check below and fails there. That is intended: this
+    # platform builds with MODULE_SIG_FORCE and expects modules, so "no modules"
+    # is a composition error, not a valid image.
+    if [ ! -d ${IMAGE_ROOTFS}/lib/modules ]; then
+        bbnote "No /lib/modules in the image; no kernel packages to verify."
+        return
+    fi
+
+    # No $(( )) arithmetic anywhere in this function: bitbake parses shell
+    # functions with pysh, which raises NotImplementedError on arithmetic
+    # expansion. Collect the list and test it for emptiness instead of counting.
+    kos=$(find ${IMAGE_ROOTFS}/lib/modules \
+               -name '*.ko' -o -name '*.ko.gz' \
+               -o -name '*.ko.xz' -o -name '*.ko.zst' 2>/dev/null)
+
+    # /lib/modules exists but held no modules: the loop below would inspect
+    # nothing and report success. A gate that passes because it found no work is
+    # indistinguishable from one that passed on merit.
+    if [ -z "$kos" ]; then
+        bbfatal "Module-signature check found no modules under /lib/modules, which exists. Either the modules are packaged under a name this check does not match, or kernel-modules did not land in the image."
+    fi
+
     unsigned=""
-    for ko in $(find ${IMAGE_ROOTFS}/lib/modules -name '*.ko' 2>/dev/null); do
-        if ! tail -c 40 "$ko" | grep -qa "Module signature appended"; then
+    for ko in $kos; do
+        case "$ko" in
+            *.ko.gz)  dec="gzip -dc" ;;
+            *.ko.xz)  dec="xz -dc"   ;;
+            *.ko.zst) dec="zstd -dc" ;;
+            *)        dec="cat"      ;;
+        esac
+        if ! $dec "$ko" | tail -c 40 | grep -qa "Module signature appended"; then
             unsigned="$unsigned $ko"
         fi
     done
+
     if [ -n "$unsigned" ]; then
-        bbfatal "Unsigned kernel module(s) in the image; MODULE_SIG_FORCE would
- reject these at load time:$unsigned"
+        bbfatal "Unsigned kernel modules in the image; MODULE_SIG_FORCE would reject these at load time:$unsigned"
     fi
 }
+
 
 # Machine-specific image content, supplied by the board include. A distro
 # class must not name a board; the board names what it needs.

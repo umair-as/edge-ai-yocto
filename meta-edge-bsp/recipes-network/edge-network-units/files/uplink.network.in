@@ -1,5 +1,5 @@
 [Match]
-Name=eth1
+Name=@EDGE_UPLINK_IFACE@
 
 [Network]
 DHCP=yes

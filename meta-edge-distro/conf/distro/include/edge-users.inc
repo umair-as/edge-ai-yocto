@@ -18,71 +18,16 @@
 # or
 #   mkpasswd --method=sha-512 'your-password' # → $6$...
 
-# Fail at parse time if the operator forgot to set the hash, set a
-# malformed value, OR set an unescaped value that the shell will eat.
+# The three EDGE_DEFAULT_PASSWORD_HASH guards (presence, shell-escaping,
+# sha512crypt shape) are enforced in edge-image.bbclass, not here.
 #
-# Three guards (one is not enough — past incidents proved each layer):
-#  1. presence: empty / unset → fatal
-#  2. shell-escape: every `$` MUST be backslash-prefixed (`\$`).
-#     extrausers.bbclass interpolates EXTRA_USERS_PARAMS into a shell
-#     `var="…"` assignment; unescaped `$6$rounds=…$qO5…$Di…` has every
-#     `$X` token expanded as a shell var ref and silently deleted. The
-#     /etc/shadow entry parses but decodes to nothing. Catch this BEFORE
-#     it ships.
-#  3. format-shape: after the backslashes are conceptually stripped, the
-#     value must match the sha512crypt grammar. The shape check can't
-#     catch "valid format but wrong digest bytes" — that's still the
-#     operator's discipline (`openssl passwd -6` + paste the output
-#     unchanged), but every other class of corruption is caught here.
-python () {
-    import re
-    h = d.getVar('EDGE_DEFAULT_PASSWORD_HASH')
-    if not h:
-        bb.fatal(
-            "EDGE_DEFAULT_PASSWORD_HASH is unset.\n"
-            "  Set it in kas/local.yml (operator-private; gitignored). See\n"
-            "  kas/local.yml.example for the template. Generate a hash with:\n"
-            "    openssl passwd -6 'your-password'\n"
-            "  Building an image without a managed password hash would leave\n"
-            "  default credentials in the artefact — refusing."
-        )
-    # Shell-escape check. Every `$` must be preceded by `\`.
-    # Why: extrausers.bbclass's set_user_group function does
-    #   user_group_settings="${EXTRA_USERS_PARAMS}"
-    # then `echo $user_group_settings`. Bitbake substitutes the hash
-    # verbatim into the shell source. Unescaped `$X` is then expanded
-    # by the shell, eating salt/digest characters and silently shipping
-    # a broken hash to /etc/shadow. The escape `\$` keeps the dollar
-    # literal through both bitbake (which doesn't expand `$X`) and the
-    # shell (which sees `\$` as a literal `$`).
-    if re.search(r'(?<!\\)\$', h):
-        bb.fatal(
-            "EDGE_DEFAULT_PASSWORD_HASH contains an unescaped '$' character.\n"
-            "  Got: %s\n"
-            "  Every '$' in the hash MUST be written as '\\$' so the shell\n"
-            "  doesn't expand it as a variable reference during image\n"
-            "  assembly. Example of CORRECT form:\n"
-            "    \\$6\\$rounds=656000\\$<salt>\\$<digest>\n"
-            "  See edge-users.inc for the full explanation." % h
-        )
-    # sha512crypt shape (after conceptually stripping the escapes).
-    stripped = h.replace('\\$', '$')
-    if not re.match(r'^\$6\$(rounds=\d+\$)?[A-Za-z0-9./]{1,16}\$[A-Za-z0-9./]{86}$', stripped):
-        bb.fatal(
-            "EDGE_DEFAULT_PASSWORD_HASH is not a valid sha512crypt digest.\n"
-            "  Expected: \\$6\\$[rounds=N\\$]<salt 1-16>\\$<digest 86>\n"
-            "  Got:      %s\n"
-            "  Common mistakes:\n"
-            "    - hand-edited digest bytes from a placeholder (superficially\n"
-            "      looks valid, doesn't decode to any password — login fails\n"
-            "      silently after boot)\n"
-            "    - truncated digest segment (must be exactly 86 chars)\n"
-            "    - characters outside the crypt(3) alphabet [A-Za-z0-9./]\n"
-            "  Regenerate with:\n"
-            "    openssl passwd -6 'your-password'\n"
-            "  and paste the output with every '$' replaced by '\\$'." % h
-        )
-}
+# They cannot live in this file. edge-users.inc is distro scope, so an
+# anonymous python guard here runs during the parse of *every recipe in the
+# tree* -- boot-wrapper-aarch64 and scp-firmware included, which have no users
+# and no rootfs. A missing hash therefore made `bitbake -p` impossible, so a
+# fresh clone, a CI runner and any second machine could not parse the repo at
+# all. The credential property is unchanged: the guards are fatal in a
+# do_rootfs prefunc, so no image can be assembled without a managed hash.
 
 # extrausers.bbclass runs commands inside the rootfs at image build time
 # to modify /etc/passwd, /etc/shadow, /etc/group. The wrynose-recommended
@@ -164,4 +109,32 @@ edge_devel_authorized_keys() {
     install -d -m 0700 -o 1000 -g 1000 ${IMAGE_ROOTFS}/home/devel/.ssh
     install -m 0600 -o 1000 -g 1000 "${EDGE_DEVEL_SSH_PUBKEY_FILE}" \
         ${IMAGE_ROOTFS}/home/devel/.ssh/authorized_keys
+}
+
+# Subordinate uid/gid ranges for rootless podman (devel, and edge-ctr when the
+# container principal is present). Non-overlapping, clear of system/login uids:
+# devel 100000-165535, edge-ctr 200000-265535.
+#
+# Must run in ROOTFS_POSTUNINSTALL_COMMAND, not a pkg_postinst or
+# ROOTFS_POSTPROCESS_COMMAND: /etc/sub{u,g}id are owned by the shadow package,
+# and shadow is in ROOTFS_RO_UNNEEDED (image.bbclass), so a read-only-rootfs
+# image erases it in _uninstall_unneeded() — after every postinst and after
+# ROOTFS_POSTPROCESS_COMMAND. That erase deletes shadow's files, taking any
+# appended ranges with them. ROOTFS_POSTUNINSTALL_COMMAND runs after the erase
+# (rootfs.py) and before the verity/SELinux seal, so ranges written here reach
+# the sealed rootfs. A first-boot fixup is impossible: the verity root is
+# read-only.
+ROOTFS_POSTUNINSTALL_COMMAND += "edge_write_subid_ranges;"
+
+edge_write_subid_ranges() {
+    for f in subuid subgid; do
+        target=${IMAGE_ROOTFS}${sysconfdir}/$f
+        grep -q '^devel:100000:' "$target" 2>/dev/null || \
+            echo 'devel:100000:65536' >> "$target"
+        if grep -q '^edge-ctr:' ${IMAGE_ROOTFS}${sysconfdir}/passwd 2>/dev/null; then
+            grep -q '^edge-ctr:200000:' "$target" 2>/dev/null || \
+                echo 'edge-ctr:200000:65536' >> "$target"
+        fi
+        chmod 0644 "$target"
+    done
 }

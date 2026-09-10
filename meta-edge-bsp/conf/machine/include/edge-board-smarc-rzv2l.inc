@@ -23,13 +23,49 @@ EDGE_BOARD_INC = "1"
 # the distro pre-declares or the vendor machine conf sets.
 EDGE_ACCEL_SUPPORTED = "drpai-v2l"
 
+# --- Network interface roles --------------------------------------------
+# eth0 is reserved for the kernel's ip=dhcp NFS-root path on netboot, so
+# systemd-networkd must not manage it; eth1 is the DHCP uplink. The same
+# image works netbooted or flashed because of this split.
+EDGE_UNMANAGED_IFACES = "eth0"
+EDGE_UPLINK_IFACE     = "eth1"
+
+# --- Boot chain ---------------------------------------------------------
+# TF-A/OP-TEE -> U-Boot -> signed FIT verified against the key in U-Boot's
+# control DTB -> raw U-Boot env for RAUC boot-count.
+EDGE_BOOT_CHAIN = "uboot-fit"
+
+# --- Kernel provider ----------------------------------------------------
+# sbom-cve-check sets the SPDX compiled-sources flag for linux-yocto only.
+# Without it this kernel's SPDX omits compiled sources and CVE
+# source-attribution over-reports -- silently, in a shipped artefact.
+SPDX_INCLUDE_COMPILED_SOURCES:pn-linux-renesas = "1"
+
 # --- RAUC slot block devices --------------------------------------------
 # Written into the *signed* dm-verity table, so a wrong value produces a
 # correctly-signed image that cannot mount its own root. Partition numbers
 # follow the WKS layout: /boot p1, rootfs A p2, rootfs B p3, data p4
 # (files/wic/edge-rzv2l.wks.in).
+EDGE_BOOT_DEVICE   ?= "/dev/mmcblk0p1"
 EDGE_SLOT_A_DEVICE ?= "/dev/mmcblk0p2"
 EDGE_SLOT_B_DEVICE ?= "/dev/mmcblk0p3"
+EDGE_DATA_DEVICE   ?= "/dev/mmcblk0p4"
+
+# --- Raw U-Boot environment area ----------------------------------------
+# Must match CONFIG_ENV_OFFSET / CONFIG_ENV_OFFSET_REDUND / CONFIG_ENV_SIZE
+# in the Renesas U-Boot (patch 0002); the bbappend asserts the resolved
+# .config carries these values. A mismatch boots fine and silently loses
+# RAUC's boot-count.
+EDGE_UBOOT_ENV_DEVICE        ?= "/dev/mmcblk0"
+EDGE_UBOOT_ENV_OFFSET        ?= "0x1F0000"
+EDGE_UBOOT_ENV_OFFSET_REDUND ?= "0x210000"
+EDGE_UBOOT_ENV_SIZE          ?= "0x20000"
+
+# --- FIT trust anchor ---------------------------------------------------
+# uboot-sign concatenates the signed control DTB into u-boot.bin and deploys
+# it under UBOOT_DTB_SYMLINK; the Renesas do_deploy does not touch the DTB.
+# This is the file whose /signature node U-Boot verifies slot FITs against.
+EDGE_FIT_PUBKEY_DTB ?= "u-boot-${MACHINE}.dtb"
 
 # --- Machine-specific image content -------------------------------------
 # mtd-utils: flashcp/flash_erase/nandwrite for the BL2/FIP SPI flash
