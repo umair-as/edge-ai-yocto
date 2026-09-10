@@ -5,8 +5,9 @@
 #   kas build kas/base.yml:kas/machines/<board>.yml:kas/bpf-labs.yml
 #   make dev BPF=1                                # via Makefile flag
 #
-# Flips EDGE_ENABLE_BTF_CORE_DEV = 1, which adds btf-core-dev.cfg to
-# linux-renesas (CONFIG_DEBUG_INFO_BTF over un-reduced DWARF4 + pahole-native)
+# Flips EDGE_ENABLE_BTF_CORE_DEV = 1, which adds btf-core-dev.cfg through
+# edge-kernel-policy.inc, so it reaches whichever kernel provider the machine
+# selects (CONFIG_DEBUG_INFO_BTF over un-reduced DWARF4 + pahole-native)
 # and pulls packagegroup-edge-bpf (bpftool) into edge-image-dev. Size-heavy:
 # per-module BTF ships in /lib/modules and grows the OTA bundle, so this is
 # kept off the default build. See docs/dev/jtag-kernel-debugging.md.

@@ -4,17 +4,16 @@
 # in meta-edge-bsp. A vendor whose stack needs its own layer adds a `repos:`
 # block here instead.
 #
-#   kas build kas/base.yml:kas/machines/rzv2l.yml:kas/accel/drpai.yml
+#   kas build kas/base.yml:kas/machines/rzv2l.yml:kas/accel/drpai-v2l.yml
 #   make dev ACCEL=drpai-v2l
 #
 # EDGE_ACCEL is checked against the machine's EDGE_ACCEL_SUPPORTED in
 # edge-image.bbclass. An unsupported pair is a parse error naming both, not a
 # quietly accelerator-less image.
 #
-# Pair with VIRT=1 for the containerised path: without meta-virtualization
-# there is no podman, so the Quadlet cannot run and only the native inference
-# binary is usable. Fragments compose explicitly rather than implying each
-# other: `make dev ACCEL=drpai-v2l VIRT=1`.
+# The containerised path needs no companion flag: podman is base OS content on
+# every tier and every machine (ADR-0012), so the inference Quadlet has a
+# runtime whenever this fragment is composed.
 #
 # The compiled model is not part of the image. The inference Quadlet reads its
 # payload from /data/drpai and skips cleanly when that path is absent, so a
@@ -31,3 +30,6 @@ local_conf_header:
     # /dev/drpai0 + /dev/udmabuf0 into its container (keep-groups). Applied at
     # image assembly by edge-users.inc; "group:user" per entry.
     EDGE_ACCEL_SUPPLEMENTARY_GROUPS = "render:edge-ctr"
+    # Measurement instruments (drpai-classify, drpai-runner) for dev tiers.
+    # Consumed machine-neutrally by edge-image-dev.
+    EDGE_ACCEL_TEST_INSTALL = "packagegroup-edge-ai-test"

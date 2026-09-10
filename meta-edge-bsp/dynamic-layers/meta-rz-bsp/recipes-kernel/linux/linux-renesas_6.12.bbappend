@@ -1,8 +1,8 @@
-FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
+FILESEXTRAPATHS:prepend := "${EDGE_BSP_LAYERDIR}/recipes-kernel/linux/files:"
 
 # Human-ratified not-applicable-config CVE decisions (config-unreachable
 # only; version/backport gaps are patched, not annotated).
-require ${THISDIR}/files/cve-exclusion-renesas-6.12.inc
+require ${EDGE_BSP_LAYERDIR}/recipes-kernel/linux/files/cve-exclusion-renesas-6.12.inc
 
 # Kernel pin: rz-6.12-cip14 (6.12.59), ~150 version-in-range CVEs clear of the
 # cip7 default in the kas-pinned meta-renesas. Newer meta-renesas revisions also
@@ -19,7 +19,7 @@ LINUX_VERSION = "6.12.59-cip14"
 # The machine-neutral fragment set and the resolved-.config assertion are
 # provider-neutral policy and live in the include; this file adds only
 # what is specific to this provider or this board.
-require ${THISDIR}/edge-kernel-policy.inc
+require ${EDGE_BSP_LAYERDIR}/recipes-kernel/linux/edge-kernel-policy.inc
 
 # Dev-only fragments. Tier defaults live in edge-profile-{dev,prod}.inc;
 # this fallback keeps them on for builds that do not use the edge-ai distro.
@@ -99,3 +99,18 @@ KERNEL_FEATURES:append = ""
 # kas/machines/<board>.yml's local_conf_header) so both this recipe and
 # edge-kernel-fit see them. Defining them here would scope them to this
 # recipe only.
+
+# No kernel -src package.
+#
+# oe-core defaults PACKAGE_DEBUG_SPLIT_STYLE to "debug-with-srcpkg"
+# (bitbake.conf:331), the only value that populates ${PN}-src
+# (package.bbclass:448). For the kernel that package is ~1.6G of sources that
+# nothing can install: src-pkgs is not in IMAGE_FEATURES anywhere here, and a
+# dm-verity root could not take them anyway. It also fails buildpaths QA,
+# because generated sources such as drivers/tty/vt/consolemap_deftbl.c carry
+# the absolute path of their input in a comment emitted by conmakehash.
+#
+# Dropping it removes the package rather than excusing it; -dbg is unaffected,
+# so EDGE_DEV_DBG_PKGS still works. Kernel source for host-side debugging
+# stays in work-shared/${MACHINE}/kernel-source, which rm_work preserves.
+PACKAGE_DEBUG_SPLIT_STYLE:pn-linux-renesas = "debug-without-src"

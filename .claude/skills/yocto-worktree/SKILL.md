@@ -74,7 +74,7 @@ plus machine through its own `includes:`. Don't append it to
 
 Validate progressively before any image build: `make parse`, then the
 affected recipe's task, then the image. Capability flags compose on the
-build target, not the stack path — `make dev TPM=1 VIRT=1`.
+build target, not the stack path — `make dev TPM=1 ACCEL=drpai-v2l`.
 
 ## 2. Branch naming — before opening the PR
 

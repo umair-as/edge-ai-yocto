@@ -490,13 +490,13 @@ for u in edge-ctr devel; do
     fi
 done
 
-# ---------------- 13. DRP-AI accelerator (EDGE_ENABLE_AI images) ----------------
+# ---------------- 13. DRP-AI accelerator ----------------
 
 section "DRP-AI accelerator"
 
 drpai_ko=$(find "/lib/modules/$(uname -r)" -name 'drpai.ko*' 2>/dev/null | head -1)
 if [ -z "${drpai_ko}" ]; then
-    info "kernel-module-drpai not installed (image built without EDGE_ENABLE_AI); skipping"
+    fail "kernel-module-drpai not installed — the accelerator is baseline on this board, so this is a build or composition fault, not an image variant"
 else
     # Accelerator + zero-copy buffer nodes. render-group 0660 ownership (from
     # edge-drpai-udev) is what lets the rootless container open them via

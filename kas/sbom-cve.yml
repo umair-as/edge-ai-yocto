@@ -44,8 +44,10 @@ local_conf_header:
   spdx_vex: |
     # SPDX_INCLUDE_VEX — VEX (Vulnerability EXploitability eXchange)
     # annotations embedded in the SBOM. Values:
-    #   "all"     — every CVE for every component (default per the fragment)
-    #   "current" — only un-fixed CVEs (smaller; common for compliance audits)
+    #   "all"     — every CVE for every component
+    #   "current" — only un-fixed CVEs (smaller; common for compliance
+    #               audits). This is the oe-core default
+    #               (create-spdx-3.0.bbclass: SPDX_INCLUDE_VEX ??= "current").
     #   "none"    — no VEX annotations
     #
     # SPDX_INCLUDE_VEX = "current"
@@ -58,7 +60,7 @@ local_conf_header:
     # SPDX_INCLUDE_TIMESTAMPS = "1"
 
   cve_db_autorev: |
-    # CVE database freshness. The edge.conf pins SRCREVs of the two
+    # CVE database freshness. edge-floor.inc pins SRCREVs of the two
     # native CVE-DB recipes for reproducibility. Uncomment to re-enable
     # AUTOREV (latest NVD/CVEList tip) — useful for CVE-triage builds
     # but breaks build determinism.
@@ -69,8 +71,10 @@ local_conf_header:
   spdx_compiled_sources_extra: |
     # SPDX_INCLUDE_COMPILED_SOURCES — when set to "1" for a recipe, the
     # SBOM filters CVEs to source files actually compiled (vs every file
-    # in the upstream tarball). edge.conf already sets this for
-    # linux-renesas; add per-recipe overrides here for other large recipes
+    # in the upstream tarball). Each board include sets it for that
+    # board's own kernel recipe -- the distro deliberately does not, because
+    # the flag names a recipe and the recipe is a board fact. Add per-recipe
+    # overrides here for other large recipes
     # where unused-source over-reporting is noisy (e.g. qemu, gcc-runtime).
     #
     # SPDX_INCLUDE_COMPILED_SOURCES:pn-qemu        = "1"

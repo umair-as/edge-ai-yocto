@@ -1,4 +1,4 @@
-FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
+FILESEXTRAPATHS:prepend := "${EDGE_BSP_LAYERDIR}/recipes-bsp/u-boot/files:"
 
 # meta-renesas's u-boot-renesas.inc sets S = "${WORKDIR}/git", which
 # wrynose's do_unpack rejects. Override here (not via kas-patch) to survive bumps.
@@ -14,8 +14,8 @@ SRC_URI:append = " \
     file://patches/0002-smarc-rzv2l-enable-fit-signature-and-bootcount.patch \
     file://patches/0003-rzg2l-ft_board_setup-add-ethernet-fdt-fixup-and-kaslr-seed.patch \
     file://patches/0004-smarc-rzv2l-dts-add-optee-firmware-node-for-rng.patch \
-    file://patches/0005-rzg2l-add-build-tag-banner.patch \
-    file://patches/0006-rzg2l-ft_board_setup-add-debug-traces.patch \
+    file://patches/0005-rzg2l-print-edge-boot-marker.patch \
+    file://patches/0006-rzg2l-report-kaslr-seed-outcome.patch \
     file://patches/0007-arm-lib-bootm-fix-unsafe-wdt_overflow-append-to-bootargs.patch \
     file://patches/0008-smarc-rzv2l-drop-legacy-CONFIG_BOOTCOMMAND-define.patch \
 "
@@ -38,10 +38,12 @@ SRC_URI:append = "${@' file://edge-uboot-net-off.cfg' \
 SRC_URI:append = "${@' file://edge-uboot-fit-enforce.cfg' \
     if 'fit_enforce' in (d.getVar('EDGE_UBOOT_FEATURES') or '') else ''}"
 
-# Shared serial-visible build marker.
+# Serial-visible boot marker, same scheme and values as the TF-A append so one
+# grep over a captured console log yields the whole boot chain in order.
 EDGE_BUILD_PROFILE ?= "local"
-EDGE_BUILD_TAG     ?= "edge-${EDGE_BUILD_PROFILE}"
-EXTRA_OEMAKE:append = " KCPPFLAGS=\"-DBUILD_TAG=\\\"${EDGE_BUILD_TAG}\\\"\""
+EDGE_BOOT_VERSION  ?= "${DISTRO_VERSION}"
+EDGE_BOOT_PROFILE  ?= "${EDGE_PROFILE}"
+EXTRA_OEMAKE:append = " KCPPFLAGS='-DEDGE_BOOT_VERSION=\"${EDGE_BOOT_VERSION}\" -DEDGE_BOOT_PROFILE=\"${EDGE_BOOT_PROFILE}\"'"
 
 # meta-renesas's do_deploy:append:rzg2l-family reads from
 # ${B}/<UBOOT_MACHINE>, but oe-core's u-boot.inc now names per-config dirs
@@ -136,3 +138,84 @@ EOF
 		fi
 	fi
 }
+
+# Repair the deployed control DTB and nodtb binary.
+#
+# uboot-sign.bbclass deploy_dtb() (:222-245) installs each artifact as
+# u-boot[-nodtb]-${type}-${PV}-${PR} then `ln -sf` it onto UBOOT_{DTB,NODTB}_IMAGE,
+# which is u-boot[-nodtb]-${MACHINE}-${PV}-${PR}. smarc-rzv2l.conf:26 sets
+# UBOOT_CONFIG ??= "smarc-rzv2l", so type == MACHINE, both names are one string
+# and the link replaces the file with a link to itself.
+do_deploy:append() {
+    signed=$(find ${WORKDIR}/build -name '${UBOOT_DTB_BINARY}-signed' -type f | head -1)
+    if [ -z "$signed" ]; then
+        bbfatal "No ${UBOOT_DTB_BINARY}-signed under ${WORKDIR}/build; \
+UBOOT_SIGN_ENABLE is ${UBOOT_SIGN_ENABLE} but nothing signed the control DTB."
+    fi
+    install -m 0644 "$signed" ${DEPLOYDIR}/${UBOOT_DTB_IMAGE}
+    ln -sf ${UBOOT_DTB_IMAGE} ${DEPLOYDIR}/${UBOOT_DTB_SYMLINK}
+
+    nodtb=$(find ${WORKDIR}/build -name '${UBOOT_NODTB_BINARY}' -type f | head -1)
+    if [ -z "$nodtb" ]; then
+        bbfatal "No ${UBOOT_NODTB_BINARY} under ${WORKDIR}/build."
+    fi
+    install -m 0644 "$nodtb" ${DEPLOYDIR}/${UBOOT_NODTB_IMAGE}
+    ln -sf ${UBOOT_NODTB_IMAGE} ${DEPLOYDIR}/${UBOOT_NODTB_SYMLINK}
+}
+
+# Assert the board's declared env area against the resolved U-Boot .config.
+#
+# EDGE_UBOOT_ENV_* (board include) tells userspace where the raw environment
+# lives; CONFIG_ENV_OFFSET / _OFFSET_REDUND / _SIZE tell U-Boot the same
+# thing. Nothing couples them, and a mismatch is invisible: the board boots,
+# fw_setenv writes to an area U-Boot does not read, and RAUC's boot-count
+# silently never persists -- so a failed update never rolls back. Ordered
+# after do_configure because that is where the defconfig plus fragments
+# resolve into .config.
+python edge_assert_uboot_env_offsets() {
+    import os, re
+    want = {
+        'CONFIG_ENV_OFFSET':        d.getVar('EDGE_UBOOT_ENV_OFFSET'),
+        'CONFIG_ENV_OFFSET_REDUND': d.getVar('EDGE_UBOOT_ENV_OFFSET_REDUND'),
+        'CONFIG_ENV_SIZE':          d.getVar('EDGE_UBOOT_ENV_SIZE'),
+    }
+    missing = [k for k, v in want.items() if not v]
+    if missing:
+        bb.fatal("Board declares no value for: %s. Set them in "
+                 "conf/machine/include/edge-board-%s.inc."
+                 % (' '.join(missing), d.getVar('MACHINE')))
+
+    b = d.getVar('B')
+    configs = []
+    for root, _dirs, files in os.walk(b):
+        if '.config' in files:
+            configs.append(os.path.join(root, '.config'))
+    if not configs:
+        bb.fatal("No resolved .config under %s; cannot verify the env area." % b)
+
+    problems = []
+    for cfg in configs:
+        with open(cfg) as fh:
+            text = fh.read()
+        for sym, expect in want.items():
+            m = re.search(r'^%s=(\S+)$' % sym, text, re.M)
+            if not m:
+                problems.append("%s: %s absent" % (cfg, sym))
+                continue
+            got = m.group(1)
+            if int(got, 0) != int(expect, 0):
+                problems.append("%s: %s is %s, board declares %s"
+                                % (cfg, sym, got, expect))
+    if problems:
+        bb.fatal(
+            "U-Boot environment area disagrees with the board include:\n  %s\n"
+            "  fw_setenv would write where U-Boot does not read, so RAUC's\n"
+            "  boot-count would never persist and a failed update would never\n"
+            "  roll back. Fix the board include or the U-Boot env patch so the\n"
+            "  two agree." % "\n  ".join(problems))
+    bb.note("U-Boot env area matches the board include in %d .config file(s)"
+            % len(configs))
+}
+do_configure[postfuncs] += "edge_assert_uboot_env_offsets"
+edge_assert_uboot_env_offsets[vardeps] += "EDGE_UBOOT_ENV_OFFSET \
+    EDGE_UBOOT_ENV_OFFSET_REDUND EDGE_UBOOT_ENV_SIZE"

@@ -88,7 +88,7 @@ python __anonymous() {
 
 # Pick up bundle-hooks.sh from the sibling rauc/files directory.
 FILESEXTRAPATHS:prepend := "${THISDIR}/../rauc/files:${THISDIR}/../../recipes-bsp/u-boot/files:"
-SRC_URI:append = " file://bundle-hooks.sh;mode=0755 file://rauc-uboot-env.defaults "
+SRC_URI:append = " file://bundle-hooks.sh;mode=0755 file://rauc-uboot-env.defaults.in "
 RAUC_BUNDLE_EXTRA_FILES += "rauc-uboot-env.defaults"
 
 # Substitute image-specific bundle filenames before bundle.bbclass copies the
@@ -99,7 +99,22 @@ edge_bundle_substitute_fit_names() {
         -e "s|@FIT_IMAGE_A@|${EDGE_RAUC_FIT_A}|g" \
         -e "s|@FIT_IMAGE_B@|${EDGE_RAUC_FIT_B}|g" \
         "${UNPACKDIR}/bundle-hooks.sh"
+
+    # The bundle ships the U-Boot env defaults so the update hook can seed a
+    # slot's env. Same template and same board facts as rauc-uboot-env's
+    # do_install -- the file is shared through FILESEXTRAPATHS above, so the
+    # two expansions cannot drift in content, only in whether they happen.
+    [ -n "${EDGE_SLOT_A_DEVICE}" ] || bbfatal "EDGE_SLOT_A_DEVICE is empty; set it in conf/machine/include/edge-board-${MACHINE}.inc"
+    [ -n "${EDGE_SLOT_B_DEVICE}" ] || bbfatal "EDGE_SLOT_B_DEVICE is empty; set it in conf/machine/include/edge-board-${MACHINE}.inc"
+    sed -e "s|@EDGE_SLOT_A_DEVICE@|${EDGE_SLOT_A_DEVICE}|g" \
+        -e "s|@EDGE_SLOT_B_DEVICE@|${EDGE_SLOT_B_DEVICE}|g" \
+        "${UNPACKDIR}/rauc-uboot-env.defaults.in" \
+        > "${UNPACKDIR}/rauc-uboot-env.defaults"
+    if grep -q '@[A-Z_]*@' "${UNPACKDIR}/rauc-uboot-env.defaults"; then
+        bbfatal "Unexpanded @TOKEN@ left in the bundle's rauc-uboot-env.defaults"
+    fi
 }
+do_unpack[vardeps] += "EDGE_SLOT_A_DEVICE EDGE_SLOT_B_DEVICE"
 
 BUNDLE_BASENAME = "${BUNDLE_IMAGE}-bundle"
 BUNDLE_NAME     = "${BUNDLE_BASENAME}"

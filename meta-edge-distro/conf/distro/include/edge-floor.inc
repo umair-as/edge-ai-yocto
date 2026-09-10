@@ -194,10 +194,22 @@ BB_GIT_SHALLOW_DEPTH:pn-sbom-cve-check-update-nvd-native     = "1"
 BB_GIT_SHALLOW:pn-sbom-cve-check-update-cvelist-native       = "1"
 BB_GIT_SHALLOW_DEPTH:pn-sbom-cve-check-update-cvelist-native = "1"
 
-# sbom-cve-check fragment hard-codes the SPDX compiled-sources flag for
-# linux-yocto; apply to linux-renesas so kernel CVE
-# source-attribution doesn't over-report.
-SPDX_INCLUDE_COMPILED_SOURCES:pn-linux-renesas = "1"
+# A checksum mismatch is a hard stop and does NOT fall back to MIRRORS the
+# way a fetch failure does, so an upstream that re-rolls a release tarball
+# stops a cold build outright. own-mirrors puts the Yocto source mirror ahead
+# of the primary. Tracked here, not in gitignored kas/local.yml, because a
+# fresh clone hits the same tarballs.
+SOURCE_MIRROR_URL ?= "https://downloads.yoctoproject.org/mirror/sources/"
+INHERIT += "own-mirrors"
+
+# The sbom-cve-check fragment hard-codes the SPDX compiled-sources flag for
+# linux-yocto only, so every other kernel provider needs it set explicitly or
+# its SPDX output omits compiled sources and kernel CVE source-attribution
+# over-reports. The flag names a recipe, and the recipe is a board fact, so
+# each board include sets it for its own kernel -- see
+# conf/machine/include/edge-board-<machine>.inc. It cannot live here: this
+# file is required at edge-ai.conf:27 and the board include lands at :42, so
+# a board-supplied recipe name is not yet visible at this point.
 
 # The default ("current") drops fixed-version and cpe-stable-backport
 # CVE_STATUS entries from the VEX export on the assumption the CVE DB's
@@ -220,8 +232,27 @@ UBOOT_SIGN_KEYDIR      ?= "${TOPDIR}/../keys/dev/fit"
 UBOOT_SIGN_KEYNAME     ?= "edge-fit-dev"
 FIT_HASH_ALG           ?= "sha256"
 FIT_SIGN_ALG           ?= "rsa2048"
+# Pin the key size. kernel-signing-keys-native generates the dev key from
+# FIT_SIGN_NUMBITS; oe-core leaves it unset, so mkimage defaults to 2048 and
+# matches rsa2048 only by coincidence. Pinned here so a future rsa<N> bump must
+# move NUMBITS with it, caught by the agreement assertion below.
+FIT_SIGN_NUMBITS       ?= "2048"
 FIT_GENERATE_KEYS      ?= "1"
 FIT_SIGN_INDIVIDUAL    ?= "0"
+
+# FIT_SIGN_ALG and FIT_SIGN_NUMBITS must agree: the FIT algo string is built
+# from FIT_SIGN_ALG while the key is generated at FIT_SIGN_NUMBITS bits. A
+# mismatch (e.g. rsa4096 algo, 2048 key) parses clean and fails at mkimage.
+python () {
+    import re
+    alg  = d.getVar('FIT_SIGN_ALG') or ''
+    bits = d.getVar('FIT_SIGN_NUMBITS') or ''
+    m = re.match(r'^rsa(\d+)$', alg)
+    if m and bits != m.group(1):
+        bb.fatal("FIT signing mismatch: FIT_SIGN_ALG=%s implies a %s-bit key "
+                 "but FIT_SIGN_NUMBITS=%s. Set both together in edge-floor.inc."
+                 % (alg, m.group(1), bits or '(unset)'))
+}
 
 # ----- RAUC bundle signing (file-key dev profile) -------------------------
 

@@ -12,9 +12,9 @@
 loadaddr=0x58000000
 splashload=if ext4load mmc 0:1 ${loadaddr} splash.bmp; then true; fi
 rauc_init=if test -z "${BOOT_ORDER}"; then setenv BOOT_ORDER "A B"; fi; if test -z "${BOOT_A_LEFT}"; then setenv BOOT_A_LEFT 3; fi; if test -z "${BOOT_B_LEFT}"; then setenv BOOT_B_LEFT 3; fi
-rauc_select_slot=setenv rootpartnum; setenv rauc_slot; setenv verity_ready; for BOOT_SLOT in ${BOOT_ORDER}; do if test -n "${rootpartnum}"; then true; elif test "x${BOOT_SLOT}" = "xA"; then if itest ${BOOT_A_LEFT} -gt 0; then setexpr BOOT_A_LEFT ${BOOT_A_LEFT} - 1; setenv rootpartnum 2; setenv rauc_slot A; setenv verity_ready ${EDGE_VERITY_A}; fi; elif test "x${BOOT_SLOT}" = "xB"; then if itest ${BOOT_B_LEFT} -gt 0; then setexpr BOOT_B_LEFT ${BOOT_B_LEFT} - 1; setenv rootpartnum 3; setenv rauc_slot B; setenv verity_ready ${EDGE_VERITY_B}; fi; fi; done
-rauc_validate_slot=if test -z "${rootpartnum}"; then echo "[RAUC] no bootable slot, resetting counters"; setenv BOOT_A_LEFT 3; setenv BOOT_B_LEFT 3; saveenv; reset; fi
-rauc_set_legacy_bootargs=setenv bootargs rw rootwait earlycon root=/dev/mmcblk0p${rootpartnum} rauc.slot=${rauc_slot} init_on_alloc=1 init_on_free=1 slab_nomerge page_alloc.shuffle=1 randomize_kstack_offset=on vsyscall=none ${EXTRA_KERNEL_ARGS}; echo "[RAUC] legacy slot=${rauc_slot} part=${rootpartnum}"
+rauc_select_slot=setenv rauc_root; setenv rauc_slot; setenv verity_ready; for BOOT_SLOT in ${BOOT_ORDER}; do if test -n "${rauc_root}"; then true; elif test "x${BOOT_SLOT}" = "xA"; then if itest ${BOOT_A_LEFT} -gt 0; then setexpr BOOT_A_LEFT ${BOOT_A_LEFT} - 1; setenv rauc_root @EDGE_SLOT_A_DEVICE@; setenv rauc_slot A; setenv verity_ready ${EDGE_VERITY_A}; fi; elif test "x${BOOT_SLOT}" = "xB"; then if itest ${BOOT_B_LEFT} -gt 0; then setexpr BOOT_B_LEFT ${BOOT_B_LEFT} - 1; setenv rauc_root @EDGE_SLOT_B_DEVICE@; setenv rauc_slot B; setenv verity_ready ${EDGE_VERITY_B}; fi; fi; done
+rauc_validate_slot=if test -z "${rauc_root}"; then echo "[RAUC] no bootable slot, resetting counters"; setenv BOOT_A_LEFT 3; setenv BOOT_B_LEFT 3; saveenv; reset; fi
+rauc_set_legacy_bootargs=setenv bootargs rw rootwait earlycon root=${rauc_root} rauc.slot=${rauc_slot} init_on_alloc=1 init_on_free=1 slab_nomerge page_alloc.shuffle=1 randomize_kstack_offset=on vsyscall=none ${EXTRA_KERNEL_ARGS}; echo "[RAUC] legacy slot=${rauc_slot} root=${rauc_root}"
 # Transitional legacy-slot cmdline appendix. Verity-ready slots take their
 # complete command line from the signed FIT DTB.
 #   security=selinux           — activate the LSM (mode in /etc/selinux/config)

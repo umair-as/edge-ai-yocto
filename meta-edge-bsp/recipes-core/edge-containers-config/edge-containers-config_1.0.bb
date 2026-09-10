@@ -1,8 +1,8 @@
 SUMMARY     = "Runtime config for the edge container stack"
 DESCRIPTION = "Installs sysctl user-namespace allowance (rootless podman), \
-netavark network backend selection in containers.conf, subuid/subgid ranges \
-for the devel user, Quadlet drop directories for systemd-managed containers, \
-and a tmpfiles.d entry to pre-create the rootless Quadlet path at boot."
+network backend and image-copy scratch-dir settings in containers.conf, \
+Quadlet drop directories for systemd-managed containers, and a tmpfiles.d \
+entry to pre-create the rootless Quadlet path at boot."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "console/utils"
 LICENSE     = "MIT"
@@ -40,18 +40,12 @@ do_install() {
 
 }
 
-# Subordinate UID/GID ranges for the devel user — required for rootless
-# podman. 65536 IDs from 100000; avoids system (0-999) and devel's UID
-# (1000). /etc/sub{u,g}id are owned by the shadow package, so append in
-# postinst rather than shipping the files (a shipped copy collides with
-# shadow's at do_rootfs). newuidmap/newgidmap come from the base shadow
-# package.
-pkg_postinst:${PN}() {
-    for f in subuid subgid; do
-        grep -q '^devel:100000:' $D${sysconfdir}/$f 2>/dev/null || \
-            echo 'devel:100000:65536' >> $D${sysconfdir}/$f
-    done
-}
+# Subordinate uid/gid ranges (devel, edge-ctr) are written by
+# edge_write_subid_ranges in edge-users.inc. They cannot be provisioned from a
+# recipe postinst: /etc/sub{u,g}id belong to the shadow package, which a
+# read-only-rootfs image erases (ROOTFS_RO_UNNEEDED) after all postinsts run,
+# taking any appended ranges with it. Only ROOTFS_POSTUNINSTALL_COMMAND runs
+# after that erase.
 
 FILES:${PN} = " \
     ${sysconfdir}/sysctl.d/80-edge-containers.conf \

@@ -30,7 +30,7 @@ make clean-lock           # remove a stale build/bitbake.lock
 Capability toggles are **make flags, not shell environment**:
 
 ```bash
-make dev VIRT=1                  # + meta-virtualization (Podman/runc/crun)
+make dev ACCEL=drpai-v2l         # select an accelerator stack
 make dev TPM=1                   # + meta-secure-core (TPM2 + IMA/EVM)
 make dev JTAG=1 BPF=1            # flags compose freely
 make dev EDGE_BOOT_TARGET=emmc   # GPT + systemd-repart eMMC layout

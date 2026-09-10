@@ -55,7 +55,7 @@ sudo bmaptool copy \
 
 `make` sets up the kas environment automatically — no manual shell sourcing needed.
 Use `make shell` for an interactive kas shell; `make help` lists all targets and
-capability flags (`VIRT=1`, `TPM=1`, `SBOM_TUNE=1`, …).
+capability flags (`TPM=1`, `SBOM_TUNE=1`, …).
 
 ---
 

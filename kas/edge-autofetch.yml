@@ -7,10 +7,10 @@
 #   git-alternates cache — first-time setup, CI builders, fresh clones.
 #
 # What this file is NOT:
-#   The single source of truth for SHA pins. That stays in kas/base.yml
-#   (where every upstream `repos:` entry already declares a `commit:`
-#   pin). This file only includes base + machine; the pins flow in
-#   through `includes:`. Keeping pins in one place avoids two-file drift.
+#   A place to declare SHA pins. Pins live with the composition that owns
+#   them: upstream layers in kas/base.yml, vendor BSP layers in the
+#   kas/bsp/*.yml fragment for that BSP. This file only includes base +
+#   machine; the pins flow in through `includes:`.
 #
 # Operator workflow:
 #   # Via make (env vars exported automatically):

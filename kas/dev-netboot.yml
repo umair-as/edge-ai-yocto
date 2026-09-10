@@ -10,16 +10,22 @@
 #     /etc/rauc-uboot-env.defaults and /etc/u-boot-initial-env
 #   - prod builds composed without this fragment carry zero netboot bytes
 #
-# eth0 is left unmanaged by systemd-networkd (edge-network-units ships
-# 10-eth0.network with Unmanaged=yes), so the kernel's ip=dhcp NFS-root
-# path on eth0 is not disrupted. eth1 is the DHCP uplink. The same image
-# works netbooted (NFS-root on eth0) or flashed (eth1 uplink), with no
+# The NFS-root interface is left unmanaged by systemd-networkd so the
+# kernel's ip=dhcp path is not disrupted, and a second interface carries the
+# DHCP uplink. The same image works netbooted or flashed, with no
 # netboot-specific network gating.
 #
-# linux-renesas (= rz_linux-cip, CIP-based) ships CONFIG_NFS_FS, CONFIG_NFS_V4,
-# CONFIG_ROOT_NFS, CONFIG_IP_PNP_DHCP, CONFIG_RAVB, CONFIG_MICREL_PHY all
-# built-in — no kernel fragment required. NFS-root works out of the box
-# once the netboot env macro is in place.
+# The interface roles are a board fact, not a property of this fragment.
+# edge-network-units currently ships 10-eth0.network with Unmanaged=yes
+# unconditionally and allarch, which is wrong on a board whose only
+# interface is eth0 -- tracked as a single-board leak, to be moved behind
+# the board include.
+#
+# NFS-root needs CONFIG_NFS_FS, CONFIG_NFS_V4, CONFIG_ROOT_NFS and
+# CONFIG_IP_PNP_DHCP, plus the board's Ethernet and PHY drivers, built in
+# rather than modular. The RZ/V2L provider (rz_linux-cip) ships all of them
+# built-in, so no kernel fragment is required there; a second provider must
+# be checked rather than assumed.
 #
 # Host-side setup (TFTP + NFS server, exports, sync workflow) is
 # documented in docs/dev/netboot-setup.md and automated by
