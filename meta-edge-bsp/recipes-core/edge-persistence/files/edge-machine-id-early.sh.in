@@ -1,0 +1,52 @@
+#!/bin/bash
+# Restore /etc/machine-id from the persisted copy on the raw /data
+# partition, before any service caches the transient id. The device is the
+# board's EDGE_DATA_DEVICE, on the same MMC device as the verity root, so
+# the kernel has already scanned its partition table by the time init runs.
+# Read-only, no journal replay: one known file is read, nothing is written
+# to /data. Every failure leaves the transient id in place and exits 0;
+# edge-machine-id-persist captures or restores once /data is mounted.
+set -u
+
+DEV="@EDGE_DATA_DEVICE@"
+LIVE=/etc/machine-id
+RUNDIR=/run/edge
+MNT="${RUNDIR}/data-early"
+ID="${RUNDIR}/machine-id"
+
+log() { echo "[edge-machine-id-early] $*"; }
+
+n=0
+while [ ! -b "${DEV}" ] && [ "${n}" -lt 30 ]; do
+    sleep 0.1
+    n=$((n + 1))
+done
+if [ ! -b "${DEV}" ]; then
+    log "${DEV} is not a block device; keeping the transient machine-id"
+    exit 0
+fi
+
+mkdir -p "${MNT}"
+if ! mount -t ext4 -o ro,noload,nosuid,nodev,noexec "${DEV}" "${MNT}" 2>/dev/null; then
+    log "${DEV} not mountable read-only; keeping the transient machine-id"
+    exit 0
+fi
+id=$(head -n 1 "${MNT}/machine-id/id" 2>/dev/null || true)
+umount "${MNT}" 2>/dev/null || umount -l "${MNT}"
+
+if ! [[ "${id}" =~ ^[0-9a-f]{32}$ ]]; then
+    log "no persisted machine-id on ${DEV}; keeping the transient machine-id"
+    exit 0
+fi
+if [ "$(head -n 1 "${LIVE}" 2>/dev/null)" = "${id}" ]; then
+    exit 0
+fi
+
+printf '%s\n' "${id}" > "${ID}"
+chmod 0444 "${ID}"
+if mount --bind "${ID}" "${LIVE}"; then
+    log "restored machine-id ${id} from ${DEV}"
+else
+    log "bind mount over ${LIVE} failed; keeping the transient machine-id"
+fi
+exit 0
