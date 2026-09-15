@@ -21,6 +21,9 @@
 # The script does not modify RAUC state or touch anything destructive.
 
 set -u
+# pipefail makes `producer | grep -q` report failure whenever grep exits on
+# the first match before the producer is done writing (SIGPIPE); every grep
+# fed by a pipe below therefore reads to EOF (`grep ... >/dev/null`), never -q.
 set -o pipefail
 
 # ---------------- output helpers ----------------
@@ -143,7 +146,7 @@ else
     fail "/etc/fstab has duplicate mountpoint(s): ${fstab_dups}"
 fi
 if ! journalctl -b 0 -u systemd-fstab-generator --no-pager 2>/dev/null \
-       | grep -qi 'duplicate entry'; then
+       | grep -i 'duplicate entry' >/dev/null; then
     pass "systemd-fstab-generator has no 'Duplicate entry' errors this boot"
 else
     fail "systemd-fstab-generator logged 'Duplicate entry' — WIC dup-fstab trap struck"
@@ -216,7 +219,7 @@ else
 fi
 
 # Source-of-truth: the actual file should live in /data/log/journal/
-if find /data/log/journal -maxdepth 2 -name 'system.journal' 2>/dev/null | grep -q .; then
+if find /data/log/journal -maxdepth 2 -name 'system.journal' 2>/dev/null | grep . >/dev/null; then
     pass "/data/log/journal populated (real persistence path)"
 else
     fail "/data/log/journal empty — bind not working"
@@ -228,6 +231,24 @@ if [ "${boot_count}" -ge 2 ]; then
     pass "journal history spans ${boot_count} boots"
 else
     warn "only ${boot_count} boot recorded — reboot at least once to prove persistence"
+fi
+
+# journald names its directory by the machine id it read at start. A journal
+# for the current boot that journalctl cannot see means journald started
+# with a transient id that was replaced later.
+cur_boot=$(tr -d '-' < /proc/sys/kernel/random/boot_id)
+if journalctl --list-boots --no-pager 2>/dev/null | grep "${cur_boot}" >/dev/null; then
+    pass "journalctl --list-boots includes the current boot"
+else
+    fail "current boot ${cur_boot} missing from journalctl --list-boots (journal written under another machine id?)"
+fi
+mid=$(cat /etc/machine-id 2>/dev/null)
+mid_dirs=$(ls -1 "${mid_dir}" 2>/dev/null | wc -l)
+if [ "${mid_dirs}" -eq 1 ] && [ -d "${mid_dir}/${mid}" ]; then
+    pass "exactly one journal directory and it is the live machine id"
+else
+    fail "${mid_dir} has ${mid_dirs} entries; expected only ${mid}"
+    ls -1 "${mid_dir}" 2>/dev/null | sed 's/^/        /'
 fi
 
 # ---------------- 5. machine-id persistence ----------------
@@ -252,6 +273,19 @@ if systemctl is-active edge-machine-id-persist.service >/dev/null 2>&1; then
     pass "edge-machine-id-persist.service active (exited)"
 else
     fail "edge-machine-id-persist.service did not run"
+fi
+
+# Restored before journald started: the early unit logs the restore, and
+# journald's own first entries carry the persisted id.
+if systemctl is-active edge-machine-id-early.service >/dev/null 2>&1; then
+    pass "edge-machine-id-early.service active (exited)"
+    if journalctl -b -u edge-machine-id-early.service --no-pager 2>/dev/null | grep "restored machine-id" >/dev/null; then
+        pass "machine-id restored from the raw data device before services started"
+    else
+        info "no early restore this boot (first boot, or id already matched)"
+    fi
+else
+    fail "edge-machine-id-early.service did not run"
 fi
 
 # ---------------- 6. sshd host keys persistence ----------------
@@ -482,7 +516,7 @@ done
 # dispatches systemd-repart (GPT/eMMC) or parted (MBR/eSD) plus a shared
 # resize2fs + tune2fs tail. Gated by /boot/.edge-data-grown, so it runs once on
 # the first boot of a fresh flash — look across all boots for that run.
-if journalctl -u edge-grow-data.service --no-pager 2>/dev/null | grep -qiE '✓|▶|⏭|growth complete'; then
+if journalctl -u edge-grow-data.service --no-pager 2>/dev/null | grep -iE '✓|▶|⏭|growth complete' >/dev/null; then
     pass "edge-grow-data.service ran (/data growth logged)"
 elif [ "$(systemctl is-active edge-grow-data.service 2>/dev/null)" = "active" ]; then
     pass "edge-grow-data.service active (exited) — /data growth"
@@ -503,7 +537,7 @@ section "Lingering user managers (boot auto-start)"
 # search (see roadmap Q4). logind's enumeration log is the definitive boot-time
 # signal — it survives later manual recovery of the session.
 if sudo -n journalctl -b -u systemd-logind --no-pager 2>/dev/null \
-       | grep -qiE 'User enumeration failed|Couldn.t add lingering user'; then
+       | grep -iE 'User enumeration failed|Couldn.t add lingering user' >/dev/null; then
     fail "systemd-logind failed to enumerate lingering users this boot — userdb refused the records (workers started before /etc/machine-id was restored; edge-persistence orders systemd-userdbd after it). Rootless Quadlets won't auto-start until userdbd's workers recycle (~5 min) or \`systemctl restart systemd-userdbd\`"
 else
     pass "systemd-logind enumerated lingering users cleanly this boot"
@@ -564,17 +598,17 @@ if [ "${accel}" = "dxm1" ]; then
         *pcie_aspm=off*) pass "kernel cmdline: pcie_aspm=off (BCM2712 + DX-M1 SError guard)" ;;
         *) fail "kernel cmdline lacks pcie_aspm=off — link-state resets panic this board" ;;
     esac
-    if sudo -n dmesg 2>/dev/null | grep -qiE 'AER:.*(Uncorrect|Correct)ed error'; then
+    if sudo -n dmesg 2>/dev/null | grep -iE 'AER:.*(Uncorrect|Correct)ed error' >/dev/null; then
         warn "PCIe AER errors logged this boot (dmesg | grep AER)"
     else
         pass "no PCIe AER errors this boot"
     fi
     for m in dx_dma dxrt_driver; do
-        lsmod | grep -q "^${m} " && pass "module ${m} loaded" || fail "module ${m} not loaded (udev modalias autoload after PCIe enumeration)"
+        lsmod | grep "^${m} " >/dev/null && pass "module ${m} loaded" || fail "module ${m} not loaded (udev modalias autoload after PCIe enumeration)"
     done
     if [ -e /dev/dxrt0 ]; then
         l=$(ls -l /dev/dxrt0)
-        if printf '%s' "${l}" | grep -qE '^crw-rw----.* root dxrt '; then
+        if printf '%s' "${l}" | grep -E '^crw-rw----.* root dxrt ' >/dev/null; then
             pass "/dev/dxrt0 root:dxrt 0660"
         else
             fail "/dev/dxrt0 not root:dxrt 0660: ${l}"
@@ -583,26 +617,29 @@ if [ "${accel}" = "dxm1" ]; then
         fail "/dev/dxrt0 missing — dxrt_driver found no device"
     fi
     if systemctl is-active dxrtd.service >/dev/null 2>&1; then
-        dx_user=$(ps -o user= -C dxrtd 2>/dev/null | head -1)
-        [ "${dx_user}" = "dxrt" ] && pass "dxrtd active as dxrt" || fail "dxrtd active but running as '${dx_user:-?}' (expected dxrt)"
+        # BusyBox ps has no -C; read the main PID's uid from /proc instead.
+        dx_pid=$(systemctl show -p MainPID --value dxrtd.service 2>/dev/null)
+        dx_uid=$(awk '/^Uid:/{print $2}' "/proc/${dx_pid:-0}/status" 2>/dev/null)
+        dx_user=$(getent passwd "${dx_uid:-}" 2>/dev/null | cut -d: -f1)
+        [ "${dx_user}" = "dxrt" ] && pass "dxrtd active as dxrt" || fail "dxrtd active but running as '${dx_user:-?}' (uid ${dx_uid:-?}; expected dxrt)"
     else
         fail "dxrtd.service not active ($(systemctl is-active dxrtd.service 2>/dev/null)) — ConditionPathExistsGlob=/dev/dxrt* unmet, or the daemon failed"
     fi
     if command -v dxrt-cli >/dev/null 2>&1; then
         dx_status=$(sudo -n timeout 20 dxrt-cli -s 2>&1 | head -20)
-        if printf '%s' "${dx_status}" | grep -qiE 'device|firmware|fw'; then
+        if printf '%s' "${dx_status}" | grep -iE 'device|firmware|fw' >/dev/null; then
             pass "dxrt-cli -s reports a device"
             printf '%s\n' "${dx_status}" | grep -iE 'device|firmware|fw|version' | head -4 | sed 's/^/        /'
         else
             warn "dxrt-cli -s gave no device report (daemon/firmware handshake): $(printf '%s' "${dx_status}" | head -1)"
         fi
     fi
-    id -nG edge-ctr 2>/dev/null | tr ' ' '\n' | grep -qx dxrt \
+    id -nG edge-ctr 2>/dev/null | tr ' ' '\n' | grep -x dxrt >/dev/null \
         && pass "edge-ctr is in dxrt (rootless passthrough via keep-groups)" \
         || fail "edge-ctr is not in the dxrt group"
     if sudo -n test -f /data/dxm1/bin/run_model 2>/dev/null; then
         pass "/data/dxm1 inference payload present"
-        if sudo -n journalctl _UID=608 -b --no-pager 2>/dev/null | grep -qiE 'dxm1|run_model'; then
+        if sudo -n journalctl _UID=608 -b --no-pager 2>/dev/null | grep -iE 'dxm1|run_model' >/dev/null; then
             pass "DX-M1 inference Quadlet ran this boot (user-608 journal)"
         else
             fail "payload present but the dxm1-inference Quadlet left no trace this boot"
@@ -624,7 +661,7 @@ else
     for n in drpai0 udmabuf0; do
         if [ -e "/dev/${n}" ]; then
             l=$(ls -l "/dev/${n}")
-            if printf '%s' "${l}" | grep -q 'root render'; then
+            if printf '%s' "${l}" | grep 'root render' >/dev/null; then
                 pass "/dev/${n}: $(printf '%s' "${l}" | awk '{print $1, $3":"$4}')"
             else
                 fail "/dev/${n} not root:render (rootless passthrough breaks): ${l}"
@@ -635,7 +672,7 @@ else
     done
 
     for m in drpai u_dma_buf; do
-        lsmod | grep -q "^${m} " && pass "module ${m} loaded" || fail "module ${m} not loaded"
+        lsmod | grep "^${m} " >/dev/null && pass "module ${m} loaded" || fail "module ${m} not loaded"
     done
 
     # drp_reserved is a static 512 MB carveout; usable RAM should be well under
@@ -672,7 +709,7 @@ else
     # Inference auto-start: only meaningful if the payload exists — the Quadlet
     # ConditionPathExists skips cleanly without it (expected on a fresh flash,
     # where /data carries no payload yet). A manual run also satisfies this.
-    if sudo -n journalctl _UID=608 -b --no-pager 2>/dev/null | grep -qiE 'beagle|AI Processing Time'; then
+    if sudo -n journalctl _UID=608 -b --no-pager 2>/dev/null | grep -iE 'beagle|AI Processing Time' >/dev/null; then
         pass "DRP-AI inference ran this boot (result in user-608 journal)"
     elif [ "${payload_present:-0}" -eq 1 ]; then
         fail "DRP-AI inference did NOT run this boot despite payload present (Quadlet auto-start)"
