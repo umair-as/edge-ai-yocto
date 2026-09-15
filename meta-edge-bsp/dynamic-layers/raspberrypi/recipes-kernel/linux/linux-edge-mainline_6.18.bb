@@ -4,7 +4,7 @@ require recipes-kernel/linux/linux-yocto.inc
 SUMMARY     = "Mainline stable Linux 6.18 for the Raspberry Pi 5"
 DESCRIPTION = "kernel.org linux-6.18.y pinned to a released tag, built from the \
 arm64 defconfig plus the edge-ai kernel policy fragments, with the BCM2712 \
-enablement patches mainline lacks (firmware RTC, AVS thermal zone, ramoops)."
+enablement patches mainline lacks (firmware RTC, AVS thermal zone, ramoops, RNG)."
 HOMEPAGE    = "https://www.kernel.org/"
 BUGTRACKER  = "https://bugzilla.kernel.org/"
 LIC_FILES_CHKSUM = "file://COPYING;md5=6bc538ed5bd9a7fc9398086aedcd7e46"
@@ -46,28 +46,39 @@ KBUILD_DEFCONFIG = "defconfig"
 require ${EDGE_BSP_LAYERDIR}/recipes-kernel/linux/edge-kernel-policy.inc
 
 # Board content. The RTC driver and its DT node are backports of the
-# raspberrypi/linux firmware RTC; the AVS thermal zone is pending upstream;
-# the ramoops region pairs with pstore-persist.cfg in the policy set.
-# pcie-rpi5.cfg builds the PCIe host bridge in (RP1 sits behind it);
-# boot-devices-rpi5.cfg builds the SD host in (the dm-verity root cannot
-# wait for a module). wireless-rpi5.cfg comes after the policy fragments
-# on purpose: later fragments win the merge, and it re-enables the 802.11
-# stack security-hardening.cfg turns off for boards without a radio.
+# raspberrypi/linux firmware RTC; the AVS thermal zone and the RNG200 node
+# are pending upstream; the ramoops region pairs with pstore-persist.cfg in
+# the policy set. pcie-rpi5.cfg builds the PCIe host bridge and its MIP MSI
+# parent in (RP1 and the accelerator sit behind them); boot-devices-rpi5.cfg
+# builds the SD host in (the dm-verity root cannot wait for a module);
+# rng-rpi5.cfg builds the RNG driver the new node binds. wireless-rpi5.cfg
+# comes after the policy fragments on purpose: later fragments win the
+# merge, and it re-enables the 802.11 stack security-hardening.cfg turns off
+# for boards without a radio.
 SRC_URI:append = " \
     file://patches/0001-rtc-rtc-rpi-add-simple-RTC-driver-for-Raspberry-Pi.patch \
     file://patches/0002-arm64-dts-broadcom-bcm2712-add-rpi-rtc-node.patch \
     file://patches/0003-arm64-dts-broadcom-bcm2712-add-avs-thermal-zone.patch \
     file://patches/0004-arm64-dts-broadcom-bcm2712-rpi-5-b-add-ramoops-reserved-memory.patch \
+    file://patches/0005-arm64-dts-broadcom-bcm2712-add-rng200-node.patch \
     file://cfg/boot-devices-rpi5.cfg \
     file://cfg/pcie-rpi5.cfg \
+    file://cfg/rng-rpi5.cfg \
     file://cfg/thermal-rpi5.cfg \
     file://cfg/rtc-rpi.cfg \
+    file://cfg/localversion-rpi5.cfg \
     file://cfg/wireless-rpi5.cfg \
 "
 
-# Asserted with the platform symbols: a modular SD host or PCIe bridge is a
-# green build whose root device or network appears too late.
-EDGE_KERNEL_POLICY_EXTRA_CONFIG = "CONFIG_MMC_SDHCI_BRCMSTB=y CONFIG_PCIE_BRCMSTB=y"
+# Asserted with the platform symbols: a modular SD host, PCIe bridge, MSI
+# parent or RNG is a green build whose root device, network, accelerator or
+# entropy appears too late.
+EDGE_KERNEL_POLICY_EXTRA_CONFIG = " \
+    CONFIG_MMC_SDHCI_BRCMSTB=y \
+    CONFIG_PCIE_BRCMSTB=y \
+    CONFIG_BCM2712_MIP=y \
+    CONFIG_HW_RANDOM_IPROC_RNG200=y \
+"
 
 # FIT trust anchor. U-Boot on this board takes its control FDT from the
 # firmware, which loads the board DTB this recipe deploys, so the FIT public
