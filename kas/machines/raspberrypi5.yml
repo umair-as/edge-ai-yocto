@@ -46,17 +46,22 @@ local_conf_header:
     LICENSE_FLAGS_ACCEPTED:append = " synaptics-killswitch"
     DISTRO_FEATURES:append = " wifi"
 
-    # No wireless. security-hardening.cfg builds the kernel without
-    # CONFIG_WIRELESS/WLAN on every board, so the Synaptics WiFi/BT firmware
-    # raspberrypi5.conf recommends would never load; it is also license-flagged
-    # (synaptics-killswitch), and an unaccepted flag makes the recommend an
-    # unbuildable dependency rather than a skipped one.
+    # MACHINE_EXTRA_RRECOMMENDS reaches every edge image through
+    # packagegroup-machine-base. The vendor recommends name the firmware for
+    # both radio variants and udev-rules-rpi, whose rules target the vendor
+    # kernel and name groups this distro does not create (gpio, i2c, spi);
+    # udevd resolves rule group names at start, and a missing name stalls it
+    # behind systemd-userdbd. The board include names the fitted firmware and
+    # the edge-owned rules instead. The wifi/bluetooth machine features only
+    # feed those recommends; the WiFi userspace comes from the distro feature
+    # above, and no Bluetooth userspace is installed.
     MACHINE_FEATURES_OPTED_OUT:append = " wifi bluetooth"
     MACHINE_EXTRA_RRECOMMENDS:remove = " \
         linux-firmware-rpidistro-bcm43455 \
         bluez-firmware-rpidistro-bcm4345c0-hcd \
         linux-firmware-rpidistro-bcm43456 \
         bluez-firmware-rpidistro-bcm4345c5-hcd \
+        udev-rules-rpi \
     "
 
     # rpi-default-providers.inc maps the GL virtuals to the legacy VideoCore
