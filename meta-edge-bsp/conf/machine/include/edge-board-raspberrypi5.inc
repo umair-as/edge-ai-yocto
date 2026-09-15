@@ -73,12 +73,22 @@ EDGE_UBOOT_ENV_SIZE          ?= "0x20000"
 EDGE_FIT_PUBKEY_DTB ?= "bcm2712-rpi-5-b.dtb"
 
 # --- Machine-specific image content -------------------------------------
-# No SPI flash tooling and no OP-TEE: the board has neither. On-board WiFi:
-# the CYW43455 firmware and the regulatory database cfg80211 requests at
-# init. raspberrypi5.conf only recommends the firmware through
-# packagegroup-base-extended, which no edge image installs, so it is named
-# here.
-EDGE_MACHINE_EXTRA_INSTALL ?= "linux-firmware-rpidistro-bcm43455 wireless-regdb-static"
+# No SPI flash tooling and no OP-TEE: the board has neither. On-board
+# CYW43455 radio: the WiFi firmware, the regulatory database cfg80211
+# requests at init, and the Bluetooth patch firmware hci_uart_bcm requests
+# for hci0 (no Bluetooth userspace is installed; the controller initialises
+# and stays idle). The vendor machine conf recommends the firmware for both
+# radio variants through packagegroup-machine-base; kas/machines/
+# raspberrypi5.yml removes those recommends and the fitted variant is named
+# here. edge-io-udev: gpio group + gpiochip rule, in place of the vendor
+# udev-rules-rpi (removed there too; its rules target the vendor kernel and
+# name groups this distro does not create, which stalls udevd at start).
+EDGE_MACHINE_EXTRA_INSTALL ?= "linux-firmware-rpidistro-bcm43455 bluez-firmware-rpidistro-bcm4345c0-hcd wireless-regdb-static edge-io-udev"
+
+# devel joins the I/O groups the board's recipes create. i2c and spi are not
+# offered: mainline 6.18 exposes no RP1 header I2C/SPI controller for this
+# board, only two SoC-internal I2C buses, and no spidev node.
+EDGE_BOARD_DEVEL_GROUPS = "gpio"
 
 # --- Boot artifacts (contract in edge-ab-image.bbclass) ------------------
 # The FAT partition carries what the EEPROM boot ROM reads: config.txt

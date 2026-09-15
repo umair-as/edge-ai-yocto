@@ -72,6 +72,14 @@ EXTRA_USERS_PARAMS = " \
 # error there rather than a silently skipped membership here.
 EXTRA_USERS_PARAMS:append = "${@''.join(' usermod -aG %s %s;' % (e.split(':', 1)[0], e.split(':', 1)[1]) for e in (d.getVar('EDGE_ACCEL_SUPPLEMENTARY_GROUPS') or '').split() if ':' in e)}"
 
+# Board-declared supplementary groups for devel (EDGE_BOARD_DEVEL_GROUPS,
+# set in conf/machine/include/edge-board-<MACHINE>.inc). The groups are
+# created by the board's own recipes (edge-io-udev: gpio), so they exist
+# only where the board installs them; an entry for a group the image lacks
+# fails do_rootfs, as with tee below.
+EDGE_BOARD_DEVEL_GROUPS ??= ""
+EXTRA_USERS_PARAMS:append = "${@''.join(' usermod -aG %s devel;' % g for g in (d.getVar('EDGE_BOARD_DEVEL_GROUPS') or '').split())}"
+
 # optee-client creates the tee group owning /dev/tee0 (0660, no uaccess ACL);
 # devel joins it to open a TEE context without sudo. Machine-scoped append, not
 # a member of the universal -G list above: the tee group is absent on non-rzv2l

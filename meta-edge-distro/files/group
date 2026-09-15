@@ -33,6 +33,7 @@ dxrt:*:609:
 #   systemd-journal       — journal read access
 #   empower               — systemd hostnamed PolicyKit
 #   tracing               — systemtap
+#   gpio                  — edge-io-udev (gpiochip access, board-installed)
 tee:*:620:
 teepriv:*:621:teesuppl
 seat:*:622:weston
@@ -42,6 +43,7 @@ render:*:625:weston
 systemd-journal:*:626:
 empower:*:627:
 tracing:*:628:
+gpio:*:629:
 
 # Regular-user primary group (see files/passwd for the matching uid).
 devel:*:1000:
