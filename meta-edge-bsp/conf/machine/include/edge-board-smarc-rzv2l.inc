@@ -116,3 +116,7 @@ WICVARS:append = " FIP_WIC_OFFSET"
 # conf/machine/${MACHINE}.conf (:825), so it already wins over
 # smarc-rzv2l.conf:44's conditional without an override.
 WKS_FILE = "${@oe.utils.conditional('EDGE_BOOT_TARGET', 'emmc', 'edge-rzv2l-emmc.wks.in', 'edge-rzv2l.wks.in', d)}"
+
+# Partition table of the selected layout; edge-slot-udev keys its rules on it.
+# Plain `=`: the distro pre-declares it.
+EDGE_PTABLE = "${@oe.utils.conditional('EDGE_BOOT_TARGET', 'emmc', 'gpt', 'msdos', d)}"

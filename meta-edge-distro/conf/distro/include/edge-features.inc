@@ -86,6 +86,11 @@ EDGE_UPLINK_IFACE ??= ""
 EDGE_BOOT_DEVICE ??= ""
 EDGE_DATA_DEVICE ??= ""
 
+# Partition table of the boot medium: "msdos" or "gpt". Decides where slot
+# identity comes from -- device names on MBR, which carries no partition
+# names, or GPT partition names. Set by the board include.
+EDGE_PTABLE ??= ""
+
 # Raw U-Boot environment area, where RAUC keeps its boot-count. Board facts:
 # the block device and the two redundant offsets/size. They must agree with
 # CONFIG_ENV_OFFSET / CONFIG_ENV_OFFSET_REDUND / CONFIG_ENV_SIZE in the

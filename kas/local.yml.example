@@ -150,9 +150,9 @@ local_conf_header:
     # EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION = "1"
     #
     # Everything else is override-only. Defaults, relative to the repo root:
-    # EDGE_RAUC_BUNDLE_ENCRYPT_RECIPIENTS = "${TOPDIR}/../keys/dev/rauc/rauc-recipients.pem"
-    # EDGE_RAUC_DECRYPT_KEY_SRC = "${TOPDIR}/../keys/dev/rauc/rauc-recipient.key"
-    # EDGE_RAUC_DECRYPT_CERT_SRC = "${TOPDIR}/../keys/dev/rauc/rauc-recipient.cert.pem"
+    # EDGE_RAUC_BUNDLE_ENCRYPT_RECIPIENTS = "${EDGE_KEYS_DIR}/dev/rauc/rauc-recipients.pem"
+    # EDGE_RAUC_DECRYPT_KEY_SRC = "${EDGE_KEYS_DIR}/dev/rauc/rauc-recipient.key"
+    # EDGE_RAUC_DECRYPT_CERT_SRC = "${EDGE_KEYS_DIR}/dev/rauc/rauc-recipient.cert.pem"
     #
     # The *_SRC pair is copied into the image by ota-certs as
     # /etc/ota/bundle-decrypt.{key,cert.pem} (root:ota, key 0640), and

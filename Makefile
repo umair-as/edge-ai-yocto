@@ -77,11 +77,16 @@ BASE = kas/base.yml:kas/machines/$(BOARD).yml$(if $(wildcard kas/local.yml),:kas
 # has changed location") -- so migrating an existing tree means rebuilding it,
 # not moving it. New boards get their own directory immediately; an existing
 # one migrates when its tmp/ is next discarded anyway.
+#
+# The pre-restructure build/ belongs to the first board only: a second board
+# must not inherit it just because it exists, or two machines end up sharing
+# one conf/ again.
 ifneq ($(wildcard $(CURDIR)/build/conf),)
-  KAS_BUILD_DIR ?= $(CURDIR)/build
-else
-  KAS_BUILD_DIR ?= $(CURDIR)/build/$(BOARD)
+  ifeq ($(BOARD),rzv2l)
+    KAS_BUILD_DIR ?= $(CURDIR)/build
+  endif
 endif
+KAS_BUILD_DIR ?= $(CURDIR)/build/$(BOARD)
 export KAS_BUILD_DIR
 
 
@@ -223,7 +228,7 @@ help:
 	@echo "Capability flags (composable; combine freely):"
 	@echo "  TPM=1                        + meta-secure-core (TPM2 + IMA/EVM userspace)"
 	@echo "  VIRT=1                       no-op; containers are baseline (ADR-0012)"
-	@echo "  BOARD=<name>                 select board: kas/machines/<name>.yml (rzv2l)"
+	@echo "  BOARD=<name>                 select board: kas/machines/<name>.yml (rzv2l, raspberrypi5)"
 	@echo "  ACCEL=<name>                 override the machine's accelerator (rarely needed)"
 	@echo "  AI=1                         no-op; the accelerator is baseline and machine-composed"
 	@echo "  SBOM_TUNE=1                  + kas/sbom-cve.yml tuning knobs"

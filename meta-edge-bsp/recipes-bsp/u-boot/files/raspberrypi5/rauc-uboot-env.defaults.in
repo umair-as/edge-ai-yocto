@@ -1,0 +1,20 @@
+# Managed U-Boot environment defaults for first-boot migration (raspberrypi5).
+# Format: KEY=VALUE (single line per variable)
+#
+# RAUC state vars (BOOT_ORDER, BOOT_A_LEFT, BOOT_B_LEFT) are intentionally
+# absent here — they are init-only (written if missing, never overwritten) and
+# managed directly in rauc-uboot-env-init.sh so that RAUC's slot selection
+# (fw_setenv BOOT_ORDER "B A") is never clobbered on OTA boot.
+#
+# mmc 0 = the SD card, the only MMC host on this board. loadaddr matches
+# CONFIG_SYS_LOAD_ADDR in edge-rpi5-boot.cfg. bootm takes the FIT's own
+# signed DTB (no firmware fdt argument), so /chosen/bootargs is the
+# authenticated dm-verity command line. Every slot on this board is a verity
+# slot: there is no legacy-image path and no mutable EXTRA_KERNEL_ARGS.
+
+loadaddr=0x08000000
+rauc_init=if test -z "${BOOT_ORDER}"; then setenv BOOT_ORDER "A B"; fi; if test -z "${BOOT_A_LEFT}"; then setenv BOOT_A_LEFT 3; fi; if test -z "${BOOT_B_LEFT}"; then setenv BOOT_B_LEFT 3; fi
+rauc_select_slot=setenv rauc_root; setenv rauc_slot; setenv verity_ready; for BOOT_SLOT in ${BOOT_ORDER}; do if test -n "${rauc_root}"; then true; elif test "x${BOOT_SLOT}" = "xA"; then if itest ${BOOT_A_LEFT} -gt 0; then setexpr BOOT_A_LEFT ${BOOT_A_LEFT} - 1; setenv rauc_root @EDGE_SLOT_A_DEVICE@; setenv rauc_slot A; setenv verity_ready ${EDGE_VERITY_A}; fi; elif test "x${BOOT_SLOT}" = "xB"; then if itest ${BOOT_B_LEFT} -gt 0; then setexpr BOOT_B_LEFT ${BOOT_B_LEFT} - 1; setenv rauc_root @EDGE_SLOT_B_DEVICE@; setenv rauc_slot B; setenv verity_ready ${EDGE_VERITY_B}; fi; fi; done
+rauc_validate_slot=if test -z "${rauc_root}"; then echo "[RAUC] no bootable slot, resetting counters"; setenv BOOT_A_LEFT 3; setenv BOOT_B_LEFT 3; saveenv; reset; fi
+boot_fit=if test "x${verity_ready}" = "x1"; then if fatload mmc 0:1 ${loadaddr} fitImage-${rauc_slot}; then setenv bootargs; saveenv; bootm ${loadaddr}#conf-${rauc_slot}; fi; fi; echo "[RAUC] verified slot FIT load/boot failed"; reset
+bootcmd=if mmc dev 0; then run rauc_init; run rauc_select_slot; run rauc_validate_slot; run boot_fit; else reset; fi

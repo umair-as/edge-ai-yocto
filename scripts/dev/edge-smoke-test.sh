@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # On-device smoke test for the edge-ai distro.
 #
+# Board-neutral: the machine, its uplink interface and its accelerator are
+# read from the image (/etc/buildinfo, the shipped networkd units, the
+# installed accelerator stack), not assumed. Runs on RZ/V2L and Raspberry Pi 5.
+#
 # Validates the bind-mount persistence architecture (edge-persistence recipe):
 #   - /var/log, /var/lib/{containers,systemd} and /home are bind
 #     mounted from /data subdirs (not overlays)
@@ -59,6 +63,29 @@ check_bind() {
         fail "${where}: fsroot='${fsroot}' source='${src}' (wanted ${expect_source} / fsroot ${expect_subpath})"
     fi
 }
+
+# ---------------- 0. board identity ----------------
+
+section "Board identity"
+
+EDGE_MACHINE=$(awk -F= '/^MACHINE=/{print $2; exit}' /etc/buildinfo 2>/dev/null)
+EDGE_BUILD_ID=$(awk -F= '/^EDGE_BUILD_ID=/{print $2; exit}' /etc/buildinfo 2>/dev/null)
+if [ -n "${EDGE_MACHINE}" ]; then
+    pass "MACHINE=${EDGE_MACHINE} build ${EDGE_BUILD_ID:-?} ($(tr -d '\0' < /proc/device-tree/model 2>/dev/null || echo 'model unknown'))"
+else
+    fail "/etc/buildinfo has no MACHINE= — cannot derive board facts; checks below assume nothing"
+fi
+
+# Uplink = the shipped networkd unit that is not Unmanaged; unmanaged = the
+# rest. edge-network-units templates both from the board include, so the
+# image itself says which interface carries DHCP.
+EDGE_UPLINK=""; EDGE_UNMANAGED=""
+for u in /etc/systemd/network/10-*.network; do
+    [ -f "${u}" ] || continue
+    n=$(basename "${u}" .network); n=${n#10-}
+    if grep -qE '^\s*Unmanaged\s*=\s*yes' "${u}"; then EDGE_UNMANAGED="${EDGE_UNMANAGED} ${n}"; else EDGE_UPLINK="${n}"; fi
+done
+info "uplink: ${EDGE_UPLINK:-?}  unmanaged:${EDGE_UNMANAGED:- none}"
 
 # ---------------- 1. system health ----------------
 
@@ -295,12 +322,21 @@ if command -v podman >/dev/null 2>&1; then
     # DNS not-yet-settled) is visible. Smoke test runs at uptime ~2-4 min;
     # networkd-without-resolved may not have written a resolvable DNS server yet
     # (the Network section reports whether /etc/resolv.conf got populated).
-    podman_run_err=$(sudo podman run --rm docker.io/library/alpine:3 echo "container-ok" 2>&1 >/dev/null)
+    podman_run_err=$(sudo -n podman run --rm docker.io/library/alpine:3 echo "container-ok" 2>&1 >/dev/null)
     if [ $? -eq 0 ]; then
         pass "podman run alpine:3 — OK (pulled + executed)"
     else
-        warn "podman run alpine:3 failed — likely transient first-boot DNS"
-        printf '        %s\n' "${podman_run_err}" | head -3 | sed 's/^/        /'
+        # Name the cause: a missing nft binary is an image defect (netavark's
+        # nftables driver execs it for every root container network), a DNS
+        # failure is first-boot timing. Only the second is transient.
+        case "${podman_run_err}" in
+            *'unable to execute "nft"'*|*'nft: No such file'*)
+                fail "root podman run failed: netavark cannot exec nft — nftables userspace missing from the image" ;;
+            *"no such host"*|*"lookup "*|*"Temporary failure in name resolution"*)
+                warn "root podman run failed on name resolution (first-boot DNS); rerun later" ;;
+            *)
+                fail "root podman run alpine:3 failed: $(printf '%s' "${podman_run_err}" | tail -1 | cut -c1-160)" ;;
+        esac
     fi
 else
     fail "podman not installed"
@@ -468,7 +504,7 @@ section "Lingering user managers (boot auto-start)"
 # signal — it survives later manual recovery of the session.
 if sudo -n journalctl -b -u systemd-logind --no-pager 2>/dev/null \
        | grep -qiE 'User enumeration failed|Couldn.t add lingering user'; then
-    fail "systemd-logind failed to enumerate lingering users this boot (ESRCH linger race) — rootless Quadlets won't auto-start; on a fresh-OTA first boot this self-heals on reboot"
+    fail "systemd-logind failed to enumerate lingering users this boot — userdb refused the records (workers started before /etc/machine-id was restored; edge-persistence orders systemd-userdbd after it). Rootless Quadlets won't auto-start until userdbd's workers recycle (~5 min) or \`systemctl restart systemd-userdbd\`"
 else
     pass "systemd-logind enumerated lingering users cleanly this boot"
 fi
@@ -490,13 +526,97 @@ for u in edge-ctr devel; do
     fi
 done
 
-# ---------------- 13. DRP-AI accelerator ----------------
+# ---------------- 13. accelerator ----------------
 
-section "DRP-AI accelerator"
-
+# Every board carries one; which one is read from the image, not assumed.
+# DRP-AI (RZ/V2L): kernel-module-drpai + render-group nodes. DX-M1 (RPi5):
+# edge-dxm1-runtime's udev rule + dxrtd + the PCIe endpoint.
+accel="none"
 drpai_ko=$(find "/lib/modules/$(uname -r)" -name 'drpai.ko*' 2>/dev/null | head -1)
-if [ -z "${drpai_ko}" ]; then
-    fail "kernel-module-drpai not installed — the accelerator is baseline on this board, so this is a build or composition fault, not an image variant"
+[ -n "${drpai_ko}" ] && accel="drpai-v2l"
+[ -f /etc/udev/rules.d/71-edge-dxm1.rules ] && accel="dxm1"
+
+section "Accelerator (${accel})"
+
+if [ "${accel}" = "dxm1" ]; then
+    # PCIe endpoint: DEEPX vendor id 1ff4. The bridge is built in and the
+    # driver is autoloaded from the modalias, so an absent endpoint means the
+    # card, the slot or the link — not the image.
+    if command -v lspci >/dev/null 2>&1; then
+        dx_bdf=$(lspci -d 1ff4: -n 2>/dev/null | awk '{print $1; exit}')
+        if [ -n "${dx_bdf}" ]; then
+            pass "DX-M1 endpoint on PCIe at ${dx_bdf}"
+            ctl=$(sudo -n lspci -vvs "${dx_bdf}" 2>/dev/null | grep -m1 -E '^\s*Control:')
+            case "${ctl}" in
+                *Mem+*BusMaster+*) pass "endpoint Control: Mem+ BusMaster+" ;;
+                "") warn "lspci -vv needs sudo; endpoint control state not read" ;;
+                *) fail "endpoint not enabled: ${ctl}" ;;
+            esac
+            aspm=$(sudo -n lspci -vvs "${dx_bdf}" 2>/dev/null | grep -m1 -oE 'ASPM (Disabled|L0s|L1|L0s L1)')
+            [ -n "${aspm}" ] && info "link ${aspm}"
+        else
+            fail "no DEEPX (1ff4) PCIe endpoint enumerated — card not detected"
+        fi
+    else
+        warn "lspci absent — PCIe endpoint not inspected"
+    fi
+    case "$(cat /proc/cmdline)" in
+        *pcie_aspm=off*) pass "kernel cmdline: pcie_aspm=off (BCM2712 + DX-M1 SError guard)" ;;
+        *) fail "kernel cmdline lacks pcie_aspm=off — link-state resets panic this board" ;;
+    esac
+    if sudo -n dmesg 2>/dev/null | grep -qiE 'AER:.*(Uncorrect|Correct)ed error'; then
+        warn "PCIe AER errors logged this boot (dmesg | grep AER)"
+    else
+        pass "no PCIe AER errors this boot"
+    fi
+    for m in dx_dma dxrt_driver; do
+        lsmod | grep -q "^${m} " && pass "module ${m} loaded" || fail "module ${m} not loaded (udev modalias autoload after PCIe enumeration)"
+    done
+    if [ -e /dev/dxrt0 ]; then
+        l=$(ls -l /dev/dxrt0)
+        if printf '%s' "${l}" | grep -qE '^crw-rw----.* root dxrt '; then
+            pass "/dev/dxrt0 root:dxrt 0660"
+        else
+            fail "/dev/dxrt0 not root:dxrt 0660: ${l}"
+        fi
+    else
+        fail "/dev/dxrt0 missing — dxrt_driver found no device"
+    fi
+    if systemctl is-active dxrtd.service >/dev/null 2>&1; then
+        dx_user=$(ps -o user= -C dxrtd 2>/dev/null | head -1)
+        [ "${dx_user}" = "dxrt" ] && pass "dxrtd active as dxrt" || fail "dxrtd active but running as '${dx_user:-?}' (expected dxrt)"
+    else
+        fail "dxrtd.service not active ($(systemctl is-active dxrtd.service 2>/dev/null)) — ConditionPathExistsGlob=/dev/dxrt* unmet, or the daemon failed"
+    fi
+    if command -v dxrt-cli >/dev/null 2>&1; then
+        dx_status=$(sudo -n timeout 20 dxrt-cli -s 2>&1 | head -20)
+        if printf '%s' "${dx_status}" | grep -qiE 'device|firmware|fw'; then
+            pass "dxrt-cli -s reports a device"
+            printf '%s\n' "${dx_status}" | grep -iE 'device|firmware|fw|version' | head -4 | sed 's/^/        /'
+        else
+            warn "dxrt-cli -s gave no device report (daemon/firmware handshake): $(printf '%s' "${dx_status}" | head -1)"
+        fi
+    fi
+    id -nG edge-ctr 2>/dev/null | tr ' ' '\n' | grep -qx dxrt \
+        && pass "edge-ctr is in dxrt (rootless passthrough via keep-groups)" \
+        || fail "edge-ctr is not in the dxrt group"
+    if sudo -n test -f /data/dxm1/bin/run_model 2>/dev/null; then
+        pass "/data/dxm1 inference payload present"
+        if sudo -n journalctl _UID=608 -b --no-pager 2>/dev/null | grep -qiE 'dxm1|run_model'; then
+            pass "DX-M1 inference Quadlet ran this boot (user-608 journal)"
+        else
+            fail "payload present but the dxm1-inference Quadlet left no trace this boot"
+        fi
+    else
+        info "no /data/dxm1 payload — Quadlet skips (expected on a fresh flash; stage runtime libs + model + run_model there to enable)"
+    fi
+    if [ -f /etc/systemd/user/podman-user-wait-network-online.service.d/10-edge-noop.conf ]; then
+        pass "podman-user-wait no-op drop-in present (no 90s inference delay)"
+    else
+        warn "podman-user-wait no-op drop-in missing — first inference likely delayed ~90s at boot"
+    fi
+elif [ "${accel}" = "none" ]; then
+    fail "no accelerator stack installed — the accelerator is baseline on every board, so this is a build or composition fault, not an image variant"
 else
     # Accelerator + zero-copy buffer nodes. render-group 0660 ownership (from
     # edge-drpai-udev) is what lets the rootless container open them via
@@ -565,9 +685,8 @@ fi
 
 section "Network (systemd-networkd)"
 
-# Migrated from NetworkManager this cycle: networkd owns DHCP on eth1; eth0 is
-# left unmanaged for the netboot ip=dhcp path. resolved was dropped, so whether
-# /etc/resolv.conf gets populated is the open question this section answers.
+# networkd owns DHCP on the board's uplink (EDGE_UPLINK, from the shipped
+# unit); unmanaged interfaces are reserved for the kernel netboot path.
 if systemctl is-active systemd-networkd.service >/dev/null 2>&1; then
     pass "systemd-networkd active"
 else
@@ -577,30 +696,43 @@ fi
 if command -v networkctl >/dev/null 2>&1; then
     # Parse `networkctl list` columns (IDX LINK TYPE OPERATIONAL SETUP) — robust
     # vs. parsing the prose of `networkctl status`.
-    eth1_op=$(networkctl --no-legend list 2>/dev/null | awk '$2=="eth1"{print $4}')
-    if [ "${eth1_op}" = "routable" ]; then
-        pass "eth1 routable"
+    up_op=$(networkctl --no-legend list 2>/dev/null | awk -v i="${EDGE_UPLINK}" '$2==i{print $4}')
+    if [ "${up_op}" = "routable" ]; then
+        pass "${EDGE_UPLINK} routable"
+    elif [ -z "$(ip -o link show "${EDGE_UPLINK}" 2>/dev/null)" ]; then
+        fail "uplink '${EDGE_UPLINK}' (from the shipped unit) does not exist — interface naming differs from the board include (links: $(ip -o link show | awk -F': ' '{print $2}' | grep -v '^lo$' | tr '\n' ' '))"
     else
-        fail "eth1 not routable (operational='${eth1_op:-absent}') — DHCP uplink down"
+        fail "${EDGE_UPLINK} not routable (operational='${up_op:-absent}') — DHCP uplink down"
     fi
-    eth0_setup=$(networkctl --no-legend list 2>/dev/null | awk '$2=="eth0"{print $5}')
-    if [ "${eth0_setup}" = "unmanaged" ]; then
-        pass "eth0 unmanaged (as configured for netboot)"
-    else
-        info "eth0 setup: ${eth0_setup:-absent}"
-    fi
+    for i in ${EDGE_UNMANAGED}; do
+        i_setup=$(networkctl --no-legend list 2>/dev/null | awk -v i="${i}" '$2==i{print $5}')
+        if [ "${i_setup}" = "unmanaged" ]; then
+            pass "${i} unmanaged (as configured for netboot)"
+        else
+            info "${i} setup: ${i_setup:-absent}"
+        fi
+    done
 else
     warn "networkctl absent — cannot inspect link state"
 fi
 
-# IPv4 on eth1 — the SSH path on a flashed (non-netboot) image.
-eth1_v4=$(ip -4 -o addr show eth1 2>/dev/null | awk '{print $4}' | head -1)
-[ -n "${eth1_v4}" ] && pass "eth1 IPv4 ${eth1_v4}" || fail "eth1 has no IPv4 address (DHCP)"
+# IPv4 on the uplink — the SSH path on a flashed (non-netboot) image.
+up_v4=$(ip -4 -o addr show "${EDGE_UPLINK}" 2>/dev/null | awk '{print $4}' | head -1)
+[ -n "${up_v4}" ] && pass "${EDGE_UPLINK} IPv4 ${up_v4}" || fail "${EDGE_UPLINK} has no IPv4 address (DHCP)"
 
-# IPv6 SLAAC on eth1 — migration smoke-test F1: confirm an RA-derived global addr.
-eth1_v6=$(ip -6 -o addr show eth1 scope global 2>/dev/null | awk '{print $4}' | head -1)
-[ -n "${eth1_v6}" ] && pass "eth1 IPv6 SLAAC ${eth1_v6}" \
-    || warn "eth1 no global IPv6 (SLAAC) — F1: if RA expected, drop net.ipv6.conf.all.accept_ra=0"
+# IPv6 SLAAC on the uplink: confirm an RA-derived global address.
+up_v6=$(ip -6 -o addr show "${EDGE_UPLINK}" scope global 2>/dev/null | awk '{print $4}' | head -1)
+[ -n "${up_v6}" ] && pass "${EDGE_UPLINK} IPv6 SLAAC ${up_v6}" \
+    || warn "${EDGE_UPLINK} no global IPv6 (SLAAC) — if RA expected, drop net.ipv6.conf.all.accept_ra=0"
+
+# WiFi, where the board has it: the link should exist with brcmfmac bound;
+# association is operator provisioning, not an image property.
+if [ -e /sys/class/net/wlan0 ]; then
+    drv=$(basename "$(readlink /sys/class/net/wlan0/device/driver 2>/dev/null)" 2>/dev/null)
+    pass "wlan0 present (driver ${drv:-?}; not configured by the image)"
+elif [ "${EDGE_MACHINE}" = "raspberrypi5" ]; then
+    fail "wlan0 absent on raspberrypi5 — brcmfmac/firmware/regulatory chain did not bring the radio up"
+fi
 
 # DNS without resolved: does networkd populate /etc/resolv.conf?
 ns=$(awk '/^nameserver /{print $2; exit}' /etc/resolv.conf 2>/dev/null)
