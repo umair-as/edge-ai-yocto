@@ -84,6 +84,16 @@ The failure→revert round-trip is therefore hardware-validated for boot-time
 failures. Power-loss atomicity (mid-write, mid-env-write) is designed-safe on
 RAUC's atomic marking + redundant U-Boot env but not yet bench-tested.
 
+The same install path is validated on the Raspberry Pi 5 (2026-09-15): a
+`.raucb` built with `make bundle BOARD=raspberrypi5` installed over `rauc
+install` from slot A, the post-install hook wrote the target slot's signed
+FIT to the FAT `/boot` partition, U-Boot selected `conf-B` on reboot, the
+slot booted with `rauc.slot=B` and was marked good, and the late-fallback
+policy then marked A bad exactly as on RZ/V2L. The T1-T8 rollback matrix
+above has been run on RZ/V2L only; the Pi shares the managed U-Boot env
+script and RAUC configuration, but its rollback paths are not yet
+bench-tested.
+
 ## Kernel and root-hash coupling
 
 A bundle always carries the rootfs plus both image-specific FIT artifacts. The
