@@ -7,9 +7,10 @@ specific extras (skills, MCP servers) live in `CLAUDE.md`.
 ## What this repo is
 
 See [README.md](README.md) for the platform summary. Short version:
-KAS-driven Yocto 6.0 (wrynose) build, custom `edge-ai` distro, Renesas
-vendor BSP (CIP-aligned `linux-renesas` kernel; preserves the SLTS
-intent of ADR-0001), RZ/V2L SMARC EVK first board.
+KAS-driven Yocto 6.0 (wrynose) build, custom `edge-ai` distro, and a
+per-board vendor BSP and kernel (ADR-0011): the Renesas RZ/V2L SMARC EVK
+on the CIP-aligned `linux-renesas` 6.12 (the SLTS intent of ADR-0001), the
+Raspberry Pi 5 on mainline-stable 6.18. `BOARD=<name>` selects the board.
 
 ## Build commands
 
@@ -19,6 +20,7 @@ the composition for you.
 ```bash
 make help                 # authoritative target catalogue — check before raw bitbake
 make base                 # build edge-image-base (the v0 wired tier)
+make base BOARD=raspberrypi5   # same for the second board; builds in build/raspberrypi5/
 make dev | prod           # dev / hardened-prod image tiers
 make bundle               # RAUC .raucb for OTA install
 make parse                # bitbake -p (parse-only sanity — cheapest validation)
@@ -45,8 +47,10 @@ whitelisted env var.
 ## KAS composition
 
 ```
-kas/base.yml         <- distro + layer wiring + kernel choice (CIP-aligned linux-renesas 6.12)
-kas/machines/*.yml   <- board pick (e.g. rzv2l.yml)
+kas/base.yml         <- distro + upstream layer wiring; board-neutral (no kernel, no vendor BSP)
+kas/bsp/*.yml        <- vendor BSP + kernel provider per board family (renesas-rz.yml, raspberrypi.yml)
+kas/machines/*.yml   <- board pick; includes its kas/bsp fragment (rzv2l.yml, raspberrypi5.yml)
+kas/accel/*.yml      <- accelerator selection, composed by the machine fragment (drpai-v2l.yml)
 kas/local.yml        <- personal overlay (paths, parallelism); gitignored
 kas/local.yml.example <- template
 ```
@@ -55,12 +59,21 @@ Compose with `:`:
 
 ```
 kas build kas/base.yml:kas/machines/rzv2l.yml
+kas build kas/base.yml:kas/machines/raspberrypi5.yml
 # Image tier is picked via the bitbake target name (edge-image-base /
 # edge-image-dev), not a kas overlay; the make wrapper handles this.
 ```
 
-The Makefile reads `kas/local.yml` first if present; otherwise it
-composes the explicit chain.
+Board facts (slot devices, U-Boot env area, FIT addresses, boot files) live
+in `meta-edge-bsp/conf/machine/include/edge-board-<MACHINE>.inc`, pulled in
+by MACHINE from the distro conf. Build directories are per board: `build/`
+for the first board, `build/<BOARD>/` for every later one, sharing
+`DL_DIR`/`SSTATE_DIR`.
+
+The Makefile always composes the tracked chain
+(`kas/base.yml:kas/machines/$(BOARD).yml`) and appends `kas/local.yml` last,
+as an additive host overlay, when it exists. A host file never decides the
+board.
 
 ### Standalone `kas` invocations — source the env first
 
@@ -93,7 +106,8 @@ kas/                                   # KAS composition
 docs/
   adr/                                 # Architecture Decision Records — read
                                        #   before re-deriving settled choices.
-                                       #   0001 = kernel base (linux-cip 6.12 SLTS).
+                                       #   0001 = RZ/V2L kernel base (linux-cip 6.12 SLTS);
+                                       #   0011 = kernel base is per board.
 .claude/
   context/bsp-workflow.md              # layer ownership + workflow contract
   references/board-catalogue.md        # boards wired vs. slot-available
@@ -105,8 +119,12 @@ meta-edge-distro/                      # brand identity + DISTRO=edge-ai
   conf/distro/edge-ai.conf
   recipes-core/psplash/                # EDGE AI OS brand splash
 meta-edge-bsp/                         # image scaffolding + board patches
+  conf/machine/include/edge-board-*.inc  # per-board facts
   recipes-core/images/edge-image-*.bb
   recipes-support/edge-systemd-presets/
+  dynamic-layers/<collection>/         # vendor-targeting recipes/bbappends, parsed
+                                       #   only when that layer is composed
+                                       #   (meta-rz-{bsp,distro}, raspberrypi)
 .kas/                                  # kas-managed upstream layers (meta-renesas,
                                        #   bitbake, openembedded-core, …); gitignored.
                                        #   See docs/adr/0002-layer-hosting.md.
@@ -126,11 +144,15 @@ build/                                 # bitbake output (gitignored)
 - **Custom distro `edge-ai`, not Poky** — defined in
   `meta-edge-distro/conf/distro/edge-ai.conf`. SBOM (SPDX 3.0) and CVE
   check are wired into the distro from day one.
-- **Renesas vendor BSP, CIP-aligned** — `meta-renesas` provides the
-  machine configs and the `linux-renesas` kernel recipe, which fetches
-  `github.com/renesas-rz/rz_linux-cip.git` (CIP base + Renesas RZ
-  enablement on top).
-  TF-A and U-Boot follow the Renesas CIP forks.
+- **Per-board vendor BSP and kernel (ADR-0011)** — RZ/V2L: `meta-renesas`
+  provides the machine configs and the `linux-renesas` kernel recipe, which
+  fetches `github.com/renesas-rz/rz_linux-cip.git` (CIP base + Renesas RZ
+  enablement on top); TF-A and U-Boot follow the Renesas CIP forks.
+  Raspberry Pi 5: `meta-raspberrypi` provides the machine conf and firmware
+  boot files; the kernel is this repo's `linux-edge-mainline` (kernel.org
+  stable 6.18, `dynamic-layers/raspberrypi/`), U-Boot is oe-core's.
+  Kernel policy shared by every board lives in
+  `recipes-kernel/linux/edge-kernel-policy.inc`.
 - **Layer ownership** — `meta-edge-distro` owns brand + distro identity;
   `meta-edge-bsp` owns image recipes and board-level patches. Do not
   mix.

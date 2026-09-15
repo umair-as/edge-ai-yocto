@@ -5,7 +5,10 @@
 # SELinux LSM stack and CONFIG_LSM ordering, lockdown, IMA/EVM, RAUC
 # verity, dm-crypt, container cgroups and storage/net, AI compute,
 # hwcrypto/RNG and pstore. Board-specific fragments and DTS patches stay
-# in the provider bbappend behind a machine override.
+# in the provider bbappend behind a machine override. The dev-tier and
+# opt-in toggles (EDGE_KERNEL_DEV_FRAGMENTS, EDGE_ENABLE_BTF_CORE_DEV,
+# EDGE_ENABLE_JTAG_DEBUG) and the kernel -src packaging policy live here
+# too: they read the same fragment set and apply to every provider.
 #
 # do_kernel_configme resolves these into .config; the assertion at the
 # bottom of this file is what makes a dropped symbol a build failure
@@ -31,6 +34,62 @@ SRC_URI:append = " \
 # generation into two stages: the kernel recipe publishes raw artifacts,
 # edge-kernel-fit consumes them to assemble and sign the FIT.
 KERNEL_CLASSES:append = " kernel-fit-extra-artifacts"
+
+# Dev-only fragments. Tier defaults live in edge-profile-{dev,prod}.inc;
+# this fallback keeps them on for builds that do not use the edge-ai distro.
+EDGE_KERNEL_DEV_FRAGMENTS ?= "1"
+SRC_URI:append = "${@' file://cfg/observability-dev.cfg file://cfg/crash-debug-dev.cfg' if d.getVar('EDGE_KERNEL_DEV_FRAGMENTS') == '1' else ''}"
+
+# BTF/CO-RE — independent, OFF by default. btf-core-dev.cfg turns on in-kernel
+# BTF (CONFIG_DEBUG_INFO_BTF + _MODULES) over un-reduced DWARF; the build runs
+# pahole to emit the .BTF section. Three things are required, all gated together:
+#   - btf-core-dev.cfg (the CONFIG_* request)
+#   - pahole-native in DEPENDS (meta-oe pahole v1.31; the generator)
+#   - KERNEL_DEBUG="True", which makes linux-yocto.inc drop its default
+#     `PAHOLE=false` from the config-time make and add pahole-native to
+#     do_kernel_configme. Without it, CONFIG_PAHOLE_VERSION probes `false`,
+#     resolves to 0, and Kconfig silently drops DEBUG_INFO_BTF even though
+#     pahole is in the sysroot.
+# Un-reduced DWARF + per-module BTF inflate /lib/modules and the OTA bundle, so
+# this is its own gate (separate from JTAG): off for DRP-AI/edge-AI builds, on
+# only for libbpf/CO-RE labs.
+EDGE_ENABLE_BTF_CORE_DEV ?= "0"
+SRC_URI:append = "${@' file://cfg/btf-core-dev.cfg' if d.getVar('EDGE_ENABLE_BTF_CORE_DEV') == '1' else ''}"
+DEPENDS:append = "${@' pahole-native' if d.getVar('EDGE_ENABLE_BTF_CORE_DEV') == '1' else ''}"
+KERNEL_DEBUG = "${@'True' if d.getVar('EDGE_ENABLE_BTF_CORE_DEV') == '1' else ''}"
+
+# JTAG/OpenOCD source-level kernel-debug fragment — opt-in, off by default.
+# Appended last so its KASLR/lockup-detector overrides win the merge over
+# crash-debug-dev.cfg. do_kernel_configcheck flags those two symbols as a
+# requested-vs-final mismatch; that is the intended override, not an error.
+EDGE_ENABLE_JTAG_DEBUG ?= "0"
+SRC_URI:append = "${@' file://cfg/jtag-debug.cfg' if d.getVar('EDGE_ENABLE_JTAG_DEBUG') == '1' else ''}"
+
+# Generate the in-tree gdb helpers' constants.py (lx-ps, lx-dmesg, lx-symbols).
+# CONFIG_GDB_SCRIPTS=y (jtag-debug.cfg) builds the infra, but constants.py is
+# only produced by `make scripts_gdb`; without it `source vmlinux-gdb.py` fails
+# with "No module named 'linux'". Emitted into ${B}/scripts/gdb/ for the host
+# debugger to source. Gated on the JTAG toggle — no cost on normal builds.
+do_compile:append() {
+    if [ "${EDGE_ENABLE_JTAG_DEBUG}" = "1" ]; then
+        oe_runmake scripts_gdb
+    fi
+}
+
+# No kernel -src package.
+#
+# oe-core defaults PACKAGE_DEBUG_SPLIT_STYLE to "debug-with-srcpkg"
+# (bitbake.conf:331), the only value that populates ${PN}-src
+# (package.bbclass:448). For the kernel that package is ~1.6G of sources that
+# nothing can install: src-pkgs is not in IMAGE_FEATURES anywhere here, and a
+# dm-verity root could not take them anyway. It also fails buildpaths QA,
+# because generated sources such as drivers/tty/vt/consolemap_deftbl.c carry
+# the absolute path of their input in a comment emitted by conmakehash.
+#
+# Dropping it removes the package rather than excusing it; -dbg is unaffected,
+# so EDGE_DEV_DBG_PKGS still works. Kernel source for host-side debugging
+# stays in work-shared/${MACHINE}/kernel-source, which rm_work preserves.
+PACKAGE_DEBUG_SPLIT_STYLE = "debug-without-src"
 
 # Load-bearing symbols asserted against the resolved .config. Each entry
 # is matched as an exact line, so a value change (CONFIG_LSM ordering) is

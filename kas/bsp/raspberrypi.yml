@@ -1,0 +1,38 @@
+# Raspberry Pi vendor BSP composition.
+#
+# Everything meta-raspberrypi: the repo pin and its layer, plus (via the
+# kernel include) the kernel provider selection. Included from
+# kas/machines/raspberrypi5.yml, not from kas/base.yml -- base is
+# board-neutral distro policy, and this machine composes its own vendor BSP
+# fragment the way kas/machines/rzv2l.yml composes kas/bsp/renesas-rz.yml.
+#
+# The layer supplies the machine conf, the firmware boot files (rpi-bootfiles,
+# rpi-config, rpi-cmdline) and the U-Boot defconfig selection. It does NOT
+# supply the kernel: kas/bsp/raspberrypi-kernel.yml masks the vendor kernel
+# recipes and selects the mainline provider (ADR-0011).
+
+header:
+  version: 19
+  includes:
+    - kas/bsp/raspberrypi-kernel.yml
+
+repos:
+  # No wrynose branch upstream (agherzan/meta-raspberrypi#1598); master
+  # declares LAYERSERIES_COMPAT = "wrynose". Pinned by commit, same revision
+  # as the proven RPi5 reference build on the same oe-core pin.
+  meta-raspberrypi:
+    url: https://github.com/agherzan/meta-raspberrypi.git
+    branch: master
+    commit: b0f0a6c0bfbf5d0e464c13944dda73fa69f31f6b
+    # The layer sits at the repo root, not in a subdirectory.
+    layers:
+      .:
+
+local_conf_header:
+  rpi_boot_chain: |
+    # U-Boot is the boot chain (EDGE_BOOT_CHAIN = "uboot-fit" in the board
+    # include): the EEPROM boot ROM loads u-boot.bin in the kernel slot of the
+    # FAT partition, and U-Boot verifies and boots the signed slot FIT.
+    # Read by rpi-base.inc at machine-conf parse, so it must be local.conf
+    # scope -- the board include parses too late.
+    RPI_USE_U_BOOT = "1"

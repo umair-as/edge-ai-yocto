@@ -223,12 +223,17 @@ SPDX_INCLUDE_VEX = "all"
 
 # ----- FIT verified boot (file-key dev profile) --------------------------
 
+# Repo-root key store, keys/ (gitignored). Anchored on the distro layer, not
+# TOPDIR: the build directory is build/ for the first board and build/<BOARD>/
+# for every later one, so a TOPDIR-relative path resolves per board and
+# FIT_GENERATE_KEYS would mint a second trust root for the second board.
+EDGE_KEYS_DIR ?= "${@os.path.normpath(d.getVar('EDGE_DISTRO_LAYERDIR') + '/../keys')}"
+
 # Non-negotiable: signed FIT is the boot path. The profile (file-key vs
 # HSM) can change; the fact of signing cannot. mkimage auto-generates
-# the key pair into UBOOT_SIGN_KEYDIR on first build; keys/dev/fit/ is
-# gitignored.
+# the key pair into UBOOT_SIGN_KEYDIR on first build.
 UBOOT_SIGN_ENABLE      ?= "1"
-UBOOT_SIGN_KEYDIR      ?= "${TOPDIR}/../keys/dev/fit"
+UBOOT_SIGN_KEYDIR      ?= "${EDGE_KEYS_DIR}/dev/fit"
 UBOOT_SIGN_KEYNAME     ?= "edge-fit-dev"
 FIT_HASH_ALG           ?= "sha256"
 FIT_SIGN_ALG           ?= "rsa2048"
@@ -259,14 +264,14 @@ python () {
 # Chain-rooted PKI: leaf (with codeSigning EKU) signs the bundle; root CA
 # is installed on the device as /etc/rauc/ca.cert.pem. Generate the chain
 # with scripts/rauc-init-certs.sh — keys live under keys/dev/rauc/, same
-# pattern as keys/dev/fit/ for the FIT signing. keys/ is gitignored.
+# pattern as keys/dev/fit/ for the FIT signing.
 #
 # RAUC_DEVICE_KEYRING is a project-local variable consumed by rauc-conf-edge;
 # explicitly pin to the CA so the leaf is NOT installed on the device
 # (only the CA needs to be there for chain verification).
-RAUC_KEY_FILE       ?= "${TOPDIR}/../keys/dev/rauc/rauc-signer.key"
-RAUC_CERT_FILE      ?= "${TOPDIR}/../keys/dev/rauc/rauc-signer.cert.pem"
-RAUC_KEYRING_FILE   ?= "${TOPDIR}/../keys/dev/rauc/rauc-ca.cert.pem"
+RAUC_KEY_FILE       ?= "${EDGE_KEYS_DIR}/dev/rauc/rauc-signer.key"
+RAUC_CERT_FILE      ?= "${EDGE_KEYS_DIR}/dev/rauc/rauc-signer.cert.pem"
+RAUC_KEYRING_FILE   ?= "${EDGE_KEYS_DIR}/dev/rauc/rauc-ca.cert.pem"
 RAUC_DEVICE_KEYRING ?= "${RAUC_KEYRING_FILE}"
 
 # ----- RAUC bundle encryption (crypt format, on by default) ---------------
@@ -278,9 +283,9 @@ RAUC_DEVICE_KEYRING ?= "${RAUC_KEYRING_FILE}"
 #
 # Consumed by: edge-bundle-common.inc (recipients), ota-certs (device key
 # and cert), rauc-conf-edge (the [encryption] stanza that names them).
-EDGE_RAUC_BUNDLE_ENCRYPT_RECIPIENTS ?= "${TOPDIR}/../keys/dev/rauc/rauc-recipients.pem"
-EDGE_RAUC_DECRYPT_KEY_SRC           ?= "${TOPDIR}/../keys/dev/rauc/rauc-recipient.key"
-EDGE_RAUC_DECRYPT_CERT_SRC          ?= "${TOPDIR}/../keys/dev/rauc/rauc-recipient.cert.pem"
+EDGE_RAUC_BUNDLE_ENCRYPT_RECIPIENTS ?= "${EDGE_KEYS_DIR}/dev/rauc/rauc-recipients.pem"
+EDGE_RAUC_DECRYPT_KEY_SRC           ?= "${EDGE_KEYS_DIR}/dev/rauc/rauc-recipient.key"
+EDGE_RAUC_DECRYPT_CERT_SRC          ?= "${EDGE_KEYS_DIR}/dev/rauc/rauc-recipient.cert.pem"
 
 # ----- Build identifier ---------------------------------------------------
 

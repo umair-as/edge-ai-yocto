@@ -49,7 +49,7 @@ INHERIT += "extrausers"
 EXTRA_USERS_PARAMS = " \
     usermod -p '${EDGE_DEFAULT_PASSWORD_HASH}' root; \
     groupadd devel; \
-    useradd -G wheel,systemd-journal,dialout,audio,video,input,tty,render,wayland \
+    useradd -G wheel,systemd-journal,dialout,audio,video,input,tty,render${@',wayland' if d.getVar('EDGE_ENABLE_DISPLAY') == '1' else ''} \
             -m -s /bin/bash \
             -p '${EDGE_DEFAULT_PASSWORD_HASH}' devel; \
 "
@@ -87,11 +87,12 @@ EXTRA_USERS_PARAMS:append = "${@bb.utils.contains('EDGE_ENABLE_OPTEE', '1', ' us
 #                    ALSA + DRM + evdev for weston / multimedia work
 #   tty              direct /dev/tty* access
 #   render           DRM render nodes (drp-ai, mesa, opencl)
-#   wayland          weston socket access (clients)
-# All of these are created either by base-passwd (wheel/dialout/audio/
-# video/input/tty) or by systemd-journald / weston-init recipes — both
-# of which are in edge-image-base and edge-image-dev, so this -G list is
-# safe for either image.
+#   wayland          weston socket access (clients); only when the display
+#                    stack is on -- weston-init creates the group, and a
+#                    headless image (EDGE_ENABLE_DISPLAY = "0") has no such
+#                    group, where naming it fails useradd at do_rootfs.
+# The rest are created by base-passwd (wheel/dialout/audio/video/input/tty),
+# systemd-journald, or udev (render), all present in every tier.
 
 # Bake an operator-provided SSH public key into /home/devel/.ssh/authorized_keys.
 # EDGE_DEVEL_SSH_PUBKEY_FILE points at a host-side .pub file (path is

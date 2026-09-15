@@ -21,7 +21,7 @@ and the reasoning behind them.
 
 ## Index
 
-- [ADR-0001](0001-kernel-base.md) — kernel base (linux-cip 6.12 SLTS)
+- [ADR-0001](0001-kernel-base.md) — RZ/V2L kernel base (linux-cip 6.12 SLTS); scope narrowed to that board by ADR-0011
 - [ADR-0002](0002-layer-hosting.md) — layer hosting (kas-managed `.kas/`)
 - [ADR-0003](0003-block-layer-integrity-confidentiality.md) — block-layer integrity + confidentiality
 - [ADR-0004](0004-persistent-state-architecture.md) — persistent state architecture

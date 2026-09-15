@@ -1,7 +1,7 @@
 SUMMARY = "Stable RAUC slot udev symlinks for the edge-ai distro"
 DESCRIPTION = "Provides /dev/disk/by-rauc-slot/{boot,rootfsA,rootfsB,data} \
-symlinks based on partition identity (mmcblk0pN on MBR, GPT PARTLABEL on the \
-emmc target). This avoids slot lookup failures if ext4 labels change during OTA writes."
+symlinks based on partition identity (device names on MBR, partition names on \
+GPT). This avoids slot lookup failures if ext4 labels change during OTA writes."
 HOMEPAGE = "https://github.com/umair-as/edge-ai-yocto"
 SECTION = "base"
 LICENSE = "MIT"
@@ -17,12 +17,17 @@ PACKAGE_ARCH = "${MACHINE_ARCH}"
 
 S = "${UNPACKDIR}"
 
-# Boot target picks the rule keying: esd/MBR has no PARTLABEL so it keys on
-# mmcblk0pN; emmc/GPT keys on ID_PART_ENTRY_NAME. Both install to the same
-# filename so FILES and the RAUC by-rauc-slot devices are identical.
+# The partition table (EDGE_PTABLE, a board fact) picks the rule keying: MBR
+# has no partition names so it keys on device names; GPT keys on
+# ID_PART_ENTRY_NAME. Both install to the same filename so FILES and the RAUC
+# by-rauc-slot devices are identical.
 do_install() {
     install -d ${D}${sysconfdir}/udev/rules.d
-    if [ "${EDGE_BOOT_TARGET}" = "emmc" ]; then
+    case "${EDGE_PTABLE}" in
+        gpt|msdos) ;;
+        *) bbfatal "EDGE_PTABLE is '${EDGE_PTABLE}'; set it to gpt or msdos in conf/machine/include/edge-board-${MACHINE}.inc" ;;
+    esac
+    if [ "${EDGE_PTABLE}" = "gpt" ]; then
         # GPT keys on ID_PART_ENTRY_NAME, which is layout identity rather than
         # a device name, so this branch needs no board facts and must not fail
         # when they are unset.
@@ -53,7 +58,7 @@ do_install() {
 }
 
 do_install[vardeps] += "EDGE_BOOT_DEVICE EDGE_SLOT_A_DEVICE EDGE_SLOT_B_DEVICE \
-                        EDGE_DATA_DEVICE EDGE_BOOT_TARGET"
+                        EDGE_DATA_DEVICE EDGE_PTABLE"
 
 FILES:${PN} = "${sysconfdir}/udev/rules.d/99-edge-rauc-slots.rules"
 
