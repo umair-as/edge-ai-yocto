@@ -11,12 +11,18 @@ PACKAGE_ARCH = "${MACHINE_ARCH}"
 
 inherit packagegroup
 
+# nftables: netavark is configured with firewall_driver = "nftables"
+# (edge-containers-config) and execs the nft binary for every root
+# container network; without it `podman run` as root fails with "unable
+# to execute nft". Rootless containers (pasta) never touch it, which is
+# why the rootless proofs passed without this.
 RDEPENDS:${PN} = " \
     podman \
     conmon \
     crun \
     netavark \
     aardvark-dns \
+    nftables \
     passt \
     slirp4netns \
     catatonit \
