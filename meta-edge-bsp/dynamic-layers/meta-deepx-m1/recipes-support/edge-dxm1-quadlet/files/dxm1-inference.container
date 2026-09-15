@@ -1,0 +1,28 @@
+[Unit]
+Description=DX-M1 inference (rootless, edge-ctr)
+# Payload (runner + runtime libs + compiled .dxnn model) lives on /data.
+After=data.mount
+ConditionPathExists=/data/dxm1/bin/run_model
+
+[Container]
+Image=docker.io/library/debian:trixie-slim
+Pull=missing
+
+# DX-M1 runtime chardev. keep-groups carries edge-ctr's dxrt membership into
+# the container so the 0660 node is openable. dxrtd on the host owns the
+# device management side.
+AddDevice=/dev/dxrt0
+GroupAdd=keep-groups
+
+Volume=/data/dxm1:/dxm1:ro
+WorkingDir=/dxm1
+Environment=LD_LIBRARY_PATH=/dxm1/lib
+Exec=/dxm1/bin/run_model -m /dxm1/model/model.dxnn -b
+
+Notify=false
+
+[Service]
+Type=oneshot
+
+[Install]
+WantedBy=default.target
