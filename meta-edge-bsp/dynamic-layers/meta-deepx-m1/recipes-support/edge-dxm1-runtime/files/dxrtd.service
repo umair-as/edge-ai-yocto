@@ -1,0 +1,38 @@
+# DXRT daemon for the DEEPX DX-M1 accelerator. Replaces the vendor's SysV
+# script (dxrt-init), which this distro never runs.
+[Unit]
+Description=DEEPX DXRT daemon (DX-M1 accelerator)
+Documentation=https://github.com/DEEPX-AI/dx_rt
+# /dev/dxrt* exists once dxrt_driver is loaded; dx_dma is autoloaded by udev
+# from its PCI modalias when the endpoint enumerates and its softdep pulls
+# dxrt_driver behind it. The path condition covers a board with no card
+# fitted: the unit does not start rather than crash-looping.
+After=systemd-modules-load.service systemd-udev-settle.service
+ConditionPathExistsGlob=/dev/dxrt*
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/dxrtd
+Restart=on-failure
+RestartSec=2s
+User=dxrt
+Group=dxrt
+StateDirectory=dxrt
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

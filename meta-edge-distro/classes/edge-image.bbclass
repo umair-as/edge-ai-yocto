@@ -341,3 +341,18 @@ edge_check_modules_signed() {
 # Machine-specific image content, supplied by the board include. A distro
 # class must not name a board; the board names what it needs.
 CORE_IMAGE_EXTRA_INSTALL += " ${EDGE_MACHINE_EXTRA_INSTALL}"
+
+# Proprietary accelerator stacks (EDGE_ACCEL_PROPRIETARY, set by the
+# accelerator fragment) make the image non-redistributable: the recipes are
+# publishable, the artifacts are not. A marker next to the image files in
+# DEPLOY_DIR_IMAGE is what a release step checks before publishing anything.
+EDGE_ACCEL_PROPRIETARY ??= "0"
+IMAGE_POSTPROCESS_COMMAND:append = " edge_mark_proprietary_image;"
+edge_mark_proprietary_image() {
+    if [ "${EDGE_ACCEL_PROPRIETARY}" = "1" ]; then
+        printf '%s\n' \
+            "EDGE_ACCEL=${EDGE_ACCEL} carries proprietary vendor packages." \
+            "This image, its rootfs and any bundle built from it are not redistributable." \
+            > ${IMGDEPLOYDIR}/${IMAGE_NAME}.NOT-REDISTRIBUTABLE
+    fi
+}

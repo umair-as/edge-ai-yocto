@@ -23,6 +23,7 @@ systemd-timesync:*:605:
 systemd-network:*:606:
 ota:*:607:
 edge-ctr:*:608:
+dxrt:*:609:
 
 # Standalone groups (no associated system user). Recipe sources:
 #   tee, teepriv          — optee-client / optee-os
