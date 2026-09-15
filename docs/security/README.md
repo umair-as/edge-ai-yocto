@@ -1,6 +1,6 @@
 # EDGE AI OS — Security Posture
 
-EDGE AI OS is designed to satisfy the essential cybersecurity requirements of EU Cyber Resilience Act (CRA) Annex I on a real RZ/V2L SMARC EVK. The design goals are:
+EDGE AI OS is designed to satisfy the essential cybersecurity requirements of EU Cyber Resilience Act (CRA) Annex I on real hardware: the Renesas RZ/V2L SMARC EVK (the first board, where every control below was first validated) and the Raspberry Pi 5 with the DEEPX DX-M1 accelerator (the second board, on a mainline kernel). Controls are distro-level unless a document says otherwise; the U-Boot hardening and OP-TEE documents are RZ/V2L-specific (the Pi runs oe-core U-Boot with its own Kconfig fragments and has no OP-TEE), and measurements quoted from a board are labelled with it. The design goals are:
 
 - Every credential is **operator-supplied**, not committed.
 - The normal boot path verifies a signed kernel, DTB, and root hash at U-Boot,
