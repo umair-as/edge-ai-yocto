@@ -26,9 +26,13 @@ export KAS_REPO_REF_DIR="${KAS_REPO_REF_DIR:-/mnt/yocto-nvme/layers-wrynose}"
 # the universal Yocto convention.
 # Mirror the Makefile's resolution exactly, or a standalone `kas shell` writes
 # to a different tree than `make` does for the same board. A pre-existing
-# single-dir build/ keeps being used (Yocto's TMPDIR is not relocatable);
-# otherwise the tree is per-board.
-if [ -d "${_EDGE_REPO_ROOT}/build/conf" ]; then
+# single-dir build/ keeps being used for the legacy default board only
+# (Yocto's TMPDIR is not relocatable, and another board must not share its
+# conf/); otherwise the tree is per-board. Checking BOARD here, not just
+# whether build/conf exists, matters once it does: on a host with an
+# established rzv2l build/, sourcing this with BOARD already set to
+# something else must not still land on the single-dir path.
+if [ -d "${_EDGE_REPO_ROOT}/build/conf" ] && [ "${BOARD:-rzv2l}" = "rzv2l" ]; then
     export KAS_BUILD_DIR="${KAS_BUILD_DIR:-${_EDGE_REPO_ROOT}/build}"
 else
     export KAS_BUILD_DIR="${KAS_BUILD_DIR:-${_EDGE_REPO_ROOT}/build/${BOARD:-rzv2l}}"
