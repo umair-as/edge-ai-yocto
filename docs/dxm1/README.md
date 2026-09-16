@@ -3,9 +3,10 @@
 The DX-M1 is a PCIe M.2 NPU. On EDGE AI OS it is the Raspberry Pi 5's
 accelerator, composed by the machine fragment the way the RZ/V2L composes
 DRP-AI: `make dev BOARD=raspberrypi5` builds it in, there is no separate
-toggle. This set records what is in the tree and what has been proven on
-hardware as of 2026-09-15; it does not cover model compilation or
-benchmarking, which have not been done on this platform yet.
+toggle. This set records what is in the tree and what is hardware-validated
+(2026-09-16), including rootless inference through the shipped Quadlet;
+model compilation is not covered — the sample model used for validation is
+a pre-compiled artifact from the vendor's DX-Stream sample tarball.
 
 - [`README.md`](README.md) — this page: at a glance, architecture, proof, status.
 - [`port-notes.md`](port-notes.md) — composing the vendor layer on wrynose and
@@ -23,8 +24,8 @@ benchmarking, which have not been done on this platform yet.
 | Kernel side | `dx_dma` (PCIe, single-MSI path for the brcmstb root port) and `dxrt_driver` (chardev) out-of-tree modules, signed like every other module |
 | Userspace | `dx-rt` 3.4.1: `libdxrt`, `dxrtd`, `dxrt-cli`, `run_model` |
 | Identity | system user and group `dxrt` (uid/gid 609); `/dev/dxrt0` is `root:dxrt 0660` |
-| Rootless path | `edge-ctr` (uid 608) is in `dxrt`; the `dxm1-inference` Quadlet passes `/dev/dxrt0` into a container with `keep-groups` |
-| Licence | every DEEPX package is `Proprietary`; images and bundles that carry them are marked `NOT-REDISTRIBUTABLE` beside the artifact |
+| Rootless path | `edge-ctr` (uid 608) is in `dxrt`; the `dxm1-inference` Quadlet passes `/dev/dxrt0` into a container with `keep-groups`, `--pid=host`, and a bind-mounted `/run/dxrt` for the daemon's IPC socket |
+| Licence | every DEEPX package is `Proprietary`; an image that carries them gets a `NOT-REDISTRIBUTABLE` marker beside it (bundles built from it inherit the restriction, unmarked) |
 | Card firmware | on the card, not in the image; the runtime refuses inference against a firmware older than it requires |
 
 ## Architecture — how the pieces fit
@@ -49,8 +50,7 @@ starts as `dxrt` (`ConditionPathExistsGlob=/dev/dxrt*`).
 
 ## Proof it is the accelerator
 
-From the Raspberry Pi 5 on 2026-09-15 (image `20260915122250` and later,
-`scratch/logs/rpi5-ontarget-checks*-20260915.txt`):
+From the Raspberry Pi 5, image `20260915122250` and later (2026-09-15):
 
 ```
 dx_dma_pcie 0001:01:00.0: RPi: forcing single MSI mode (brcmstb multi-MSI data misalignment)
@@ -75,18 +75,32 @@ NPU 0..2: voltage 750 mV, clock 1000 MHz, temperature 52'C
 
 `dxrtd` runs as uid 609 (`/proc/<pid>/status`), `/dev/dxrt0` is
 `crw-rw---- root dxrt`, and `id edge-ctr` lists `dxrt`. The smoke test's
-accelerator section (`scripts/dev/edge-smoke-test.sh`, dispatched on
-`EDGE_ACCEL`) checks each of these.
+accelerator section (`scripts/dev/edge-smoke-test.sh`, selected by the
+installed accelerator stack) checks each of these.
+
+From the same board, image `20260916084924`, the shipped
+`dxm1-inference` Quadlet running unattended at boot as `edge-ctr`:
+
+```
+=============================================
+* Benchmark Result (30 inputs)
+  - FPS : 271.88
+=============================================
+```
+
+with `run_model` reaching `dxrtd` from inside the container's private
+network namespace via a bind-mounted socket and a shared host PID
+namespace — see [`integration-notes.md`](integration-notes.md) for the
+mechanism.
 
 ## Status
 
 Proven on hardware: enumeration, MSI, driver probe, device node policy,
-daemon identity, device identification from the rootless principal.
+daemon identity, device identification from the rootless principal, and
+rootless inference through the shipped Quadlet, unattended at boot.
 
-Not yet done: no inference payload has been staged on `/data/dxm1`, so the
-`dxm1-inference` Quadlet has never run (it skips cleanly on
-`ConditionPathExists=/data/dxm1/bin/run_model`); no model has been compiled
-for the DX-M1 on this platform; no latency measured. The sibling project
-that this port draws from staged `run_model` plus a model under
-`/data/dxm1/{bin,lib,model}`; the same layout is what the Quadlet expects
-here.
+Not covered: no model has been compiled for the DX-M1 on this platform —
+validation uses the pre-compiled sample model from DEEPX's DX-Stream
+tarball, and `run_model`'s own benchmark mode (synthetic input) rather than
+a real inference pipeline, so the FPS above is NPU throughput, not an
+end-to-end pipeline measurement.
