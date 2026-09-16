@@ -18,6 +18,15 @@ RestartSec=2s
 User=dxrt
 Group=dxrt
 StateDirectory=dxrt
+# libdxrt's default dynamic-IPC lookup (@dxrt_dynamic_ipc.sock in the host
+# network namespace, then /tmp/dxrt_dynamic_ipc.sock — unreachable behind
+# PrivateTmp=yes) has no path a rootless Podman Quadlet in a private netns
+# can reach. RuntimeDirectory + the endpoint override publish a fixed,
+# group-readable socket that a container can bind-mount in
+# (meta-deepx-m1/.../dxm1-inference.container).
+RuntimeDirectory=dxrt
+RuntimeDirectoryMode=0750
+Environment=DXRT_DYNAMIC_IPC_ENDPOINT=/run/dxrt/ipc.sock
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
