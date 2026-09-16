@@ -15,7 +15,7 @@
 
 ## What makes it notable
 
-- 🧠 **Container-native DRP-AI inference.** The RZ/V2L neural accelerator runs inside a rootless Podman container under a dedicated system principal. No root, no capability widening, a per-principal subuid namespace. Validated on hardware: ResNet18 at 27 ms/frame. The model-as-OCI-artifact direction is already scoped into the runtime packaging.
+- 🧠 **Container-native NPU inference, on both boards.** Each board's neural accelerator runs inside a rootless Podman container under a dedicated system principal — no root, no capability widening, a per-principal subuid namespace. Validated on hardware: RZ/V2L DRP-AI at 27 ms/frame (ResNet18); Raspberry Pi 5 DX-M1 at 271.88 FPS (YOLOv5S 640×640, benchmark mode) through a rootless Quadlet reaching the host's accelerator daemon over a bind-mounted IPC socket. The model-as-OCI-artifact direction is already scoped into the runtime packaging.
 
 - 🔒 **Signed boot chain, end to end.** TF-A (Renesas CIP fork) → OP-TEE (secure world, BL32) → U-Boot → FIT image with RSA-2048 signature verified against a key embedded in the U-Boot control DTB. A file key covers the dev profile; the signing slot is designed for HSM/YubiKey-ROT in production.
 
@@ -29,7 +29,7 @@
 
 ## Status
 
-Hardware-validated on RZ/V2L SMARC EVK: full boot chain, A/B OTA round-trip, rootless DRP-AI container inference. Raspberry Pi 5 (second board) with the DEEPX DX-M1 PCIe accelerator: composed and building, not yet booted. In progress: DM-VERITY rootfs enforcement, IMA appraisal, HSM/YubiKey signing, and the production image tier.
+Hardware-validated on RZ/V2L SMARC EVK: full boot chain, A/B OTA round-trip, rootless DRP-AI container inference. Raspberry Pi 5 (second board) with the DEEPX DX-M1 PCIe accelerator: signed A/B boot, RAUC install and slot switch, and rootless DX-M1 container inference — all validated on hardware, the last auto-starting from the shipped Quadlet at boot. In progress: DM-VERITY rootfs enforcement, IMA appraisal, HSM/YubiKey signing, and the production image tier.
 
 ---
 
@@ -64,6 +64,7 @@ capability flags (`TPM=1`, `SBOM_TUNE=1`, …).
 - **[AGENTS.md](AGENTS.md)** — build commands, kas composition, layer conventions, and contributing rules
 - **[docs/security/README.md](docs/security/README.md)** — security posture overview and on-board verification commands
 - **[docs/drp-ai/README.md](docs/drp-ai/README.md)** — DRP-AI integration overview and model-compile guide
+- **[docs/dxm1/README.md](docs/dxm1/README.md)** — DX-M1 integration overview and proof
 
 ---
 
