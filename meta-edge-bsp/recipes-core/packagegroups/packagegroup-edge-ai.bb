@@ -19,15 +19,12 @@ PACKAGES = " \
     ${PN}-test \
 "
 
-# DRP-AI is RZ/V2L-only SoC IP. Kept as belt-and-braces alongside the
-# machine/accelerator gate in edge-image.bbclass: this still protects a
-# hand-composed bitbake invocation that bypasses the image class.
+# DRP-AI is RZ/V2L-only SoC IP. Also covers bitbake invocations that bypass
+# the machine/accelerator gate in edge-image.bbclass.
 COMPATIBLE_MACHINE = "smarc-rzv2l"
 
-# The image class installs the accelerator packagegroup by derivation from
-# EDGE_ACCEL (packagegroup-edge-accel-<name>), so a new vendor needs no edit
-# there. Aliased rather than renamed: the recipe and its produced package keep
-# their names, so the image manifest and the artifact set do not move.
+# The image class installs packagegroup-edge-accel-${EDGE_ACCEL}; the alias
+# keeps this package's own name stable in image manifests.
 RPROVIDES:${PN} += "packagegroup-edge-accel-drpai-v2l"
 
 # mmngr/mmngrbuf nodes + linux,multimedia carveout are already in the base

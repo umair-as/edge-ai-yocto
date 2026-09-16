@@ -14,15 +14,11 @@ header:
   includes:
     # Renesas vendor BSP: the meta-renesas repo pin, its two layers, its kas
     # patch, its BBMASKs and (via that file) the vendor kernel recipe pin.
-    # Was in kas/base.yml, where it applied to every machine. Without the
-    # kernel pin meta-renesas's weak "6.1%" default wins and the build
-    # silently produces a 6.1 kernel instead of 6.12-cip14.
+    # Without the kernel pin meta-renesas's weak "6.1%" default silently
+    # selects a 6.1 kernel.
     - kas/bsp/renesas-rz.yml
-    # DRP-AI is in the RZ/V2L SoC. It is not an operator choice and not a
-    # capability flag: an edge-ai image for this board without its accelerator
-    # has no purpose, so the machine composes the accelerator the way it
-    # composes the BSP. A board with a genuine choice of accelerators would
-    # compose none here and require an explicit selection instead.
+    # DRP-AI is part of the RZ/V2L SoC, so the machine composes it like the
+    # BSP rather than as a capability flag.
     - kas/accel/drpai-v2l.yml
     - kas/trusted-firmware-a/renesas-cip-2.10.yml
     - kas/u-boot/renesas-cip-2024.07.yml
@@ -34,7 +30,6 @@ local_conf_header:
   # pick its WKS_FILE, and the vendor machine conf parses at
   # bitbake.conf:825 -- before the board include at :828. Setting it in
   # conf/machine/include/edge-board-smarc-rzv2l.inc would be too late.
-  # Every other board fact moved there.
   pmic: |
     # Build the PMIC variants of BL2/BL31/FIP. The SMARC RZ/V2L EVK
     # DDR4 carrier ships with the Renesas RAA215300 PMIC; BL2's DDR/

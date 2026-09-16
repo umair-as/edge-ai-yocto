@@ -19,15 +19,8 @@
 #   mkpasswd --method=sha-512 'your-password' # → $6$...
 
 # The three EDGE_DEFAULT_PASSWORD_HASH guards (presence, shell-escaping,
-# sha512crypt shape) are enforced in edge-image.bbclass, not here.
-#
-# They cannot live in this file. edge-users.inc is distro scope, so an
-# anonymous python guard here runs during the parse of *every recipe in the
-# tree* -- boot-wrapper-aarch64 and scp-firmware included, which have no users
-# and no rootfs. A missing hash therefore made `bitbake -p` impossible, so a
-# fresh clone, a CI runner and any second machine could not parse the repo at
-# all. The credential property is unchanged: the guards are fatal in a
-# do_rootfs prefunc, so no image can be assembled without a managed hash.
+# sha512crypt shape) are enforced in edge-image.bbclass: distro scope would
+# run them for every recipe and make `bitbake -p` fail without a hash.
 
 # extrausers.bbclass runs commands inside the rootfs at image build time
 # to modify /etc/passwd, /etc/shadow, /etc/group. The wrynose-recommended
@@ -54,20 +47,17 @@ EXTRA_USERS_PARAMS = " \
             -p '${EDGE_DEFAULT_PASSWORD_HASH}' devel; \
 "
 
-# Accelerator principal group membership. The accelerator's packagegroup
-# creates the principal (edge-ctr for DRP-AI) and the device groups; this adds
+# Accelerator principal group membership. packagegroup-edge-containers
+# creates the principal (edge-ctr), the accelerator stack creates the device
+# groups; this adds
 # the memberships that let it pass the accelerator's device nodes into a
 # rootless container (keep-groups).
 #
 # Added at image assembly, not in the recipe useradd: the groups are created
 # by other recipes and a recipe-level --groups races their creation.
 #
-# EDGE_ACCEL_SUPPLEMENTARY_GROUPS is accelerator policy, supplied by the
-# accelerator fragment. Empty when no accelerator is selected, which is what
-# makes this safe on a machine that has none -- the previous form fired on
-# any machine whenever the AI toggle was on, against a user that only the
-# RZ/V2L-only packagegroup creates.
-# Entries are "group:user" -- the group to join and the principal joining it.
+# EDGE_ACCEL_SUPPLEMENTARY_GROUPS is supplied by the accelerator fragment and
+# empty when none is selected. Entries are "group:user".
 # Format is validated in edge-image.bbclass; a malformed entry is a parse
 # error there rather than a silently skipped membership here.
 EXTRA_USERS_PARAMS:append = "${@''.join(' usermod -aG %s %s;' % (e.split(':', 1)[0], e.split(':', 1)[1]) for e in (d.getVar('EDGE_ACCEL_SUPPLEMENTARY_GROUPS') or '').split() if ':' in e)}"

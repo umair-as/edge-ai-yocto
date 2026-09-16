@@ -1,8 +1,7 @@
 # The recipe is named 2.6.0 but its SRCREV is the v2.4.1 commit (module
-# reports 2.2.0). Repinned to the real v2.6.0 tip, which carries what this
-# board needs: PCIe link-health monitoring with an MMIO guard (the old tree
-# took a fatal SError on the runtime's first MMIO after a probe with Mem-
-# and BusMaster- clear), and the RPI_BUILD code path below.
+# reports 2.2.0). The v2.6.0 tip carries PCIe link-health monitoring with an
+# MMIO guard (v2.4.1 takes a fatal SError on the first MMIO after a probe
+# with Mem- and BusMaster- clear) and the RPI_BUILD code path below.
 SRCREV = "7074748e7104f470b02f517583abba652b3f05fa"
 
 # wrynose source layout: the recipe's S = "${WORKDIR}/git/modules" is a hard
@@ -23,8 +22,8 @@ S = "${UNPACKDIR}/${BP}/modules"
 # make flag, not a Kconfig symbol, despite the prefix.
 EXTRA_OEMAKE:append:raspberrypi5 = " CONFIG_RPI_BUILD=1"
 
-# Prove the flag reached the object rather than trusting the make line: the
-# single-MSI path logs a fixed string that is absent when it compiled out.
+# The single-MSI path logs a fixed string; its absence in the object means
+# the flag did not reach Kbuild.
 do_install[postfuncs] += "${@'edge_check_dx_rpi_build' if bb.utils.contains('MACHINEOVERRIDES', 'raspberrypi5', True, False, d) else ''}"
 edge_check_dx_rpi_build() {
     ko=$(find ${D}${nonarch_base_libdir}/modules -name 'dx_dma.ko' | head -1)

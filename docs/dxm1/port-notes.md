@@ -1,8 +1,7 @@
 # Porting the DX-M1 stack to wrynose on the Raspberry Pi 5
 
 What it took to compose DEEPX's `meta-deepx-m1` on Yocto 6.0 (wrynose)
-with a mainline 6.18 kernel, and the kernel facts the card turned out to
-depend on. Evidence: `scratch/rpi5/boot2-analysis-20260915.md`.
+with a mainline 6.18 kernel, and the kernel facts the card depends on.
 
 ## Vendor layer: one branch, two patches
 
@@ -64,7 +63,7 @@ at load. With `LOCALVERSION_AUTO` off the kernel release is the plain
 `6.18.52`, so the module directory and both modules' vermagic match the
 pinned version rather than a git describe of the patched tree.
 
-## Versions seen on the bench (2026-09-15)
+## Versions validated on hardware (2026-09-15)
 
 | component | version |
 |---|---|

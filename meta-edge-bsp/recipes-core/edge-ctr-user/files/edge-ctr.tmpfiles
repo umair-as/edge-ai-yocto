@@ -5,11 +5,10 @@ d /data/edge-ctr 0700 608 608 -
 
 # Pre-create the podman image-copy scratch dir. containers.conf sets
 # image_copy_tmp_dir = "storage" (edge-containers-config), which resolves to
-# <graphroot>/tmp on /data (eMMC), not tmpfs — a large image layer would
-# exhaust the 1.3G RAM otherwise. podman creates the graphroot on first run but
-# not this tmp subdir, and podman's default (/var/tmp) sits on the read-only
-# verity rootfs and is unwritable. Without this dir a rootless pull fails
-# "creating a temporary directory: ... no such file or directory".
+# <graphroot>/tmp on /data, not tmpfs, so a large image layer does not
+# exhaust RAM. podman creates the graphroot but not this subdir, and its
+# default (/var/tmp) is on the read-only verity rootfs. Without it a rootless
+# pull fails "creating a temporary directory: ... no such file or directory".
 d /data/edge-ctr/.local 0700 608 608 -
 d /data/edge-ctr/.local/share 0700 608 608 -
 d /data/edge-ctr/.local/share/containers 0700 608 608 -

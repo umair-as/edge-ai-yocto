@@ -1,16 +1,8 @@
 # DEPRECATED -- superseded by kas/accel/drpai-v2l.yml.
 #
-# Retained as a shim so external compositions that name this path keep
-# working. The accelerator axis is now a selector (EDGE_ACCEL) rather than a
-# boolean, because a boolean cannot express *which* accelerator a machine
-# carries, and the old EDGE_ENABLE_AI toggle was applied without regard to
-# machine -- it pulled an RZ/V2L-only packagegroup into any image.
-#
-# Use instead:
+# Shim for external compositions that name this path. The accelerator is a
+# selector (EDGE_ACCEL), not a boolean. Replacement:
 #   kas build kas/base.yml:kas/machines/rzv2l.yml:kas/accel/drpai-v2l.yml
-#   make dev ACCEL=drpai-v2l
-#
-# Removal is scheduled one release after the ACCEL= flag ships.
 header:
   version: 19
   includes:

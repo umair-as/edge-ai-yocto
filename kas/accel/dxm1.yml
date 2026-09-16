@@ -25,9 +25,8 @@ header:
 repos:
   meta-deepx-m1:
     url: https://github.com/DEEPX-AI/meta-deepx-m1.git
-    # walnascar (Yocto 5.2) branch tip. One release from wrynose rather than
-    # four, a single dx-driver version and the newest driver SRCREV. Neither
-    # upstream branch is wrynose-compatible on its own; see the patches.
+    # walnascar (Yocto 5.2) branch: nearest to wrynose, one dx-driver
+    # version. No upstream branch is wrynose-compatible; see the patches.
     branch: walnascar
     commit: 703831e7aacd7a6d18b0291a94e99aa59bf9113e
     # The layer sits at the repo root.
@@ -55,7 +54,7 @@ local_conf_header:
     # (root:dxrt 0660, edge-dxm1-runtime) can be passed into its container
     # with keep-groups. Applied at image assembly by edge-users.inc.
     EDGE_ACCEL_SUPPLEMENTARY_GROUPS = "dxrt:edge-ctr"
-    # Measurement instruments for dev tiers; none beyond dx-rt's own tools yet.
+    # dx-rt ships its own measurement tools (dxtop, dxbenchmark).
     EDGE_ACCEL_TEST_INSTALL = ""
 
     # DEEPX packages are proprietary: images and bundles carrying them are

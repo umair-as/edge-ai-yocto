@@ -142,13 +142,12 @@ before the fresh-image container gap below was found; re-validated unchanged
 across the CIP kernel bump to 6.12.59-cip14, a **dm-verity read-only rootfs**,
 and **enforced kernel module signing**.
 
-**⚠️ Container auto-start needed two fixes, landing in this change set** — a
-freshly flashed image shipped no `/etc/subuid` / `/etc/subgid`, so `edge-ctr`'s
-rootless user namespace mapped a single ID and could not unpack a normal OCI
-image; and rootless `podman pull` used `/var/tmp` — read-only on the dm-verity
-root — for unpack scratch and failed there too. Both are fixed here: subuid/subgid
-now ship for `edge-ctr`, and the pull scratch directory moved to a writable
-location. Egress to docker.io and the `edge-ctr` linger are otherwise fine. A
+**⚠️ Container auto-start needed two fixes** — a freshly flashed image shipped
+no `/etc/subuid` / `/etc/subgid`, so `edge-ctr`'s rootless user namespace mapped a
+single ID and could not unpack a normal OCI image; and rootless `podman pull` used
+`/var/tmp` — read-only on the dm-verity root — for unpack scratch and failed there
+too. The image now writes subuid/subgid ranges for `edge-ctr` at rootfs assembly,
+and the pull scratch directory is on `/data`. Egress to docker.io and the `edge-ctr` linger are otherwise fine. A
 fresh-pull, on-target container run has not been re-validated against these
 fixes yet — that is pending a rebuild, not claimed as done.
 

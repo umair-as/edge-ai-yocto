@@ -15,10 +15,9 @@ header:
     - kas/bsp/renesas-rz-kernel.yml
 
 repos:
-  # No wrynose branch upstream — newest Yocto branch is scarthgap/rz
-  # (Yocto 5.0). Pin the scarthgap/rz HEAD and carry the
-  # scarthgap→wrynose port locally (override syntax, debug-tweaks
-  # split, DISTRO_FEATURES_DEFAULTS, LAYERSERIES_COMPAT, ...).
+  # No wrynose branch upstream; newest is scarthgap/rz (Yocto 5.0). Pinned
+  # to its HEAD, with the scarthgap→wrynose port carried locally (override
+  # syntax, debug-tweaks split, DISTRO_FEATURES_DEFAULTS, LAYERSERIES_COMPAT).
   # meta-rz-bsp: machine conf for smarc-rzv2l, bptool/firmware-pack,
   # multimedia kernel modules.
   # meta-rz-distro: multimedia userspace .inc plumbing
@@ -39,26 +38,17 @@ repos:
     layers:
       meta-rz-bsp:
       meta-rz-distro:
-    # Scarthgap→wrynose port is handled in-layer wherever a bbappend can
-    # reach: the LAYERSERIES_COMPAT amendment lives in
-    # meta-edge-bsp/conf/layer.conf; the do_unpack S = "${WORKDIR}/git"
-    # rejection is fixed via per-recipe bbappends
-    # (meta-edge-bsp/recipes-bsp/{u-boot,trusted-firmware-a}/
-    # {u-boot_2024.07.bbappend,trusted-firmware-a_%.bbappend,
-    # bptool-native.bbappend}); audio-init/v4l2-init are not in the
-    # active build path. The u-boot_2024.07.bb cosmetic whitespace
-    # warning is tolerated as parser noise.
+    # The rest of the port is in-layer: LAYERSERIES_COMPAT in
+    # meta-edge-bsp/conf/layer.conf, and the S = "${WORKDIR}/git" rejection
+    # in per-recipe bbappends (u-boot_2024.07, trusted-firmware-a_%,
+    # bptool-native). The u-boot_2024.07.bb whitespace warning is parser
+    # noise.
 
 local_conf_header:
   bbmask_deferred_scarthgap_skew: |
-    # DEFERRED: scarthgap→wrynose version skew — revisit in the
-    # multimedia step. These meta-renesas bbappends pin scarthgap-era
-    # upstream versions (weston 13.0.1, gstreamer 1.22.12); wrynose
-    # ships different versions, so the bbappends have no recipe to
-    # attach to and parse fails with "No recipes in default available".
-    # Park them with BBMASK so parse stays green while the kernel
-    # provider switch lands. Re-derive against wrynose versions or
-    # drop in the multimedia decision.
+    # scarthgap-era bbappends (weston 13.0.1, gstreamer 1.22.12) with no
+    # matching wrynose recipe; unmasked they fail parse with "No recipes in
+    # default available".
     BBMASK += "meta-rz-distro/recipes-graphics/wayland/weston_13.0.1\.bbappend"
     BBMASK += "meta-rz-distro/recipes-multimedia/gstreamer/gstreamer1\.0_1\.22\.12\.bbappend"
     BBMASK += "meta-rz-distro/recipes-multimedia/gstreamer/gstreamer1\.0-plugins-base_1\.22\.12\.bbappend"
@@ -66,16 +56,11 @@ local_conf_header:
     BBMASK += "meta-rz-distro/recipes-multimedia/gstreamer/gstreamer1\.0-plugins-bad_1\.22\.12\.bbappend"
 
   bbmask_vendor_cruft_unshipped: |
-    # meta-renesas vendor-layer recipes explicitly not shipped (per
-    # meta-edge-bsp/recipes-support/edge-systemd-presets/files/90-edge.preset
-    # which disables v4l2-init.service as "vendor-layer cruft"). They use
-    # scarthgap-era S = "${WORKDIR}" which wrynose rejects at parse time,
-    # so masking them off the parse path is functionally equivalent to
-    # the previous kas-patch that rewrote them — without the patch.
+    # Vendor recipes not shipped (90-edge.preset disables v4l2-init.service).
+    # Their scarthgap-era S = "${WORKDIR}" is a wrynose parse error.
     BBMASK += "meta-rz-distro/recipes-extend/audio-init/audio-init\.bb"
     BBMASK += "meta-rz-distro/recipes-extend/v4l2-init/v4l2-init_1\.0\.bb"
-    # meta-renesas's weston-init bbappend installs weston.sh from
-    # ${WORKDIR} (scarthgap-era path) and adds an idle-time=0 ExecStart
-    # tweak — neither needed here (meta-edge-bsp already ships its own
-    # weston-init bbappend that handles the multi-user.target deferral).
+    # Installs weston.sh from ${WORKDIR} (scarthgap-era path) and adds an
+    # idle-time=0 ExecStart; meta-edge-bsp's own weston-init bbappend
+    # replaces it.
     BBMASK += "meta-rz-distro/recipes-graphics/wayland/weston-init\.bbappend"

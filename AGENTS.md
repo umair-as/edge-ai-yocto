@@ -367,6 +367,7 @@ deferred until the first release needs them.
 | Yocto syntax, failure triage, patch headers, sstate traps | `.claude/rules/yocto-patterns.md` |
 | Authoring a new recipe (header layout, metadata) | `.claude/rules/recipe-metadata.md` |
 | Comments in recipes / kas / scripts | `.claude/rules/comment-style.md` |
+| Prose in `docs/` and `README.md` (what may and may not be written) | `.claude/rules/docs-style.md` |
 | Cross-compiling apps outside bitbake | `.claude/rules/cross-compilation.md` |
 | Settled architecture decisions | `docs/adr/README.md` (index) |
 | Security docs — SBOM/CVE triage, SELinux, U-Boot hardening, vuln mgmt | `docs/security/README.md` (index) |

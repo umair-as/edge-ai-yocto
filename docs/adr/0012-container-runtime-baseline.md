@@ -1,8 +1,7 @@
 # ADR-0012: Container userspace is OS baseline, on every tier and machine
 
-## Status
-
-Accepted.
+- Status: Accepted
+- Date: 2026-09-09
 
 ## Context
 
@@ -16,8 +15,8 @@ inference path is the delivery mechanism the model channel
 opt-in, an image can be built that contains the accelerator stack, its
 device policy, its principal and its Quadlet, and cannot run any of it.
 That failure is silent: the image builds green, boots, and exposes the
-accelerator device, while the unit that would use it has no engine. It was
-produced accidentally during development, which is the evidence that an
+accelerator device, while the unit that would use it has no engine. Such an
+image was produced during development, which is the evidence that an
 opt-in default is the wrong one.
 
 A capability flag is the right shape for something a product may or may not
@@ -46,14 +45,12 @@ accelerator.** `edge-ctr-user` moves to `packagegroup-edge-containers`. It
 was previously installed by the DRP-AI packagegroup, which made a
 distro-level identity an artifact of one accelerator on one board.
 
-**6. There is no off-switch, and that is the point.** An earlier draft of
-this ADR kept `EDGE_ENABLE_CONTAINERS` as a toggle defaulting to `1`,
-changing the default but not the mechanism. That reintroduces the exact
-defect the ADR exists to remove: a platform dependency expressed as an
-operator-selected flag is a dependency that will eventually not be
-selected, and the resulting image fails on hardware rather than at build
-time. The variable is deleted, not defaulted. `VIRT=1` is retained as a
-warned no-op so existing invocations keep working.
+**6. There is no off-switch.** A toggle defaulting to `1` (an
+`EDGE_ENABLE_CONTAINERS`) was considered and rejected: it changes the
+default but keeps the mechanism, and a platform dependency expressed as an
+operator-selected flag fails on hardware rather than at build time when it
+is eventually not selected. `VIRT=1` is retained as a warned no-op so
+existing invocations keep working.
 
 ## Rationale
 

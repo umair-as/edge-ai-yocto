@@ -157,8 +157,7 @@ PODMAN_FEATURES:pn-podman            ?= ""
 # of the release record rather than silent network-driven drift. These are
 # deliberately chosen revisions, not the .bb-shipped ones — the .bb values
 # trail the fragment. A pinned DB reports no CVE published after its date,
-# so the pin date is a security input: bump it deliberately and record the
-# date, do not let it age silently.
+# so the pin date below is a security input.
 #
 # IMAGE_CLASSES:append wires sbom-cve-check.bbclass directly. The
 # fragment's same line via OE_FRAGMENTS is unreliable in this wrynose
@@ -187,8 +186,8 @@ SRCREV:pn-sbom-cve-check-update-cvelist-native = "690942529c4953e38803aa62215bd0
 #
 # Depth must be non-zero or the fetcher silently disables shallow
 # (bb/fetch2/git.py: shallow off when depth == 0 and no explicit revs).
-# Both pinned SHAs are non-tip; GitHub allows SHA-specific shallow fetches
-# for both repositories, verified before enabling this.
+# Both pinned SHAs are non-tip; GitHub serves SHA-specific shallow fetches
+# for both repositories.
 BB_GIT_SHALLOW:pn-sbom-cve-check-update-nvd-native           = "1"
 BB_GIT_SHALLOW_DEPTH:pn-sbom-cve-check-update-nvd-native     = "1"
 BB_GIT_SHALLOW:pn-sbom-cve-check-update-cvelist-native       = "1"
@@ -205,11 +204,8 @@ INHERIT += "own-mirrors"
 # The sbom-cve-check fragment hard-codes the SPDX compiled-sources flag for
 # linux-yocto only, so every other kernel provider needs it set explicitly or
 # its SPDX output omits compiled sources and kernel CVE source-attribution
-# over-reports. The flag names a recipe, and the recipe is a board fact, so
-# each board include sets it for its own kernel -- see
-# conf/machine/include/edge-board-<machine>.inc. It cannot live here: this
-# file is required at edge-ai.conf:27 and the board include lands at :42, so
-# a board-supplied recipe name is not yet visible at this point.
+# over-reports. The flag names a recipe, which is a board fact, so each
+# conf/machine/include/edge-board-<machine>.inc sets it for its own kernel.
 
 # The default ("current") drops fixed-version and cpe-stable-backport
 # CVE_STATUS entries from the VEX export on the assumption the CVE DB's
@@ -239,8 +235,8 @@ FIT_HASH_ALG           ?= "sha256"
 FIT_SIGN_ALG           ?= "rsa2048"
 # Pin the key size. kernel-signing-keys-native generates the dev key from
 # FIT_SIGN_NUMBITS; oe-core leaves it unset, so mkimage defaults to 2048 and
-# matches rsa2048 only by coincidence. Pinned here so a future rsa<N> bump must
-# move NUMBITS with it, caught by the agreement assertion below.
+# matches rsa2048 only by coincidence. The assertion below keeps the two in
+# step.
 FIT_SIGN_NUMBITS       ?= "2048"
 FIT_GENERATE_KEYS      ?= "1"
 FIT_SIGN_INDIVIDUAL    ?= "0"

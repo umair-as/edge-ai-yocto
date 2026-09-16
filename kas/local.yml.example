@@ -64,9 +64,8 @@ local_conf_header:
     # The value below is an intentionally-invalid placeholder. The three
     # guards live in edge-image.bbclass: fatal in a do_rootfs prefunc (no
     # image is assembled without a managed hash) plus a warning when the
-    # image recipe is parsed. Replace it with a real $6$-prefixed hash. Do not "fix" by
-    # making it parse; replace it with the output of `openssl passwd
-    # -6 'your-password'` (with every `$` escaped as `\$`).
+    # image recipe is parsed. Replace it with the output of
+    # `openssl passwd -6 'your-password'`, every `$` escaped as `\$`.
     EDGE_DEFAULT_PASSWORD_HASH = "REPLACE_ME_WITH_OUTPUT_OF_openssl_passwd_-6"
 
     # OPTIONAL. Path on the build host to your SSH public key (~/.ssh/id_ed25519.pub

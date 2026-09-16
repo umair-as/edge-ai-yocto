@@ -4,12 +4,11 @@ FILESEXTRAPATHS:prepend := "${EDGE_BSP_LAYERDIR}/recipes-kernel/linux/files:"
 # only; version/backport gaps are patched, not annotated).
 require ${EDGE_BSP_LAYERDIR}/recipes-kernel/linux/files/cve-exclusion-renesas-6.12.inc
 
-# Kernel pin: rz-6.12-cip14 (6.12.59), ~150 version-in-range CVEs clear of the
-# cip7 default in the kas-pinned meta-renesas. Newer meta-renesas revisions also
-# default to cip14 but name a KERNEL_REV absent from rz_linux-cip; this SRCREV is
-# the branch tip and fetches. cip8+ dropped the V2L downstream memory + ISU
-# enablement, restored by patches 0009/0010 below, applied before the DRP-AI
-# patches anchored to them. Boot + HW validated on 6.12.59.
+# rz-6.12-cip14 (6.12.59), overriding the pinned meta-renesas cip7 default.
+# Later meta-renesas revisions name a cip14 KERNEL_REV absent from
+# rz_linux-cip; this SRCREV is the branch tip. cip8+ dropped the V2L memory
+# and ISU enablement that patches 0009/0010 restore, ahead of the DRP-AI
+# patches anchored to them.
 KERNEL_BRANCH = "rz-6.12-cip14"
 KERNEL_REV    = "212f6e88b7249f803ff5475c07b72c92ce2d929d"
 LINUX_VERSION = "6.12.59-cip14"
@@ -54,7 +53,5 @@ SRC_URI:append:smarc-rzv2l = " \
 
 KERNEL_FEATURES:append = ""
 
-# EDGE_FIT_LOADADDRESS / EDGE_FIT_ENTRYPOINT are set at conf level (from
-# kas/machines/<board>.yml's local_conf_header) so both this recipe and
-# edge-kernel-fit see them. Defining them here would scope them to this
-# recipe only.
+# EDGE_FIT_LOADADDRESS / EDGE_FIT_ENTRYPOINT are set at conf level (board
+# include) so both this recipe and edge-kernel-fit see them.

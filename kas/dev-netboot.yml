@@ -15,17 +15,12 @@
 # DHCP uplink. The same image works netbooted or flashed, with no
 # netboot-specific network gating.
 #
-# The interface roles are a board fact, not a property of this fragment.
-# edge-network-units currently ships 10-eth0.network with Unmanaged=yes
-# unconditionally and allarch, which is wrong on a board whose only
-# interface is eth0 -- tracked as a single-board leak, to be moved behind
-# the board include.
+# Interface roles are board facts (EDGE_UNMANAGED_IFACES, EDGE_UPLINK_IFACE
+# in the board include), not properties of this fragment.
 #
-# NFS-root needs CONFIG_NFS_FS, CONFIG_NFS_V4, CONFIG_ROOT_NFS and
-# CONFIG_IP_PNP_DHCP, plus the board's Ethernet and PHY drivers, built in
-# rather than modular. The RZ/V2L provider (rz_linux-cip) ships all of them
-# built-in, so no kernel fragment is required there; a second provider must
-# be checked rather than assumed.
+# NFS-root needs CONFIG_NFS_FS, CONFIG_NFS_V4, CONFIG_ROOT_NFS,
+# CONFIG_IP_PNP_DHCP and the board's Ethernet/PHY drivers built in.
+# rz_linux-cip builds all of them in; other providers are unverified.
 #
 # Host-side setup (TFTP + NFS server, exports, sync workflow) is
 # documented in docs/dev/netboot-setup.md and automated by

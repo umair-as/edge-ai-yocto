@@ -37,50 +37,30 @@ export KAS_REPO_REF_DIR KAS_WORK_DIR
 #
 # The kas stack is image-agnostic: base + machine. The image is selected
 # via the bitbake target (`bitbake edge-image-base|edge-image-dev`), not
-# via a kas overlay. This follows the proven sibling-project pattern.
+# via a kas overlay.
 #
-# If kas/local.yml exists (operator-private overlay for paths,
-# parallelism, credentials), it is the entry point and already composes
-# base + machine through its `includes:`. Otherwise we compose the
-# tracked base + machine fragments directly.
 # BOARD=<name> selects kas/machines/<name>.yml. Named BOARD rather than
 # MACHINE because the fragment name (rzv2l) and the bitbake MACHINE it sets
-# (smarc-rzv2l) are deliberately different -- the vendor MACHINE name is a
-# frozen external interface (RAUC_BUNDLE_COMPATIBLE, fielded devices), so it
-# cannot be renamed to match. Defaults to rzv2l while it is the only wired
-# board; a second board is BOARD=<name> with no Makefile edit.
+# (smarc-rzv2l) differ: the vendor MACHINE name is a frozen external
+# interface (RAUC_BUNDLE_COMPATIBLE, fielded devices).
 BOARD ?= rzv2l
 ifeq ($(wildcard kas/machines/$(BOARD).yml),)
   $(error BOARD=$(BOARD) is unknown; kas/machines/$(BOARD).yml does not exist. \
 Available: $(patsubst kas/machines/%.yml,%,$(wildcard kas/machines/*.yml)))
 endif
-# The tracked composition always leads: base + the selected machine. If the
-# operator has a kas/local.yml it is appended as an ADDITIVE overlay, never as
-# a replacement -- it carries host facts (cache paths, parallelism,
-# credentials) and nothing about which board is built. Being last, its
-# local_conf_header wins over the tracked fragments.
-#
-# It used to be the entry point, composing base + machine through its own
-# `includes:`, which meant a gitignored host file decided the board and BOARD=
-# had to be ignored with a warning. A host overlay must not be able to change
-# what is built.
+# The tracked composition always leads: base + the selected machine.
+# kas/local.yml, when present, is appended last as an additive host overlay
+# (cache paths, parallelism, credentials); it never selects the board. Being
+# last, its local_conf_header wins over the tracked fragments.
 BASE = kas/base.yml:kas/machines/$(BOARD).yml$(if $(wildcard kas/local.yml),:kas/local.yml,)
 
-# Per-machine build directory, sharing DL_DIR and SSTATE_DIR (both host facts
-# from the overlay). Two machines building into one tree fight over build/conf
-# regeneration and tmp/; separate trees remove that at no cache cost, because
-# sstate keys on task signatures, not paths.
+# Per-machine build directory, sharing DL_DIR and SSTATE_DIR. Two machines in
+# one tree race on build/conf regeneration and tmp/; sstate keys on task
+# signatures, not paths, so separate trees cost no cache.
 #
-# A pre-existing single-dir build/ keeps being used as-is. Yocto's TMPDIR is
-# NOT relocatable -- sysroots, native binaries and manifests embed absolute
-# paths, and sanity.bbclass rejects a moved TMPDIR outright ("Error, TMPDIR
-# has changed location") -- so migrating an existing tree means rebuilding it,
-# not moving it. New boards get their own directory immediately; an existing
-# one migrates when its tmp/ is next discarded anyway.
-#
-# The pre-restructure build/ belongs to the first board only: a second board
-# must not inherit it just because it exists, or two machines end up sharing
-# one conf/ again.
+# An existing single-dir build/ stays in use for rzv2l only: TMPDIR is not
+# relocatable (sanity.bbclass: "Error, TMPDIR has changed location"), and
+# another board must not share its conf/.
 ifneq ($(wildcard $(CURDIR)/build/conf),)
   ifeq ($(BOARD),rzv2l)
     KAS_BUILD_DIR ?= $(CURDIR)/build
@@ -110,24 +90,15 @@ CAPABILITY_YMLS :=
 ifeq ($(TPM),1)
   CAPABILITY_YMLS += kas/tpm.yml
 endif
-# VIRT=1 is a no-op: container userspace is baseline (ADR-0012). Kept so
-# documented invocations keep working; warns rather than silently ignoring.
+# VIRT=1 is a warned no-op: container userspace is baseline (ADR-0012).
 ifeq ($(VIRT),1)
-  $(warning note: VIRT=1 is a no-op; container userspace is baseline since ADR-0012)
+  $(warning note: VIRT=1 is a no-op; container userspace is baseline (ADR-0012))
 endif
-# ACCEL=<name> is an OVERRIDE, not the enabler. The machine fragment composes
-# its own accelerator (kas/machines/<board>.yml -> kas/accel/<name>.yml)
-# because every board this distro targets carries one: DRP-AI in the RZ/V2L
-# SoC, DX-M1 on PCIe for the RPi5. A bare `make dev` therefore builds WITH the
-# accelerator. Use this only for a board that genuinely offers a choice.
-#
-# ACCEL=none composes no fragment. That alone does not produce an
-# accelerator-less image -- the machine's own fragment still applies, and
-# edge-image.bbclass refuses to build without an accelerator unless
-# EDGE_ALLOW_NO_ACCEL = "1" is set for board bring-up.
-#
-# An unknown name is rejected here, naming what exists: kas would otherwise
-# fail on a missing include file rather than on the actual mistake.
+# ACCEL=<name> overrides the accelerator; the machine fragment already
+# composes one (kas/machines/<board>.yml -> kas/accel/<name>.yml), so a bare
+# `make dev` builds with it. ACCEL=none composes no extra fragment and does
+# not remove the machine's own. An unknown name fails here rather than as a
+# missing kas include.
 ifneq ($(filter-out none,$(ACCEL)),)
   ifeq ($(wildcard kas/accel/$(ACCEL).yml),)
     $(error ACCEL=$(ACCEL) is unknown; kas/accel/$(ACCEL).yml does not exist. \
@@ -135,12 +106,9 @@ Available: none $(patsubst kas/accel/%.yml,%,$(wildcard kas/accel/*.yml)))
   endif
   CAPABILITY_YMLS += kas/accel/$(ACCEL).yml
 endif
-# AI=1 is a retained no-op: the accelerator is baseline and the machine
-# composes it. Kept so documented invocations keep working; warns rather than
-# silently accepting a flag that no longer does anything.
+# AI=1 is a warned no-op: the machine fragment composes the accelerator.
 ifeq ($(AI),1)
-  $(warning note: AI=1 is a no-op; the accelerator is baseline and composed by \
-the machine fragment since the accelerator-baseline revision)
+  $(warning note: AI=1 is a no-op; the machine fragment composes the accelerator)
 endif
 ifeq ($(SBOM_TUNE),1)
   CAPABILITY_YMLS += kas/sbom-cve.yml
@@ -366,10 +334,8 @@ lock: | $(KAS_WORK_DIR)
 # Report the checked-out HEAD of every repo in the composition. Reads the
 # composition, so it covers pins wherever they live -- kas/base.yml and the
 # kas/bsp/*.yml BSP fragments alike.
-#
-# Read the output; do not diff it against the `commit:` values blindly. A repo
-# carrying a kas patch (meta-renesas) reports the patched commit, not its pin,
-# so a raw comparison flags it as drifted every time.
+# A repo carrying a kas patch (meta-renesas) reports the patched commit, not
+# its `commit:` pin, so a raw diff against the pins always shows it drifted.
 verify-pins: | $(KAS_WORK_DIR)
 	@echo "==> Reporting HEAD per repo [$(STACK)]"
 	$(KAS) for-all-repos $(STACK) 'echo "$$(basename $$(pwd)): $$(git rev-parse HEAD)"'

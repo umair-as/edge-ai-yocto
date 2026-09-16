@@ -54,10 +54,8 @@ IMAGE_INSTALL:append = " packagegroup-edge-dev edge-sudoers-nopasswd edge-debug-
 # TEE that the image has no client stack for is dead weight.
 IMAGE_INSTALL:append:smarc-rzv2l = "${@bb.utils.contains('EDGE_ENABLE_OPTEE', '1', ' packagegroup-edge-optee-test', '', d)}"
 
-# Accelerator test/measurement instruments, named by the accelerator fragment
-# rather than by this recipe. Machine-neutral on purpose: a generic image must
-# not carry a board override to find its accelerator's test content. Empty
-# only in an EDGE_ALLOW_NO_ACCEL bring-up composition.
+# Accelerator test/measurement instruments, named by the accelerator
+# fragment so this recipe carries no board override.
 IMAGE_INSTALL:append = " ${EDGE_ACCEL_TEST_INSTALL}"
 
 # Optional: dbg-pkgs ships -dbg sub-packages for every recipe so gdb
