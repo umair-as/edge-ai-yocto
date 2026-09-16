@@ -104,8 +104,7 @@ CORE_IMAGE_EXTRA_INSTALL += "${@bb.utils.contains('EDGE_ENABLE_OBSERVABILITY', '
 # packagegroup gets the container runtime whether or not it came through this
 # class. One source, no second place to forget. See ADR-0012.
 
-# EDGE_DEFAULT_PASSWORD_HASH validation. Three guards, one is not enough --
-# past incidents proved each layer:
+# EDGE_DEFAULT_PASSWORD_HASH validation, three independent guards:
 #  1. presence: empty / unset.
 #  2. shell-escape: every `$` MUST be backslash-prefixed (`\$`).
 #     extrausers.bbclass interpolates EXTRA_USERS_PARAMS into a shell
@@ -117,13 +116,9 @@ CORE_IMAGE_EXTRA_INSTALL += "${@bb.utils.contains('EDGE_ENABLE_OBSERVABILITY', '
 #     wrong digest bytes" -- that stays the operator's discipline -- but every
 #     other class of corruption is caught.
 #
-# Enforced as a do_rootfs prefunc rather than at parse. The guard's purpose is
-# that a default-credential image must not leave CI, and a prefunc delivers
-# exactly that: no rootfs is assembled without a managed hash. Enforcing it at
-# parse instead put a distro-scope bb.fatal in front of every recipe in the
-# tree, so the repo could not be parsed at all without an operator's private
-# kas/local.yml. The parse-time hook below warns so a missing hash is still
-# reported immediately, not hours later at do_rootfs.
+# Fatal as a do_rootfs prefunc, so no rootfs is assembled without a managed
+# hash while the tree still parses without a private kas/local.yml. The
+# anonymous function below warns at parse.
 def edge_password_hash_problem(d):
     import re
     h = d.getVar('EDGE_DEFAULT_PASSWORD_HASH')
@@ -172,23 +167,14 @@ python edge_check_password_hash() {
 do_rootfs[prefuncs] += "edge_check_password_hash"
 edge_check_password_hash[vardeps] += "EDGE_DEFAULT_PASSWORD_HASH"
 
-# The board check exists because a missing conf/machine/include/edge-board-
-# ${MACHINE}.inc is otherwise completely silent (bitbake logs a failed soft
-# include at debug2), and the values it carries -- slot devices written into
-# the signed verity table, FIP offsets, FIT load addresses -- fail as a
-# green build producing an unbootable image rather than as an error.
-#
-# Board contract + accelerator selection, both fail-closed.
-#
-# The accelerator check refuses a machine/accelerator pair the board does not
-# declare. Building without the accelerator is deliberately NOT the fallback:
-# an image that silently lacks its accelerator is the failure this prevents.
+# Board contract and accelerator selection, both fail-closed. A missing
+# conf/machine/include/edge-board-${MACHINE}.inc is otherwise silent (bitbake
+# logs a failed soft include at debug2) and yields an unbootable image. An
+# undeclared machine/accelerator pair is refused, never built without the
+# accelerator.
 python () {
-    # Reported here so a missing or malformed hash is visible at parse rather
-    # than only when do_rootfs is reached. Warn, not fatal: this class is
-    # parsed for the image recipes during a whole-tree `bitbake -p`, and a
-    # fatal here would make the repo unparseable without a private local.yml
-    # again. edge_check_password_hash is the enforcing copy.
+    # Warn, not fatal: a whole-tree `bitbake -p` parses this class.
+    # edge_check_password_hash is the enforcing copy.
     problem = edge_password_hash_problem(d)
     if problem:
         bb.warn("%s\n  This is fatal at do_rootfs; the image will not build."
@@ -234,12 +220,8 @@ python () {
 
     accel = (d.getVar('EDGE_ACCEL') or 'none').strip()
     if accel == 'none':
-        # An accelerator-less image is not a supported product configuration:
-        # every board this distro targets carries an accelerator (DRP-AI in
-        # the RZ/V2L SoC, DX-M1 on PCIe for the RPi5), and an edge-ai image
-        # that cannot run inference has no purpose. This used to return
-        # quietly, which made "no accelerator" the silent default whenever a
-        # composition forgot the fragment.
+        # Every board this distro targets carries an accelerator; an
+        # accelerator-less image is a bring-up state, not a product.
         if d.getVar('EDGE_ALLOW_NO_ACCEL') == '1':
             bb.warn(
                 "Building MACHINE = '%s' with NO accelerator because "
@@ -255,8 +237,7 @@ python () {
             "  EDGE_ACCEL is unset. The machine fragment composes its\n"
             "  accelerator (kas/machines/<board>.yml -> kas/accel/<name>.yml);\n"
             "  this machine declares EDGE_ACCEL_SUPPORTED = '%s'.\n"
-            "  An image without its accelerator is refused rather than built:\n"
-            "  inference is the point of the platform, not a feature of it.\n"
+            "  An image without its accelerator is refused rather than built.\n"
             "  For board bring-up before the accelerator is integrated, set\n"
             "  EDGE_ALLOW_NO_ACCEL = \"1\" explicitly and accept the warning."
             % (d.getVar('MACHINE'), d.getVar('EDGE_ACCEL_SUPPORTED') or ''))
@@ -267,8 +248,7 @@ python () {
             "  This machine declares EDGE_ACCEL_SUPPORTED = '%s'.\n"
             "  Either compose the matching machine, or drop the\n"
             "  kas/accel/%s.yml fragment from the composition.\n"
-            "  Building without the accelerator is NOT the fallback: an image\n"
-            "  that silently lacks its accelerator is the failure this refuses."
+            "  Building without the accelerator is not a fallback."
             % (accel, d.getVar('MACHINE'), ' '.join(supported), accel))
 }
 
@@ -292,14 +272,10 @@ CORE_IMAGE_EXTRA_INSTALL += "${@'' if (d.getVar('EDGE_ACCEL') or 'none') == 'non
 ROOTFS_POSTPROCESS_COMMAND += "edge_check_modules_signed;"
 
 edge_check_modules_signed() {
-    # No /lib/modules at all means no kernel packages landed. Note it and move
-    # on -- there is nothing to verify. This is NOT the monolithic-kernel case:
-    # kernel-base ships modules.order and modules.builtin under
-    # /lib/modules/${KERNEL_VERSION} even when no module is built
-    # (kernel.bbclass FILES:${KERNEL_PACKAGE_NAME}-base), so a module-free image
-    # reaches the empty check below and fails there. That is intended: this
-    # platform builds with MODULE_SIG_FORCE and expects modules, so "no modules"
-    # is a composition error, not a valid image.
+    # No /lib/modules means no kernel packages landed. A monolithic kernel
+    # still ships modules.order/modules.builtin there (kernel-base), so it
+    # reaches the empty check below and fails: MODULE_SIG_FORCE images are
+    # expected to carry modules.
     if [ ! -d ${IMAGE_ROOTFS}/lib/modules ]; then
         bbnote "No /lib/modules in the image; no kernel packages to verify."
         return
@@ -312,9 +288,7 @@ edge_check_modules_signed() {
                -name '*.ko' -o -name '*.ko.gz' \
                -o -name '*.ko.xz' -o -name '*.ko.zst' 2>/dev/null)
 
-    # /lib/modules exists but held no modules: the loop below would inspect
-    # nothing and report success. A gate that passes because it found no work is
-    # indistinguishable from one that passed on merit.
+    # An empty list would pass the loop below without inspecting anything.
     if [ -z "$kos" ]; then
         bbfatal "Module-signature check found no modules under /lib/modules, which exists. Either the modules are packaged under a name this check does not match, or kernel-modules did not land in the image."
     fi

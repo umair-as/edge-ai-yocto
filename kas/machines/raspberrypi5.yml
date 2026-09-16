@@ -1,13 +1,11 @@
 # Machine overlay: Raspberry Pi 5.
 #
-# Composes onto kas/base.yml. Second machine of the platform; the board facts
-# (slot devices, U-Boot env area, FIT addresses, boot artifacts) live in
-# meta-edge-bsp/conf/machine/include/edge-board-raspberrypi5.inc, pulled in
-# by MACHINE name from edge-ai.conf. This file is composition only.
+# Composes onto kas/base.yml. Composition only: board facts (slot devices,
+# U-Boot env area, FIT addresses, boot artifacts) live in
+# meta-edge-bsp/conf/machine/include/edge-board-raspberrypi5.inc.
 #
-# The DEEPX DX-M1 on the PCIe M.2 slot is this board's accelerator; it is
-# composed here the way kas/machines/rzv2l.yml composes DRP-AI. An image for
-# this board without it has no purpose.
+# The DEEPX DX-M1 on the PCIe M.2 slot is this board's accelerator, composed
+# here as kas/machines/rzv2l.yml composes DRP-AI.
 
 header:
   version: 19
@@ -27,19 +25,17 @@ local_conf_header:
     # enable_uart=1 into config.txt; RPI_USE_U_BOOT requires it.
     ENABLE_UART = "1"
 
-    # Headless bring-up. Mainline 6.18 carries no validated display path for
-    # BCM2712 in this composition, and rpi-config would otherwise emit a
-    # dtoverlay=vc4-kms-v3d line for an overlay the mainline kernel does not
-    # ship. No display toggle, no vc4graphics machine feature, and no
-    # "screen" feature (psplash needs a framebuffer the image cannot provide).
-    # Read by rpi-base.inc at machine-conf parse, so local.conf scope.
+    # Headless: no display stack in this composition. rpi-config would
+    # otherwise emit dtoverlay=vc4-kms-v3d, an overlay mainline does not ship,
+    # and psplash ("screen") needs a framebuffer. Read by rpi-base.inc at
+    # machine-conf parse, so local.conf scope.
     EDGE_ENABLE_DISPLAY = "0"
     DISABLE_VC4GRAPHICS = "1"
     MACHINE_FEATURES_OPTED_OUT:append = " screen touchscreen"
 
-    # On-board WiFi (Synaptics/Cypress 43455 over SDIO) is wanted on this
-    # board. Its firmware is license-flagged; accepting the flag here keeps
-    # the acceptance machine-scoped. The wifi distro feature pulls the
+    # On-board WiFi (Synaptics/Cypress 43455 over SDIO). Its firmware is
+    # license-flagged; accepting the flag here keeps the acceptance
+    # machine-scoped. The wifi distro feature pulls the
     # userspace (wpa-supplicant, iw) via packagegroup-base; the kernel side
     # is the board's wireless-rpi5.cfg fragment, which re-enables the
     # 802.11 stack the platform policy turns off for radio-less boards.

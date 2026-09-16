@@ -14,8 +14,7 @@ inherit packagegroup
 # nftables: netavark is configured with firewall_driver = "nftables"
 # (edge-containers-config) and execs the nft binary for every root
 # container network; without it `podman run` as root fails with "unable
-# to execute nft". Rootless containers (pasta) never touch it, which is
-# why the rootless proofs passed without this.
+# to execute nft". Rootless containers (pasta) do not use it.
 RDEPENDS:${PN} = " \
     podman \
     conmon \

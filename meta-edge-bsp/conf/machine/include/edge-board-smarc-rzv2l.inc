@@ -111,8 +111,7 @@ WICVARS:append = " FIP_WIC_OFFSET"
 #   emmc -> edge-rzv2l-emmc.wks.in  (GPT user area, BL2 in mmcblk0boot0)
 # Both are RZ/V2L SoC-ROM specific.
 #
-# Plain `=`, not the `:smarc-rzv2l` override form the kas overlay needed:
-# this file parses at distro-conf scope (bitbake.conf:828), after
+# Plain `=`, no `:smarc-rzv2l` override: this file parses at distro-conf scope (bitbake.conf:828), after
 # conf/machine/${MACHINE}.conf (:825), so it already wins over
 # smarc-rzv2l.conf:44's conditional without an override.
 WKS_FILE = "${@oe.utils.conditional('EDGE_BOOT_TARGET', 'emmc', 'edge-rzv2l-emmc.wks.in', 'edge-rzv2l.wks.in', d)}"

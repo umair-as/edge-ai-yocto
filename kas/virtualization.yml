@@ -1,10 +1,6 @@
 # DEPRECATED -- container userspace is now baseline (ADR-0012).
 #
-# meta-virtualization is composed from kas/base.yml and the runtime policy
-# (DISTRO_FEATURES virtualization, VIRTUAL-RUNTIME_container_*) lives in
-# edge-floor.inc. This file is retained as a no-op so external compositions
-# naming it keep working; VIRT=1 likewise still parses and does nothing.
-#
-# Removal is scheduled one release after ADR-0012 ships.
+# No-op shim for external compositions that name this path. meta-virtualization
+# is composed from kas/base.yml; the runtime policy lives in edge-floor.inc.
 header:
   version: 19

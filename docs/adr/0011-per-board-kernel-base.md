@@ -1,9 +1,9 @@
 # ADR-0011: Kernel base is a per-board property, not a distro property
 
-## Status
-
-Accepted. Amends the scope of [ADR-0001](0001-kernel-base.md), which
-remains accurate for the board it describes.
+- Status: Accepted
+- Date: 2026-09-09
+- Amends: [ADR-0001](0001-kernel-base.md) (scope narrowed to RZ/V2L, where
+  it remains accurate)
 
 ## Context
 

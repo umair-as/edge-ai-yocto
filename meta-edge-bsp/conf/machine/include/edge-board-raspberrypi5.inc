@@ -1,5 +1,5 @@
 # Board facts for the Raspberry Pi 5, consumed by the distro's board
-# contracts. One file per board; this is the second.
+# contracts. One file per board.
 #
 # Pulled in by MACHINE name from edge-ai.conf, after conf/machine/
 # raspberrypi5.conf and its rpi-base.inc. EDGE_BOARD_INC is the sentinel that
@@ -13,8 +13,7 @@ EDGE_BOARD_INC = "1"
 
 # --- Accelerator ---------------------------------------------------------
 # DEEPX DX-M1 on the PCIe M.2 slot. Allowlist only; the selection is
-# EDGE_ACCEL from kas/accel/dxm1.yml once that fragment exists. Until then the
-# machine fragment sets EDGE_ALLOW_NO_ACCEL for bring-up.
+# EDGE_ACCEL from kas/accel/dxm1.yml.
 EDGE_ACCEL_SUPPORTED = "dxm1"
 
 # --- Network interface roles --------------------------------------------

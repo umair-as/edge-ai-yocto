@@ -12,7 +12,6 @@ SRC_URI += "file://CVE-2026-85091.patch"
 #
 # No CVE_STATUS here on purpose. The patch header carries `CVE: CVE-2026-85091`
 # and cve-check derives the patched status from that. An explicit CVE_STATUS
-# overrides the automatic detection, which means the shipped SBOM would report
-# our assertion instead of the evidence: if the patch were ever dropped from
-# SRC_URI, the override would keep claiming the CVE is fixed. Deriving it from
-# the patch fails in the safe direction -- the CVE reappears as Unpatched.
+# overrides the automatic detection: if the patch were dropped from SRC_URI,
+# the override would still claim the CVE fixed. Derived from the patch, the
+# CVE reappears as Unpatched instead.

@@ -160,13 +160,11 @@ each is a single-pass adoption when the time comes:
   ≥ 5.0) pins the host toolchain bundle (gcc/python/ninja/…) by
   version + sha256. Decouples builds from host package state. Strong
   CRA-posture fit for release builds. **Now unblocked** (kas 5 is in
-  place) and newly motivated: the build host moved Fedora 41 → 44 in a
-  single step, taking gcc 15 → 16 and Python 3.13 → 3.14 with it. Warm
-  sstate absorbed that because `uninative` keys native output as
-  `universal`, but any recipe that misses sstate now compiles against a
-  host toolchain nobody chose. Evaluate the sstate-signature impact
-  before adopting -- the point is to stop trading a warm cache for
-  reproducibility by accident.
+  place) and motivated by a build-host OS upgrade that moved gcc 15 → 16
+  and Python 3.13 → 3.14 in one step. Warm sstate absorbed it because
+  `uninative` keys native output as `universal`, but any recipe that
+  misses sstate compiles against an unpinned host toolchain. The
+  sstate-signature impact is unevaluated.
 - **`signers:` + `signed: true`** — verify GPG signatures on each
   upstream layer's commit/tag before checkout. Hard CRA-posture
   statement; real setup cost (key distribution, signer policy).
@@ -177,14 +175,13 @@ each is a single-pass adoption when the time comes:
 - **`kas/sdk.yml` with `task: populate_sdk`** — dedicated stack
   fragment so `make sdk` becomes a one-line wrapper. Only useful once
   the SDK is a deliverable.
-- ~~**kas 5 upgrade**~~ — **done 2026-09-09**, build host runs kas 5.5.
-  Our configuration needed no change: format version 19 is inside 5.5's
-  supported range (earliest compatible 1, current 23), no fragment uses
-  the removed `refspec:` key, and every repo in `kas/base.yml` already
-  carries an explicit `commit:`, so the new "branch without commit or
-  lock file" warning does not fire. `make parse` clean on the upgraded
-  host, 0 errors. This unblocks `buildtools:` below and brings the "fail
-  on fetch errors" semantics and the 5.3 CVE fixes.
+- ~~**kas 5 upgrade**~~ — **done 2026-09-09** (kas 5.5). No configuration
+  change was needed: format version 19 is inside 5.5's supported range
+  (earliest compatible 1, current 23), no fragment uses the removed
+  `refspec:` key, and every repo carries an explicit `commit:`, so the
+  "branch without commit or lock file" warning does not fire. `make parse`
+  is clean on kas 5.5. This unblocks `buildtools:` above and brings the
+  "fail on fetch errors" semantics and the 5.3 CVE fixes.
 
 ## References
 

@@ -92,9 +92,9 @@ That gets the lingering user manager and its Quadlet running at boot on a fresh
 flash; it does not by itself get the container running there — a freshly flashed
 image separately shipped no `/etc/subuid`/`/etc/subgid` and no writable `podman
 pull` scratch directory, so the rootless unpack still failed even with the
-manager up. Both are fixed in the same change as this doc; see
-[Status & roadmap](README.md#status--roadmap) for that fix and its pending
-on-target re-validation. Independent of the container-unpack gap, the ordering
+manager up. Both are now fixed; see
+[Status & roadmap](README.md#status--roadmap) for that fix and its
+on-target validation state. Independent of the container-unpack gap, the ordering
 fix above does **not** yet close the **post-OTA** case:
 after a RAUC slot switch, logind's linger enumeration fails on a `default_t`-labeled
 `/var/lib/systemd` (a `User enumeration failed` log plus an SELinux AVC), so `user@608`

@@ -73,13 +73,10 @@ EDGE_BOOT_TARGET ?= "esd"
 
 # FIT trust anchor, asserted on the artifact rather than assumed from config.
 #
-# UBOOT_SIGN_ENABLE = "1" only means the build was ASKED to sign. The public
-# key reaches U-Boot's control FDT through board-specific wiring (here, the
-# overridden concat_dtb() in the Renesas U-Boot bbappend). A board whose
-# U-Boot recipe lacks that wiring still satisfies UBOOT_SIGN_ENABLE, produces
-# signed slot FITs, and boots them UNVERIFIED -- a green build with the trust
-# root silently absent. Check the deployed DTB actually carries the key, and
-# that it is the key the FITs were signed with.
+# UBOOT_SIGN_ENABLE = "1" only requests signing. The public key reaches
+# U-Boot's control FDT through board-specific wiring (concat_dtb on RZ/V2L,
+# fdt_add_pubkey on RPi5); without it the slot FITs are signed but boot
+# unverified. This checks the deployed DTB carries the signing key.
 do_image_wic[depends] += "u-boot-tools-native:do_populate_sysroot dtc-native:do_populate_sysroot"
 do_image_wic[prefuncs] += "edge_check_fit_anchor"
 
@@ -119,7 +116,7 @@ python edge_check_fit_anchor() {
             "  UBOOT_SIGN_ENABLE = '1', so the slot FITs are signed -- but with\n"
             "  no key in the control FDT U-Boot cannot verify them and boots\n"
             "  them unverified. The key injection is board-specific wiring in\n"
-            "  the U-Boot recipe; this board has none that worked."
+            "  the U-Boot or kernel recipe, and it did not run for this board."
             % (dtb, node, e.output.decode().strip()))
     if got != want:
         bb.fatal("FIT anchor algo mismatch in %s %s: got '%s', expected '%s'"

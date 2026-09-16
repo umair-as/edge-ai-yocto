@@ -92,7 +92,7 @@ slot booted with `rauc.slot=B` and was marked good, and the late-fallback
 policy then marked A bad exactly as on RZ/V2L. The T1-T8 rollback matrix
 above has been run on RZ/V2L only; the Pi shares the managed U-Boot env
 script and RAUC configuration, but its rollback paths are not yet
-bench-tested.
+tested on hardware.
 
 ## Kernel and root-hash coupling
 

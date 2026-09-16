@@ -3,7 +3,7 @@
 # All declared with ?= so kas/local.yml wins. A shell environment override
 # does NOT win unless the variable is on the Makefile's shell-level
 # BB_ENV_PASSTHROUGH_ADDITIONS list -- bitbake discards the rest of the
-# environment before this file is parsed. See the note further down.
+# environment before this file is parsed.
 
 # ----- Choice variables (string-valued) ------------------------------------
 
@@ -25,28 +25,17 @@ EDGE_OTA_BACKEND ?= "rauc"
 # Display stack (wayland + opengl in DISTRO_FEATURES; weston in image).
 EDGE_ENABLE_DISPLAY ?= "1"
 
-# Container userspace. Baseline for every image tier and every machine: the
-# accelerator runtimes ship Quadlet units, and a device that cannot run them
-# has the inference path present but dead. Kernel-side cgroup / overlay /
-# netns support is already on via kernel fragments; the userspace runtime and
-# its principal are unconditional base OS content on every machine and every
-# tier -- there is no toggle, deliberately. See ADR-0012.
+# Container userspace is unconditional base OS content on every tier and
+# machine, with no toggle (ADR-0012): the accelerator runtimes ship Quadlet
+# units.
 
-# Accelerator selection. Single-valued on purpose: one populated accelerator
-# per image is what the platform builds, and widening a single value to a list
-# later is a smaller change than un-picking a list nobody validated.
+# Accelerator selection, single-valued: one accelerator per image.
 #
 #   EDGE_ACCEL            what this image is built for; set by kas/accel/<name>.yml
-#   EDGE_ACCEL_SUPPORTED  what THIS machine can carry; set by the board include
+#   EDGE_ACCEL_SUPPORTED  what this machine can carry; set by the board include
 #
-# The pair is checked in edge-image.bbclass: an unsupported combination is a
-# parse error naming both values, never a quietly accelerator-less image.
-# No distro-scope default. edge-features.inc is required at edge-ai.conf:25
-# and the board include lands at :42, so a `?=` here would claim the slot and
-# silently defeat the board's own default. EDGE_ACCEL is set by the machine's
-# accelerator fragment (kas/accel/<name>.yml, composed from the machine
-# fragment). Unset means no accelerator was composed, which edge-image.bbclass
-# treats as a build error rather than a fallback.
+# edge-image.bbclass checks the pair at parse. EDGE_ACCEL has no distro
+# default; unset is a build error there.
 EDGE_ACCEL_SUPPORTED ??= ""
 
 # Supplementary groups the accelerator's runtime principal needs. Applied at
@@ -54,23 +43,17 @@ EDGE_ACCEL_SUPPORTED ??= ""
 # created by other recipes and a recipe-level --groups races their creation.
 EDGE_ACCEL_SUPPLEMENTARY_GROUPS ??= ""
 
-# Accelerator-supplied test/measurement packages for dev images. Set by the
-# accelerator fragment, not by an image or a machine override -- the
-# accelerator owns its own test content, and a generic image recipe must not
-# name a board to find it.
+# Accelerator-supplied test/measurement packages for dev images, set by the
+# accelerator fragment so image recipes stay board-neutral.
 EDGE_ACCEL_TEST_INSTALL ??= ""
 
-# Board-fact declarations in this file use ??=, never ?=. This file is
-# required at edge-ai.conf:25 and the board include lands at :42, so a ?=
-# empty default here claims the slot first and the board's own ?= becomes a
-# no-op -- the variable reads empty and the fail-closed check fires on a
-# board that did set it. ??= is applied only if nothing else ever assigns.
+# Board-fact declarations use ??=, never ?=: this file is required before
+# the board include (edge-ai.conf), so a ?= default here would turn the
+# board's own ?= into a no-op.
 #
-# Boot-chain family. Five recipes assume TF-A/OP-TEE -> U-Boot -> signed FIT
-# verified against a key in U-Boot's control DTB -> raw U-Boot env for RAUC's
-# boot-count. Declared so that assumption is a parse-time fact rather than
-# five silent ones. Set by the board include; the implemented set is
-# {"uboot-fit"} and edge-image.bbclass refuses anything else.
+# Boot-chain family: firmware -> U-Boot -> signed FIT verified against a key
+# in U-Boot's control DTB -> raw U-Boot env for RAUC's boot-count. Only
+# "uboot-fit" is implemented; edge-image.bbclass refuses anything else.
 EDGE_BOOT_CHAIN ??= ""
 
 # Network interface roles. Board facts: which interfaces systemd-networkd must
@@ -103,15 +86,11 @@ EDGE_UBOOT_ENV_SIZE ??= ""
 # The deployed DTB that is U-Boot's control FDT at runtime -- the file whose
 # /signature node is the FIT trust anchor. Board fact because how the key
 # reaches the control FDT differs per board (concatenated signed U-Boot DTB
-# here, fdt_add_pubkey into the board DTB elsewhere).
+# on RZ/V2L, fdt_add_pubkey into the board DTB on RPi5).
 EDGE_FIT_PUBKEY_DTB ??= ""
 
-# EDGE_ENABLE_AI is retired. It was a derived read-only alias for
-# "is an accelerator selected", which is now always true: every board this
-# distro targets carries one, and edge-image.bbclass refuses to build without
-# it. A variable that cannot be 0 is not a toggle. Use EDGE_ACCEL to name
-# which accelerator; it is never "none" outside an EDGE_ALLOW_NO_ACCEL
-# bring-up composition.
+# No EDGE_ENABLE_AI: an accelerator is always selected. EDGE_ACCEL names it,
+# and is "none" only in an EDGE_ALLOW_NO_ACCEL bring-up composition.
 
 # OP-TEE normal-world userspace. On by default for boards that wire BL32 — the
 # secure world is unreachable from Linux without the client stack — but a build
@@ -173,21 +152,6 @@ EDGE_RAUC_BUNDLE_FORMAT ?= "${@bb.utils.contains('EDGE_ENABLE_RAUC_BUNDLE_ENCRYP
 #                             edge-image-dev: ships bpftool. OFF by default —
 #                             un-reduced DWARF + module BTF bloat the OTA bundle
 
-# ----- Why there is no BB_ENV_PASSTHROUGH_ADDITIONS block here -------------
-#
-# There used to be one, listing ~25 EDGE_* variables so "operators could flip
-# them from the environment". It never worked. bitbake filters the inherited
-# environment at startup and reads BB_ENV_PASSTHROUGH_ADDITIONS *from the
-# environment* to decide what survives; a conf file is parsed long after that
-# decision, so appending here names variables that were already discarded.
-# Measured: `EDGE_ENABLE_OBSERVABILITY=0 bitbake-getvar ...` still resolves 1.
-#
-# The passthrough that does work is established before bitbake starts -- the
-# Makefile sets BB_ENV_PASSTHROUGH_ADDITIONS in the shell it invokes bitbake
-# from. Anything that must be settable from the environment goes on that list
-# in the Makefile; everything else is a make flag mapped to a kas fragment.
-# This matches AGENTS.md §"Build commands", which already states that a bare
-# EDGE_*=1 exported in the shell is silently dropped.
-#
-# Keeping the dead block was worse than having none: it advertised a control
-# surface that silently did nothing.
+# No BB_ENV_PASSTHROUGH_ADDITIONS here: bitbake reads it from the environment
+# at startup, before any conf file is parsed, so an append in conf has no
+# effect. The Makefile sets it in the shell that runs bitbake.

@@ -18,8 +18,7 @@ header:
 
 repos:
   # No wrynose branch upstream (agherzan/meta-raspberrypi#1598); master
-  # declares LAYERSERIES_COMPAT = "wrynose". Pinned by commit, same revision
-  # as the proven RPi5 reference build on the same oe-core pin.
+  # declares LAYERSERIES_COMPAT = "wrynose". Pinned by commit.
   meta-raspberrypi:
     url: https://github.com/agherzan/meta-raspberrypi.git
     branch: master
