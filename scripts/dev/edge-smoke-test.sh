@@ -625,8 +625,19 @@ if [ "${accel}" = "dxm1" ]; then
     else
         fail "dxrtd.service not active ($(systemctl is-active dxrtd.service 2>/dev/null)) — ConditionPathExistsGlob=/dev/dxrt* unmet, or the daemon failed"
     fi
+    # dxrtd's RuntimeDirectory override (edge-dxm1-runtime's dxrtd.service)
+    # publishes the dynamic-IPC socket at a fixed, bind-mountable path instead
+    # of libdxrt's default @dxrt_dynamic_ipc.sock / /tmp/dxrt_dynamic_ipc.sock.
+    if sudo -n test -S /run/dxrt/ipc.sock 2>/dev/null; then
+        pass "dxrtd listening on /run/dxrt/ipc.sock"
+    else
+        fail "/run/dxrt/ipc.sock missing — dxrtd's RuntimeDirectory override did not take, or the daemon is down"
+    fi
     if command -v dxrt-cli >/dev/null 2>&1; then
-        dx_status=$(sudo -n timeout 20 dxrt-cli -s 2>&1 | head -20)
+        # env explicitly, not a bare sudo -n: this invocation may not be an
+        # interactive login shell (edge-dxrt-env.sh, profile.d-only) and this
+        # image's sudo PAM stack does not run pam_env either.
+        dx_status=$(sudo -n env DXRT_DYNAMIC_IPC_ENDPOINT=/run/dxrt/ipc.sock timeout 20 dxrt-cli -s 2>&1 | head -20)
         if printf '%s' "${dx_status}" | grep -iE 'device|firmware|fw' >/dev/null; then
             pass "dxrt-cli -s reports a device"
             printf '%s\n' "${dx_status}" | grep -iE 'device|firmware|fw|version' | head -4 | sed 's/^/        /'
