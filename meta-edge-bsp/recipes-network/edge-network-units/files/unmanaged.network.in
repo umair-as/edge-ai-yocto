@@ -1,0 +1,5 @@
+[Match]
+Name=@IFACE@
+
+[Link]
+Unmanaged=yes

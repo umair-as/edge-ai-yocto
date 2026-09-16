@@ -122,14 +122,34 @@ bit-for-bit reproducibility.
 ## Notes
 
 - `KAS_REPO_REF_DIR` is documented in kas as `repo_ref_dir` (kas docs
-  → "Configuration Reference" → "Environment Variables"). It works
-  with kas ≥ 3.0; we pin newer than that in CI.
+  → "Configuration Reference" → "Environment Variables"). It works with
+  kas ≥ 3.0. CI does not run kas at all (the lint workflow is text-only),
+  so there is no CI-side kas pin; the build host's version is the only one
+  that matters.
 - `kas lock` requires network access to resolve floating branches.
   It's not run at build time — only when the operator explicitly
   wants to bump pins.
 - `kas purge` (the kas plugin) wipes `KAS_REPO_REF_DIR` contents in
   addition to `.kas/`; that's why our `make purge` does scoped `rm`
   directly instead of calling `kas purge`. See Makefile:`purge`.
+
+## Vendor layer series compatibility
+
+`meta-renesas` has no wrynose branch upstream; its own `layer.conf` sets
+`LAYERSERIES_COMPAT_meta-rz-{bsp,distro} = "scarthgap"`. bitbake runs the
+series-compatibility check at `layer.conf`-parse time, before `local.conf`
+is read, so the amendment cannot come from a kas fragment's
+`local_conf_header` — it has to sit in another layer's `layer.conf`.
+`meta-edge-bsp`'s runs after `meta-rz-bsp`'s in BBLAYERS order and `:append`
+is late-binding in wrynose, so the two lines land there:
+
+    LAYERSERIES_COMPAT_meta-rz-bsp:append    = " wrynose"
+    LAYERSERIES_COMPAT_meta-rz-distro:append = " wrynose"
+
+They are inert when meta-renesas is not composed — bitbake only checks
+`LAYERSERIES_COMPAT` for layers actually in BBLAYERS — so they do not
+re-couple the layer to Renesas. **Remove them when meta-renesas ships a
+wrynose-compatible branch.**
 
 ## Follow-on work
 
@@ -139,7 +159,12 @@ each is a single-pass adoption when the time comes:
 - **`buildtools:` adoption** — `kas/base.yml` `buildtools:` key (kas
   ≥ 5.0) pins the host toolchain bundle (gcc/python/ninja/…) by
   version + sha256. Decouples builds from host package state. Strong
-  CRA-posture fit for release builds. Requires the kas 5 upgrade.
+  CRA-posture fit for release builds. **Now unblocked** (kas 5 is in
+  place) and motivated by a build-host OS upgrade that moved gcc 15 → 16
+  and Python 3.13 → 3.14 in one step. Warm sstate absorbed it because
+  `uninative` keys native output as `universal`, but any recipe that
+  misses sstate compiles against an unpinned host toolchain. The
+  sstate-signature impact is unevaluated.
 - **`signers:` + `signed: true`** — verify GPG signatures on each
   upstream layer's commit/tag before checkout. Hard CRA-posture
   statement; real setup cost (key distribution, signer policy).
@@ -150,10 +175,13 @@ each is a single-pass adoption when the time comes:
 - **`kas/sdk.yml` with `task: populate_sdk`** — dedicated stack
   fragment so `make sdk` becomes a one-line wrapper. Only useful once
   the SDK is a deliverable.
-- **kas 5 upgrade** — fleet-wide decision deliberately isolated from
-  the restructure. Brings buildtools support, the "fail on fetch
-  errors" semantics, "warn about repos with branches but without
-  commit or lock file", and the 5.3 CVE fixes.
+- ~~**kas 5 upgrade**~~ — **done 2026-09-09** (kas 5.5). No configuration
+  change was needed: format version 19 is inside 5.5's supported range
+  (earliest compatible 1, current 23), no fragment uses the removed
+  `refspec:` key, and every repo carries an explicit `commit:`, so the
+  "branch without commit or lock file" warning does not fire. `make parse`
+  is clean on kas 5.5. This unblocks `buildtools:` above and brings the
+  "fail on fetch errors" semantics and the 5.3 CVE fixes.
 
 ## References
 

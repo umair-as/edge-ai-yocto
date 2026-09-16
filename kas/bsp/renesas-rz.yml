@@ -1,0 +1,66 @@
+# Renesas RZ vendor BSP composition.
+#
+# Everything meta-renesas: the repo pin, its two layers, the kas patch it
+# needs, and the BBMASKs that keep its scarthgap-era content off the parse
+# path. Included from kas/machines/rzv2l.yml, not from kas/base.yml -- base
+# is board-neutral distro policy, and a second machine composes its own
+# vendor BSP fragment instead of inheriting this one.
+#
+# Also pulls the vendor kernel recipe pin, so a machine that includes this
+# file gets the whole Renesas BSP as one unit.
+
+header:
+  version: 19
+  includes:
+    - kas/bsp/renesas-rz-kernel.yml
+
+repos:
+  # No wrynose branch upstream; newest is scarthgap/rz (Yocto 5.0). Pinned
+  # to its HEAD, with the scarthgap→wrynose port carried locally (override
+  # syntax, debug-tweaks split, DISTRO_FEATURES_DEFAULTS, LAYERSERIES_COMPAT).
+  # meta-rz-bsp: machine conf for smarc-rzv2l, bptool/firmware-pack,
+  # multimedia kernel modules.
+  # meta-rz-distro: multimedia userspace .inc plumbing
+  # (rz-distro-common.inc → RENESAS_DATADIR, vspmif.inc, mmngr_lib.inc).
+  # Its rz-bsp / rz-vlp distro confs are passive while DISTRO=edge-ai.
+  meta-renesas:
+    url: https://github.com/renesas-rz/meta-renesas
+    branch: scarthgap/rz
+    commit: b396a94cc9c0a1e491c3a0426416cb8a1dfcb04f
+    # A layer-root wic/ dir is off WKS_SEARCH_PATH and is a hard sanity
+    # failure on a fresh build dir (sanity.bbclass
+    # check_sanity_version_change). No bbappend can move a directory, so
+    # this one is a kas patch.
+    patches:
+      wic-layout:
+        repo: edge-ai-yocto
+        path: kas/patches/meta-renesas/0001-meta-rz-bsp-move-wic-wks-into-files-wic.patch
+    layers:
+      meta-rz-bsp:
+      meta-rz-distro:
+    # The rest of the port is in-layer: LAYERSERIES_COMPAT in
+    # meta-edge-bsp/conf/layer.conf, and the S = "${WORKDIR}/git" rejection
+    # in per-recipe bbappends (u-boot_2024.07, trusted-firmware-a_%,
+    # bptool-native). The u-boot_2024.07.bb whitespace warning is parser
+    # noise.
+
+local_conf_header:
+  bbmask_deferred_scarthgap_skew: |
+    # scarthgap-era bbappends (weston 13.0.1, gstreamer 1.22.12) with no
+    # matching wrynose recipe; unmasked they fail parse with "No recipes in
+    # default available".
+    BBMASK += "meta-rz-distro/recipes-graphics/wayland/weston_13.0.1\.bbappend"
+    BBMASK += "meta-rz-distro/recipes-multimedia/gstreamer/gstreamer1\.0_1\.22\.12\.bbappend"
+    BBMASK += "meta-rz-distro/recipes-multimedia/gstreamer/gstreamer1\.0-plugins-base_1\.22\.12\.bbappend"
+    BBMASK += "meta-rz-distro/recipes-multimedia/gstreamer/gstreamer1\.0-plugins-good_1\.22\.12\.bbappend"
+    BBMASK += "meta-rz-distro/recipes-multimedia/gstreamer/gstreamer1\.0-plugins-bad_1\.22\.12\.bbappend"
+
+  bbmask_vendor_cruft_unshipped: |
+    # Vendor recipes not shipped (90-edge.preset disables v4l2-init.service).
+    # Their scarthgap-era S = "${WORKDIR}" is a wrynose parse error.
+    BBMASK += "meta-rz-distro/recipes-extend/audio-init/audio-init\.bb"
+    BBMASK += "meta-rz-distro/recipes-extend/v4l2-init/v4l2-init_1\.0\.bb"
+    # Installs weston.sh from ${WORKDIR} (scarthgap-era path) and adds an
+    # idle-time=0 ExecStart; meta-edge-bsp's own weston-init bbappend
+    # replaces it.
+    BBMASK += "meta-rz-distro/recipes-graphics/wayland/weston-init\.bbappend"

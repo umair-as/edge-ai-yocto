@@ -1,0 +1,13 @@
+[Match]
+Name=@EDGE_UPLINK_IFACE@
+
+[Network]
+DHCP=yes
+IPv6AcceptRA=yes
+
+[DHCP]
+UseDNS=yes
+RouteMetric=100
+
+[IPv6AcceptRA]
+UseDNS=yes

@@ -1,0 +1,71 @@
+# Machine overlay: Raspberry Pi 5.
+#
+# Composes onto kas/base.yml. Composition only: board facts (slot devices,
+# U-Boot env area, FIT addresses, boot artifacts) live in
+# meta-edge-bsp/conf/machine/include/edge-board-raspberrypi5.inc.
+#
+# The DEEPX DX-M1 on the PCIe M.2 slot is this board's accelerator, composed
+# here as kas/machines/rzv2l.yml composes DRP-AI.
+
+header:
+  version: 19
+  includes:
+    # Raspberry Pi vendor BSP: the meta-raspberrypi repo pin, its layer, and
+    # (via that file) the mainline kernel provider selection.
+    - kas/bsp/raspberrypi.yml
+    # DEEPX DX-M1: the vendor layer, its wrynose patches and the accelerator
+    # selection.
+    - kas/accel/dxm1.yml
+
+machine: raspberrypi5
+
+local_conf_header:
+  board: |
+    # Debug UART on the 3-pin header (ttyAMA10). rpi-config writes
+    # enable_uart=1 into config.txt; RPI_USE_U_BOOT requires it.
+    ENABLE_UART = "1"
+
+    # Headless: no display stack in this composition. rpi-config would
+    # otherwise emit dtoverlay=vc4-kms-v3d, an overlay mainline does not ship,
+    # and psplash ("screen") needs a framebuffer. Read by rpi-base.inc at
+    # machine-conf parse, so local.conf scope.
+    EDGE_ENABLE_DISPLAY = "0"
+    DISABLE_VC4GRAPHICS = "1"
+    MACHINE_FEATURES_OPTED_OUT:append = " screen touchscreen"
+
+    # On-board WiFi (Synaptics/Cypress 43455 over SDIO). Its firmware is
+    # license-flagged; accepting the flag here keeps the acceptance
+    # machine-scoped. The wifi distro feature pulls the
+    # userspace (wpa-supplicant, iw) via packagegroup-base; the kernel side
+    # is the board's wireless-rpi5.cfg fragment, which re-enables the
+    # 802.11 stack the platform policy turns off for radio-less boards.
+    LICENSE_FLAGS_ACCEPTED:append = " synaptics-killswitch"
+    DISTRO_FEATURES:append = " wifi"
+
+    # MACHINE_EXTRA_RRECOMMENDS reaches every edge image through
+    # packagegroup-machine-base. The vendor recommends name the firmware for
+    # both radio variants and udev-rules-rpi, whose rules target the vendor
+    # kernel and name groups this distro does not create (gpio, i2c, spi);
+    # udevd resolves rule group names at start, and a missing name stalls it
+    # behind systemd-userdbd. The board include names the fitted firmware and
+    # the edge-owned rules instead. The wifi/bluetooth machine features only
+    # feed those recommends; the WiFi userspace comes from the distro feature
+    # above, and no Bluetooth userspace is installed.
+    MACHINE_FEATURES_OPTED_OUT:append = " wifi bluetooth"
+    MACHINE_EXTRA_RRECOMMENDS:remove = " \
+        linux-firmware-rpidistro-bcm43455 \
+        bluez-firmware-rpidistro-bcm4345c0-hcd \
+        linux-firmware-rpidistro-bcm43456 \
+        bluez-firmware-rpidistro-bcm4345c5-hcd \
+        udev-rules-rpi \
+    "
+
+    # rpi-default-providers.inc maps the GL virtuals to the legacy VideoCore
+    # "userland" stack whenever vc4graphics is off. That stack is not for
+    # BCM2712; pin mesa so anything that still links a GL virtual builds the
+    # same provider the display-enabled composition would.
+    PREFERRED_PROVIDER_virtual/egl     = "mesa"
+    PREFERRED_PROVIDER_virtual/libgles2 = "mesa"
+    PREFERRED_PROVIDER_virtual/libgl   = "mesa"
+    PREFERRED_PROVIDER_virtual/mesa    = "mesa"
+    PREFERRED_PROVIDER_virtual/libgbm  = "mesa"

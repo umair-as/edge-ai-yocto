@@ -1,0 +1,13 @@
+# /etc/fw_env.config
+# Raspberry Pi 5 U-Boot environment in the raw MMC area before the first
+# partition (edge-rpi5.wks.in). Matches edge-rpi5-boot.cfg:
+#   CONFIG_ENV_IS_IN_MMC=y
+#   CONFIG_ENV_OFFSET=0x1F0000
+#   CONFIG_ENV_OFFSET_REDUND=0x210000
+#   CONFIG_ENV_SIZE=0x20000
+#
+# /boot starts at 4 MB (--align 4096 in the WKS) so both copies end before p1.
+#
+# device         offset     env-size
+@EDGE_UBOOT_ENV_DEVICE@     @EDGE_UBOOT_ENV_OFFSET@   @EDGE_UBOOT_ENV_SIZE@
+@EDGE_UBOOT_ENV_DEVICE@     @EDGE_UBOOT_ENV_OFFSET_REDUND@   @EDGE_UBOOT_ENV_SIZE@

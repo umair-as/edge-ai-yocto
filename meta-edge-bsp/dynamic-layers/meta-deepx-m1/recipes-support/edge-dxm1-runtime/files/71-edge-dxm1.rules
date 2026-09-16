@@ -1,0 +1,6 @@
+# DEEPX DX-M1 device nodes: root:dxrt 0660. The vendor's dx-driver installs
+# MODE="0666" on a DMA-capable accelerator; that rule is removed from the
+# driver package and this one is the single owner. dxrtd runs as dxrt; the
+# rootless container principal reaches the node through the same group.
+KERNEL=="dxrt*", SUBSYSTEM=="dxrt", OWNER="root", GROUP="dxrt", MODE="0660"
+KERNEL=="dxrt*", OWNER="root", GROUP="dxrt", MODE="0660"

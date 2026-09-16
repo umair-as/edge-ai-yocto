@@ -12,7 +12,9 @@
 #
 # This is the second piece of the boot/trust chain that stays on a
 # Renesas-CIP fork (the first being U-Boot — see
-# kas/u-boot/renesas-cip-2024.07.yml). OP-TEE 4.9 (from meta-arm) and
+# kas/u-boot/renesas-cip-2024.07.yml). OP-TEE (the Renesas 4.8.0 fork --
+# meta-arm's base recipe is named 4.9.0, but optee-os_%.bbappend pins
+# PV:smarc-rzv2l to 4.8.0 because mainline 4.9.0 has no plat-rz) and
 # Linux 6.12 (linux-renesas, CIP-base) round out the chain.
 #
 # Pinning: the wildcard matches meta-renesas's "2.10+git<SRCPV>"

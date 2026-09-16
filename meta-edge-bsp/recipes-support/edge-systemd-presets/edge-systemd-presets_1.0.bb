@@ -1,7 +1,8 @@
 SUMMARY = "edge-ai-yocto systemd preset overrides"
 DESCRIPTION = "Centralizes which systemd units the edge-ai distro wants \
 enabled or masked at first boot. Vendor-layer units (v4l2-init, audio-init) \
-from meta-rz-distro are suppressed at parse time via BBMASK in kas/base.yml; \
+from meta-rz-distro are suppressed at parse time via BBMASK in \
+kas/bsp/renesas-rz.yml; \
 this preset is intentionally near-empty in v0. Add lines here for first-boot \
 preset control as needed."
 HOMEPAGE = "https://github.com/umair-as/edge-ai-yocto"

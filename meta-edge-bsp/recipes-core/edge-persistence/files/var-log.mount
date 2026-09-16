@@ -1,13 +1,18 @@
 # /var/log is a real directory (volatile-log fs-perms table dropped in
-# edge-floor.inc). Bind /data/log over it before systemd-journald reads
-# its storage path. tmpfiles seeds /data/log via edge-persistence.conf.
+# edge-floor.inc). Bind /data/log over it before tmpfiles populates it;
+# tmpfiles seeds /data/log via edge-persistence.conf.
+# Not ordered before systemd-journald: journald starts on /run/log/journal
+# and systemd-journal-flush (RequiresMountsFor=/var/log/journal) migrates it
+# once this bind is up. Ordering journald behind this mount is a cycle on
+# boards where udevd blocks until journald runs (data.mount waits on a
+# udev-created device), resolved only by the 90 s device-job timeout.
 
 [Unit]
 Description=Persistent /var/log on /data
 DefaultDependencies=no
 Requires=data.mount
 After=data.mount
-Before=systemd-journald.service systemd-tmpfiles-setup.service local-fs.target shutdown.target
+Before=systemd-tmpfiles-setup.service local-fs.target shutdown.target
 Conflicts=umount.target shutdown.target
 
 [Mount]
