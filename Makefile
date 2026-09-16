@@ -66,7 +66,15 @@ ifneq ($(wildcard $(CURDIR)/build/conf),)
     KAS_BUILD_DIR ?= $(CURDIR)/build
   endif
 endif
-KAS_BUILD_DIR ?= $(CURDIR)/build/$(BOARD)
+ifeq ($(BOARD),rzv2l)
+  KAS_BUILD_DIR ?= $(CURDIR)/build/$(BOARD)
+else
+  # `?=` would keep a KAS_BUILD_DIR already in the environment (scripts/env.sh,
+  # loaded by direnv before BOARD=$(BOARD) was known) -- for any board but the
+  # legacy default that inherited value is never correct, so it is overridden
+  # rather than merely defaulted.
+  override KAS_BUILD_DIR := $(CURDIR)/build/$(BOARD)
+endif
 export KAS_BUILD_DIR
 
 
