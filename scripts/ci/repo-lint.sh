@@ -69,9 +69,16 @@ else
 fi
 
 hdr "INVARIANT: new commits carry an Assisted-by trailer"
+# Bot-authored commits (Dependabot, and any future [bot]-suffixed GitHub
+# automation) have no AI participation to attest -- Assisted-by records AI
+# tool involvement, not automated tooling. GitHub's own convention suffixes
+# every bot account's name with "[bot]"; skip those.
 if git rev-parse --quiet --verify "${RANGE%%..*}" >/dev/null 2>&1; then
     missing=0
     for c in $(git log --no-merges "$RANGE" --format='%H' 2>/dev/null); do
+        case "$(git log -1 --format=%an "$c")" in
+            *'[bot]') continue ;;
+        esac
         git log -1 --format='%(trailers:key=Assisted-by,valueonly)' "$c" | grep -q . \
             || { printf '    %s %s\n' "$(git log -1 --format=%h "$c")" "$(git log -1 --format=%s "$c")"; missing=1; }
     done
