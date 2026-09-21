@@ -1,7 +1,11 @@
 # Vulnerability-management architecture
 
 Decision record for the CRA vulnerability-management workstream on this
-distro (Yocto wrynose 6.0, smarc-rzv2l). It states the decisions in force,
+distro (Yocto wrynose 6.0). SBOM generation and the CVE check are wired at
+distro level and apply to every board; the measurements below were taken
+on `smarc-rzv2l` and are labelled as such, the Raspberry Pi 5
+(`raspberrypi5`, mainline 6.18 kernel) has no baseline measured yet. It
+states the decisions in force,
 the measured baseline they rest on, and the questions still open. Vulnerability
 handling here maps to CRA Annex I §2 (no known exploitable vulnerabilities) and
 the Part II vulnerability-handling requirements; the draft horizontal standard
@@ -226,7 +230,7 @@ design* — SPDX 3.0 puts the URL on the `source`-purpose node, not the built on
 
 ## Userland remediation under a pinned database snapshot
 
-These measurements come from `edge-image-dev` for `smarc-rzv2l`, with
+These measurements are RZ/V2L only: `edge-image-dev` for `smarc-rzv2l`, with
 cvelistV5 revision `d34c26123e45e877be017cf361b64edc0eefc4b6` and
 nvd-json-data-feeds revision
 `b9056dbe8175514b36ed1720cd223fc73aa1796c`. They are separate stages of the

@@ -19,8 +19,13 @@ PACKAGES = " \
     ${PN}-test \
 "
 
-# DRP-AI is RZ/V2L-only SoC IP.
+# DRP-AI is RZ/V2L-only SoC IP. Also covers bitbake invocations that bypass
+# the machine/accelerator gate in edge-image.bbclass.
 COMPATIBLE_MACHINE = "smarc-rzv2l"
+
+# The image class installs packagegroup-edge-accel-${EDGE_ACCEL}; the alias
+# keeps this package's own name stable in image manifests.
+RPROVIDES:${PN} += "packagegroup-edge-accel-drpai-v2l"
 
 # mmngr/mmngrbuf nodes + linux,multimedia carveout are already in the base
 # rzg2l-smarc-som.dtsi; these modules bind them. drpai-tvm-runtime links the
@@ -39,7 +44,6 @@ RDEPENDS:${PN} = " \
     drpai-tvm-runtime \
     drpai-tvm-app \
     edge-drpai-udev \
-    edge-ctr-user \
     drpai-tvm-quadlet \
 "
 

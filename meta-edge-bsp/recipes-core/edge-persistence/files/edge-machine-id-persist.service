@@ -1,12 +1,14 @@
-# Capture-or-restore /etc/machine-id before systemd-machine-id-commit locks
-# the slot-local value in.
+# First boot: capture the transient id to /data. Later boots:
+# edge-machine-id-early has already restored it from the raw device before
+# journald/userdbd/networkd started; this unit then only verifies, and
+# restores as a fallback if the early read failed.
 
 [Unit]
 Description=Capture or restore /etc/machine-id from /data
 DefaultDependencies=no
 ConditionPathIsMountPoint=/data
 Requires=data.mount
-After=data.mount
+After=data.mount edge-machine-id-early.service
 Before=systemd-machine-id-commit.service sysinit.target shutdown.target
 Conflicts=shutdown.target
 

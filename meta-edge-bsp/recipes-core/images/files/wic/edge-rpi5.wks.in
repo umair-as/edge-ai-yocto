@@ -1,0 +1,48 @@
+# short-description: edge-ai-yocto A/B image layout for raspberrypi5
+# long-description: GPT layout for the Raspberry Pi 5 EEPROM boot ROM: a FAT
+# boot partition, two dm-verity rootfs slots, and a /data partition for
+# persistent state. Slot labels and sizes come from the bbclass via
+# bitbake-time .wks.in expansion.
+#
+# On-disk layout (mmcblk0):
+#
+#   ┌─────────────────────────────────────────────┐ byte offset
+#   │ GPT header + partition entries              │ 0x00000000  (LBA 0-33)
+#   ├─────────────────────────────────────────────┤ 0x001F0000
+#   │ U-Boot environment (primary + redundant)    │
+#   │  raw MMC area — /etc/fw_env.config points   │
+#   │  fw_setenv at these offsets                 │
+#   ├─────────────────────────────────────────────┤ 0x00230000
+#   │  ── gap to 4 MB alignment ──                │
+#   ├─────────────────────────────────────────────┤ 0x00400000   p1 "boot"
+#   │ /boot              vfat, 256 MB             │
+#   │  config.txt, kernel_2712.img (= U-Boot),    │
+#   │  bcm2712-rpi-5-b.dtb, fitImage-A/-B         │
+#   ├─────────────────────────────────────────────┤              p2 "${EDGE_SLOT_A_LABEL}"
+#   │ RAUC slot A — active at first boot          │
+#   ├─────────────────────────────────────────────┤              p3 "${EDGE_SLOT_B_LABEL}"
+#   │ RAUC slot B — inactive, first OTA target    │
+#   ├─────────────────────────────────────────────┤              p4 "data"
+#   │ /data              ext4, ${EDGE_DATA_SIZE_MB} MB seed
+#   │  grown to fill the card on first boot by    │
+#   │  edge-grow-data.service (systemd-repart)    │
+#   └─────────────────────────────────────────────┘
+#
+# The EEPROM boot ROM reads config.txt, the kernel image and the DTB from
+# the first FAT partition; no raw bootloader region is needed. The raw U-Boot
+# env sits in the gap before p1: /boot at 4 MB alignment keeps
+# 0x1F0000 + 2 * 0x20000 = 0x230000 clear of the partition, and the GPT
+# entries end at LBA 33. Partition names (--part-name) are the slot identity
+# udev keys on (edge-slot-udev, GPT rules) and what /etc/fstab mounts by.
+
+bootloader --ptable gpt
+
+part /boot --source bootimg-partition --fstype=vfat --label boot --part-name boot --ondisk mmcblk0 --align 4096 --size 256 --no-fstab-update
+
+# A/B slots contain the same self-contained ext4 + appended Merkle tree.
+part / --source rawcopy --sourceparams="file=${IMGDEPLOYDIR}/${IMAGE_LINK_NAME}.ext4.verity" --part-name ${EDGE_SLOT_A_LABEL} --ondisk mmcblk0 --align 1024 --fixed-size ${EDGE_SLOT_SIZE_MB}
+part / --source rawcopy --sourceparams="file=${IMGDEPLOYDIR}/${IMAGE_LINK_NAME}.ext4.verity" --part-name ${EDGE_SLOT_B_LABEL} --ondisk mmcblk0 --align 1024 --fixed-size ${EDGE_SLOT_SIZE_MB}
+
+# /data preformatted in-image so first boot only needs resize, not mkfs.
+# --part-type must equal Type= in edge-grow-data's repart.d/50-data.conf.
+part /data --fstype=ext4 --label data --part-name data --part-type 00FB7005-AB51-4206-9D4A-11B68E508D3A --ondisk mmcblk0 --align 1024 --fixed-size ${EDGE_DATA_SIZE_MB} --no-fstab-update

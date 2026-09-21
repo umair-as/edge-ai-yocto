@@ -1,0 +1,40 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+Date: Tue, 15 Sep 2026 12:00:00 +0200
+Subject: [PATCH] arm64: dts: broadcom: bcm2712: add RNG200 node
+
+BCM2712 carries the same RNG200 hardware random number generator block
+as BCM2711, at 0x7d208000 on the soc bus (physical 0x107d208000), and
+the iproc-rng200 driver already matches "brcm,bcm2711-rng200". Mainline
+6.18 has no node for it, so the block never binds and, with no
+/chosen/rng-seed from the firmware path, the CRNG initialises from
+interrupt timing alone: measured 50-260 s after boot on a Raspberry Pi 5,
+with every blocking getrandom(2) consumer stalled until then.
+
+Node taken from the Raspberry Pi downstream tree, rpi-6.12.y
+bcm2712-ds.dtsi (commit b979ed0bcf37); the downstream status = "okay"
+is the default and is dropped. Register size 0x28 covers the RNG200
+control, status and FIFO registers the driver touches.
+
+Upstream-Status: Pending [BCM2712 RNG200 node absent from mainline 6.18; from rpi-6.12.y bcm2712-ds.dtsi]
+Assisted-by: claude-code:claude-fable-5-1
+---
+ arch/arm64/boot/dts/broadcom/bcm2712.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/broadcom/bcm2712.dtsi b/arch/arm64/boot/dts/broadcom/bcm2712.dtsi
+index 45a382f..9d3aa80 100644
+--- a/arch/arm64/boot/dts/broadcom/bcm2712.dtsi
++++ b/arch/arm64/boot/dts/broadcom/bcm2712.dtsi
+@@ -259,6 +259,11 @@
+ 			system-power-controller;
+ 		};
+ 
++		rng: rng@7d208000 {
++			compatible = "brcm,bcm2711-rng200";
++			reg = <0x7d208000 0x28>;
++		};
++
+ 		pinctrl: pinctrl@7d504100 {
+ 			compatible = "brcm,bcm2712c0-pinctrl";
+ 			reg = <0x7d504100 0x30>;

@@ -1,0 +1,24 @@
+# Kernel selection for Raspberry Pi 5.
+#
+# Recipe: linux-edge-mainline_6.18 (meta-edge-bsp, dynamic-layers/raspberrypi).
+#   kernel.org stable linux-6.18.y, pinned by SRCREV to a released tag, plus
+#   the board enablement patches mainline lacks. Not the vendor
+#   linux-raspberrypi tree: ADR-0011 records the per-board kernel base, and
+#   this board's is a kernel.org longterm line (EOL Dec 2028).
+#
+# Provider selection: meta-raspberrypi's rpi-default-providers.inc sets
+# PREFERRED_PROVIDER_virtual/kernel ??= "linux-raspberrypi"; the plain
+# assignment here beats it regardless of parse order.
+#
+# The vendor kernel recipes are masked rather than merely unselected: they
+# would still parse (nine recipes, one at AUTOREV), and a stray
+# PREFERRED_VERSION could silently pick one.
+
+header:
+  version: 19
+
+local_conf_header:
+  kernel: |
+    PREFERRED_PROVIDER_virtual/kernel = "linux-edge-mainline"
+    PREFERRED_VERSION_linux-edge-mainline = "6.18%"
+    BBMASK += "meta-raspberrypi/recipes-kernel/linux/linux-raspberrypi.*\.bb"

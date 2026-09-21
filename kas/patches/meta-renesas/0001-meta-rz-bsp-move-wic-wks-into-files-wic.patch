@@ -1,0 +1,42 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+Date: Sun, 07 Sep 2026 00:00:00 +0000
+Subject: [PATCH] meta-rz-bsp: move wic/*.wks into files/wic
+
+oe-core searches for .wks files under <layer>/files/wic, per
+WKS_SEARCH_PATH in classes-recipe/image_types_wic.bbclass. A layer-root
+wic/ directory is not on that path, so the three .wks files named by the
+meta-rz-bsp machine confs are unreachable where they sit.
+
+Since Yocto 5.1 that layout is also a hard sanity failure:
+classes-global/sanity.bbclass raises "wic/wks files at <path> need to be
+moved to files/wic within the layer to be found/used" for any BBPATH or
+BBLAYERS entry carrying a layer-root wic/. The check runs from
+check_sanity_version_change, which only fires when SANITY_VERSION or
+NATIVELSBSTRING differs from build/cache/sanity_info -- so an existing
+build directory never sees it and only a fresh one fails, permanently:
+sanity_info is written only when there are no messages.
+
+Moving the files satisfies the check and makes the machine confs'
+WKS_FILE values resolve, on both scarthgap and wrynose.
+
+Upstream-Status: Pending
+Assisted-by: claude-code:claude-opus-5[1m]
+---
+ meta-rz-bsp/{ => files}/wic/rz-image-bootpart-esd-pmic.wks | 0
+ meta-rz-bsp/{ => files}/wic/rz-image-bootpart-esd.wks      | 0
+ meta-rz-bsp/{ => files}/wic/rz-image-bootpart-mmc.wks      | 0
+ 3 files changed, 0 insertions(+), 0 deletions(-)
+
+diff --git a/meta-rz-bsp/wic/rz-image-bootpart-esd-pmic.wks b/meta-rz-bsp/files/wic/rz-image-bootpart-esd-pmic.wks
+similarity index 100%
+rename from meta-rz-bsp/wic/rz-image-bootpart-esd-pmic.wks
+rename to meta-rz-bsp/files/wic/rz-image-bootpart-esd-pmic.wks
+diff --git a/meta-rz-bsp/wic/rz-image-bootpart-esd.wks b/meta-rz-bsp/files/wic/rz-image-bootpart-esd.wks
+similarity index 100%
+rename from meta-rz-bsp/wic/rz-image-bootpart-esd.wks
+rename to meta-rz-bsp/files/wic/rz-image-bootpart-esd.wks
+diff --git a/meta-rz-bsp/wic/rz-image-bootpart-mmc.wks b/meta-rz-bsp/files/wic/rz-image-bootpart-mmc.wks
+similarity index 100%
+rename from meta-rz-bsp/wic/rz-image-bootpart-mmc.wks
+rename to meta-rz-bsp/files/wic/rz-image-bootpart-mmc.wks

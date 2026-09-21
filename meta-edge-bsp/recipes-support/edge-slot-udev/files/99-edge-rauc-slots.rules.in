@@ -1,0 +1,7 @@
+# Stable RAUC slot aliases based on partition identity, not filesystem labels.
+# This avoids slot lookup failures if ext4 labels change during OTA writes.
+
+SUBSYSTEM=="block", KERNEL=="@EDGE_BOOT_DEVICE@", SYMLINK+="disk/by-rauc-slot/boot"
+SUBSYSTEM=="block", KERNEL=="@EDGE_SLOT_A_DEVICE@", SYMLINK+="disk/by-rauc-slot/rootfsA"
+SUBSYSTEM=="block", KERNEL=="@EDGE_SLOT_B_DEVICE@", SYMLINK+="disk/by-rauc-slot/rootfsB"
+SUBSYSTEM=="block", KERNEL=="@EDGE_DATA_DEVICE@", SYMLINK+="disk/by-rauc-slot/data"

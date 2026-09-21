@@ -26,7 +26,11 @@ EDGE_SLOT_B_LABEL = "rootfsB"
 # RAUC userspace pulled into every image. The bundle recipe
 # (edge-bundle) and the system.conf (rauc-conf-edge) are built
 # separately; the image just needs the daemon + helpers.
-IMAGE_INSTALL:append = " rauc rauc-conf-edge"
+# virtual-ota-uboot-env and u-boot-fw-utils are here, not in
+# packagegroup-edge-base: they exist because this OTA backend keeps RAUC's
+# boot-count in the U-Boot environment, not because every edge image needs
+# them. A board or backend without a U-Boot env must not ship them.
+IMAGE_INSTALL:append = " rauc rauc-conf-edge virtual-ota-uboot-env u-boot-fw-utils"
 
 # /data first-boot growth. One mechanism for both layouts: edge-grow-data
 # dispatches on the partition table at runtime (systemd-repart for GPT/eMMC,

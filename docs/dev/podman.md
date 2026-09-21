@@ -44,9 +44,9 @@ labels + WIC fstab fix), the on-board stack is:
 | `skopeo`         | image-only ops (copy, inspect, sign)     | `skopeo`                  |
 | `catatonit`      | tiny PID-1 init for containers           | `catatonit`               |
 
-The set ships via `packagegroup-edge-containers`, toggled at the distro
-level by `EDGE_ENABLE_CONTAINERS=1` (already on for dev images that
-include `packagegroup-edge-dev`).
+The set ships via `packagegroup-edge-containers`, installed
+unconditionally into every image tier on every machine (ADR-0012). There is
+no toggle.
 
 ## Two posture modes
 
@@ -305,8 +305,8 @@ the runtime drifted — file an issue with the output.
   — the package set
 - `meta-edge-bsp/recipes-core/edge-containers-config/` — runtime overrides
   for `storage.conf`, `containers.conf`, and the `edge-network` bridge
-- `meta-edge-distro/conf/distro/include/edge-features.inc` —
-  `EDGE_ENABLE_CONTAINERS` toggle
+- `meta-edge-distro/classes/edge-image.bbclass` — unconditional
+  install of the container packagegroup
 - `meta-edge-bsp/recipes-core/edge-persistence/` — bind-mount layer
   that gives containers their OTA-surviving store
 - ADR-0004 (persistent state architecture) — why `/data` is the

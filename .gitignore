@@ -9,6 +9,8 @@
 
 # === Build + kas state ===
 build/
+# Throwaway build dirs for probe/gate parses (build-gate2, build-probe, ...)
+build-*/
 .kas/
 sstate-cache/
 downloads/

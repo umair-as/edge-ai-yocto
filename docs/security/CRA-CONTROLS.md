@@ -21,7 +21,7 @@ EU Cyber Resilience Act, Annex I (essential cybersecurity requirements). This ta
 |---|---|---|
 | 1.a — Minimum attack surface (no unnecessary services) | ✅ | Base image is minimal Weston; dev image opt-in via packagegroups. `tools-debug` / `tools-profile` only in `edge-image-dev`. No demo / sample daemons. U-Boot surface reduction via `EDGE_UBOOT_FEATURES` — see [uboot-hardening.md](uboot-hardening.md). |
 | 1.b — Hardened build flags | ✅ | `security_flags.bbclass` auto-inherited. `SECURITY_CFLAGS` = `-fstack-protector-strong -O2 -D_FORTIFY_SOURCE=2 -Wformat -Wformat-security -Werror=format-security`. Userspace built PIE. U-Boot stack canary deferred — `CONFIG_STACKPROTECTOR` off pending a proof build (see uboot-hardening.md "Explicit deferrals"). |
-| 1.c — Kernel hardening | ✅ | `security-hardening.cfg` plus hardening arguments embedded in the signed slot DTBs. LSM stack includes lockdown, yama, BPF, landlock, and SELinux; lockdown is compiled but not activated. |
+| 1.c — Kernel hardening | ✅ | `security-hardening.cfg` plus hardening arguments embedded in the signed slot DTBs. LSM stack includes lockdown, yama, landlock, SELinux, and BPF (BPF last, or it shadows SELinux's procattr hooks); lockdown is compiled but not activated. |
 | 1.d — Sysctl baseline | ✅ | `edge-sysctl-hardening` — CIS L1. |
 | 1.e — Read-only rootfs | ✅ | All A/B images use a read-only dm-verity mapping; persistent writes live under `/data`. |
 

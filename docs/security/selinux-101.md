@@ -43,10 +43,10 @@ the access regardless of what DAC said. So even root can be restricted:
                   | LSM hooks      |     MAC layer
                   |  Lockdown      |     ── operator's policy
                   |  Yama          |        wins over root
-                  |  BPF           |
                   |  Landlock      |
                   |  **SELinux**   |     ── this is where the
-                  +----------------+        access actually
+                  |  BPF           |        access actually
+                  +----------------+
                           |                 gets allowed/denied
                  (any LSM may deny;
                   SELinux usually does
@@ -75,10 +75,14 @@ at a time — they're "exclusive" LSMs. The non-exclusive ones
 The `CONFIG_LSM=` kernel string defines initialization ORDER, set to:
 
 ```
-CONFIG_LSM="lockdown,yama,bpf,landlock,selinux"
+CONFIG_LSM="lockdown,yama,landlock,selinux,bpf"
 ```
 
-SELinux is last so its hooks see context already resolved by the others.
+BPF is last. `/proc/PID/attr/*` reads and writes go to the first LSM in
+init order that implements `getprocattr`/`setprocattr`; the BPF LSM stubs
+every hook with its `-EINVAL` default, so ordering it ahead of SELinux
+makes `getcon()` and `setfscreatecon()` fail and every socket unit lose
+its label. Every upstream `CONFIG_LSM` default ends with `bpf`.
 
 ## 2. SELinux concepts
 
@@ -430,9 +434,10 @@ everything that AVC denies defeats the point of SELinux.
                                                          appends
                       CONFIG_LSM=                        ${EXTRA_
                        "lockdown,                         KERNEL_
-                        yama,bpf,                         ARGS}
+                        yama,                              ARGS}
                         landlock,
-                        selinux"
+                        selinux,
+                        bpf"
        |                                  |
        |                                  |
        v                                  v
@@ -452,7 +457,7 @@ CONFIG_SECURITY_SELINUX_DEVELOP=y       # per-domain permissive during bring-up
 CONFIG_SECURITY_SELINUX_AVC_STATS=y     # /sys/fs/selinux/avc/cache_stats
 CONFIG_SECURITY_SELINUX_SIDTAB_HASH_BITS=9
 CONFIG_DEFAULT_SECURITY_SELINUX=y
-CONFIG_LSM="lockdown,yama,bpf,landlock,selinux"
+CONFIG_LSM="lockdown,yama,landlock,selinux,bpf"
 ```
 
 ### 5.2 Distro — `meta-edge-distro/conf/distro/include/edge-floor.inc`

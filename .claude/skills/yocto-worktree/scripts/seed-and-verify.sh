@@ -35,13 +35,14 @@ cd "$WT" || die "cannot cd into $WT"
 # env.sh must be sourced in the same shell as the kas call: agent shells do
 # not get direnv, and bare kas would re-clone the layer stack into the CWD.
 #
-# kas/local.yml is the entry point here — it composes base + machine through
-# its own `includes:` (Makefile: BASE = kas/local.yml when present), so it is
-# the whole stack, not an overlay to append.
-vars=$(. scripts/env.sh && kas shell -c 'bitbake -e | grep -E "^(DL_DIR|SSTATE_DIR)="' kas/local.yml 2>&1 \
+# kas/local.yml is a host OVERLAY, not a stack: it carries cache paths and
+# parallelism and composes nothing. The stack is base + machine + overlay, in
+# that order, matching the Makefile.
+_stack="kas/base.yml:kas/machines/${BOARD:-rzv2l}.yml:kas/local.yml"
+vars=$(. scripts/env.sh && kas shell -c 'bitbake -e | grep -E "^(DL_DIR|SSTATE_DIR)="' "$_stack" 2>&1 \
        | grep -E '^(DL_DIR|SSTATE_DIR)=')
 [ -n "$vars" ] || { echo "ERROR: could not read DL_DIR/SSTATE_DIR via kas — inspect manually:" >&2
-                    echo "  . scripts/env.sh && kas shell -c 'bitbake -e | grep -E \"^(DL_DIR|SSTATE_DIR)=\"' kas/local.yml" >&2
+                    echo "  . scripts/env.sh && kas shell -c 'bitbake -e | grep -E \"^(DL_DIR|SSTATE_DIR)=\"' $_stack" >&2
                     exit 2; }
 echo "$vars"
 

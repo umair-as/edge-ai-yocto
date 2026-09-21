@@ -5,13 +5,15 @@
 # downstream-only artifacts — they are not in denx mainline at any tag.
 # Mainline upstreamed the board as renesas_rzg2l_smarc_defconfig with
 # different paths. The in-tree patch series targets the fork's naming,
-# so this overlay follows the fork. See meta-edge-bsp/recipes-bsp/u-boot/u-boot_2024.07.bb
-# for the SRCREV pin and the full rationale.
+# so this overlay follows the fork. The recipe itself is meta-renesas's;
+# meta-edge-bsp carries only a bbappend, at
+# dynamic-layers/meta-rz-bsp/recipes-bsp/u-boot/u-boot_2024.07.bbappend.
 #
 # TF-A also stays on a Renesas-CIP fork (the rzg_trusted-firmware-a
 # tree) — its mainline 2.10.x has no RZ/V2L support. See
-# kas/trusted-firmware-a/renesas-cip-2.10.yml. OP-TEE 4.9 comes from
-# meta-arm (mainline); recipe-side wiring lives in
+# kas/trusted-firmware-a/renesas-cip-2.10.yml. OP-TEE comes from meta-arm
+# (base recipe 4.9.0) but is pinned to the Renesas 4.8.0 fork for this
+# board -- mainline has no plat-rz; recipe-side wiring lives in
 # meta-edge-bsp/recipes-security/optee/.
 #
 # meta-renesas's meta-rz-bsp ships u-boot_2021.10, _2023.10, _2024.07

@@ -1,0 +1,52 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+Date: Wed, 10 Sep 2026 02:00:00 +0100
+Subject: [PATCH] rzg2l: report the kaslr-seed outcome on the console
+
+ft_board_setup() seeds /chosen/kaslr-seed from the OP-TEE RNG. Upstream
+writes it inside a compound condition, so every failure path is silent:
+if the RNG is unavailable or the read fails, the kernel boots without
+ASLR and nothing says so.
+
+Split the condition and state the outcome either way, in the same
+[EDGE] marker format the boot chain uses elsewhere, so a captured serial
+log shows whether ASLR was seeded rather than leaving it to inference.
+
+Upstream-Status: Inappropriate [board-specific console instrumentation]
+
+Signed-off-by: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+---
+ board/renesas/rcar-common/common.c | 17 ++++++++++++-----
+ 1 file changed, 12 insertions(+), 5 deletions(-)
+
+--- a/board/renesas/rcar-common/common.c
++++ b/board/renesas/rcar-common/common.c
+@@ -245,6 +245,7 @@
+ 
+ int ft_board_setup(void *blob, struct bd_info *bd)
+ {
++	int ret;
+ 	struct udevice *dev;
+ 	u64 seed;
+ 	u8 mac[6];
+@@ -279,10 +280,16 @@
+ 	fdt_fixup_ethernet(blob);
+ 
+ 	/* Write /chosen/kaslr-seed from OP-TEE RNG for kernel ASLR */
+-	if (!uclass_get_device(UCLASS_RNG, 0, &dev) &&
+-	    !dm_rng_read(dev, &seed, sizeof(seed)))
+-		fdt_setprop(blob, fdt_path_offset(blob, "/chosen"),
+-			    "kaslr-seed", &seed, sizeof(seed));
++	ret = uclass_get_device(UCLASS_RNG, 0, &dev);
++	if (ret) {
++		printf("[EDGE] UBOOT kaslr-seed=FAILED rng=unavailable ret=%d\n", ret);
++	} else if (dm_rng_read(dev, &seed, sizeof(seed))) {
++		printf("[EDGE] UBOOT kaslr-seed=FAILED rng=read-error\n");
++	} else {
++		ret = fdt_setprop(blob, fdt_path_offset(blob, "/chosen"),
++				  "kaslr-seed", &seed, sizeof(seed));
++		printf("[EDGE] UBOOT kaslr-seed=%s\n", ret ? "FAILED fdt" : "ok");
++	}
+ 
+ 	return 0;
+ }

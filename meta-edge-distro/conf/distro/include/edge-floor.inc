@@ -134,13 +134,30 @@ RM_WORK_EXCLUDE += "edge-image-base edge-image-dev edge-image-prod"
 # currently edge-profile-dev.inc.
 LICENSE_FLAGS_ACCEPTED ?= ""
 
+# ----- Container runtime (baseline; see ADR-0012) -------------------------
+
+# virtualization gates meta-virtualization's own recipes. Distro scope, not a
+# capability fragment: every tier and every machine ships the runtime.
+DISTRO_FEATURES:append = " virtualization"
+
+# Runtime picks. crun over runc (C, smaller, faster start); netavark +
+# aardvark-dns are podman's current network stack. PODMAN_FEATURES cleared:
+# the defaults pull docker-compat and rootlesskit that this platform's
+# rootless-with-Quadlets model does not use.
+VIRTUAL-RUNTIME_container_runtime    ?= "crun"
+VIRTUAL-RUNTIME_container_networking ?= "netavark"
+VIRTUAL-RUNTIME_container_dns        ?= "aardvark-dns"
+PODMAN_FEATURES:pn-podman            ?= ""
+
 # ----- SBOM (SPDX 3.0) + CVE check ---------------------------------------
 
 # Non-negotiable: every edge-ai build emits an SBOM and runs the CVE check.
-# The sbom-cve-check fragment defaults the two CVE-DB fetch recipes to
-# AUTOREV; pin back to the .bb-shipped SRCREVs so the CVE DB is part of
-# the release record, not silent network-driven drift. Bump these with
-# the wrynose pin in kas/base.yml.
+# The sbom-cve-check fragment sets the two CVE-DB fetch recipes to AUTOREV
+# (conf/fragments/yocto/sbom-cve-check.conf); pin them so the CVE DB is part
+# of the release record rather than silent network-driven drift. These are
+# deliberately chosen revisions, not the .bb-shipped ones — the .bb values
+# trail the fragment. A pinned DB reports no CVE published after its date,
+# so the pin date below is a security input.
 #
 # IMAGE_CLASSES:append wires sbom-cve-check.bbclass directly. The
 # fragment's same line via OE_FRAGMENTS is unreliable in this wrynose
@@ -151,15 +168,44 @@ LICENSE_FLAGS_ACCEPTED ?= ""
 INHERIT       += "create-spdx"
 OE_FRAGMENTS  += "yocto/sbom-cve-check"
 IMAGE_CLASSES:append = " sbom-cve-check"
-# nvd-json-data-feeds @ 2026-06-16
-SRCREV:pn-sbom-cve-check-update-nvd-native     = "b9056dbe8175514b36ed1720cd223fc73aa1796c"
-# cvelistV5 @ 2026-06-16
-SRCREV:pn-sbom-cve-check-update-cvelist-native = "d34c26123e45e877be017cf361b64edc0eefc4b6"
+# nvd-json-data-feeds @ 2026-08-31
+SRCREV:pn-sbom-cve-check-update-nvd-native     = "16379bcc8b21d112542cc1946037cbe670aa4ae1"
+# cvelistV5 @ 2026-08-31
+SRCREV:pn-sbom-cve-check-update-cvelist-native = "690942529c4953e38803aa62215bd0519350919b"
 
-# sbom-cve-check fragment hard-codes the SPDX compiled-sources flag for
-# linux-yocto; apply to linux-renesas so kernel CVE
-# source-attribution doesn't over-report.
-SPDX_INCLUDE_COMPILED_SOURCES:pn-linux-renesas = "1"
+# Shallow-clone the two CVE databases. They are append-only auto-generated
+# data repositories -- ~6.7 GB of packed history between them (nvd 4.1 GB /
+# ~12k commits, cvelist 2.6 GB / ~76k commits) -- and only the pinned
+# revision's JSON is ever read. Nothing in the build inspects their history.
+#
+# This does NOT speed up a fetch into an empty DL_DIR: bb/fetch2/git.py uses
+# a shallow tarball only when one is already present, and generates it after
+# the clone. The payoff is the generated gitshallow_*.tar.gz, which makes
+# every later cold fetch (a CI runner, a new host) small. Pair it with a
+# shared DL_DIR or SOURCE_MIRROR_URL or it buys nothing.
+#
+# Depth must be non-zero or the fetcher silently disables shallow
+# (bb/fetch2/git.py: shallow off when depth == 0 and no explicit revs).
+# Both pinned SHAs are non-tip; GitHub serves SHA-specific shallow fetches
+# for both repositories.
+BB_GIT_SHALLOW:pn-sbom-cve-check-update-nvd-native           = "1"
+BB_GIT_SHALLOW_DEPTH:pn-sbom-cve-check-update-nvd-native     = "1"
+BB_GIT_SHALLOW:pn-sbom-cve-check-update-cvelist-native       = "1"
+BB_GIT_SHALLOW_DEPTH:pn-sbom-cve-check-update-cvelist-native = "1"
+
+# A checksum mismatch is a hard stop and does NOT fall back to MIRRORS the
+# way a fetch failure does, so an upstream that re-rolls a release tarball
+# stops a cold build outright. own-mirrors puts the Yocto source mirror ahead
+# of the primary. Tracked here, not in gitignored kas/local.yml, because a
+# fresh clone hits the same tarballs.
+SOURCE_MIRROR_URL ?= "https://downloads.yoctoproject.org/mirror/sources/"
+INHERIT += "own-mirrors"
+
+# The sbom-cve-check fragment hard-codes the SPDX compiled-sources flag for
+# linux-yocto only, so every other kernel provider needs it set explicitly or
+# its SPDX output omits compiled sources and kernel CVE source-attribution
+# over-reports. The flag names a recipe, which is a board fact, so each
+# conf/machine/include/edge-board-<machine>.inc sets it for its own kernel.
 
 # The default ("current") drops fixed-version and cpe-stable-backport
 # CVE_STATUS entries from the VEX export on the assumption the CVE DB's
@@ -173,31 +219,61 @@ SPDX_INCLUDE_VEX = "all"
 
 # ----- FIT verified boot (file-key dev profile) --------------------------
 
+# Repo-root key store, keys/ (gitignored). Anchored on the distro layer, not
+# TOPDIR: the build directory is build/ for the first board and build/<BOARD>/
+# for every later one, so a TOPDIR-relative path resolves per board and
+# FIT_GENERATE_KEYS would mint a second trust root for the second board.
+EDGE_KEYS_DIR ?= "${@os.path.normpath(d.getVar('EDGE_DISTRO_LAYERDIR') + '/../keys')}"
+
 # Non-negotiable: signed FIT is the boot path. The profile (file-key vs
 # HSM) can change; the fact of signing cannot. mkimage auto-generates
-# the key pair into UBOOT_SIGN_KEYDIR on first build; keys/dev/fit/ is
-# gitignored.
+# the key pair into UBOOT_SIGN_KEYDIR on first build.
 UBOOT_SIGN_ENABLE      ?= "1"
-UBOOT_SIGN_KEYDIR      ?= "${TOPDIR}/../keys/dev/fit"
+UBOOT_SIGN_KEYDIR      ?= "${EDGE_KEYS_DIR}/dev/fit"
 UBOOT_SIGN_KEYNAME     ?= "edge-fit-dev"
 FIT_HASH_ALG           ?= "sha256"
-FIT_SIGN_ALG           ?= "rsa2048"
+# rsa4096: RSA_MAX_KEY_BITS is a 4096 compile-time ceiling in U-Boot's RSA
+# verify code (include/u-boot/rsa.h), not a Kconfig option, so it applies
+# identically on both boards -- confirmed against the actual pinned/built
+# sources (Renesas CIP u-boot 2024.07 and oe-core u-boot 2026.01), both of
+# which already carry CONFIG_FIT_SIGNATURE=y, CONFIG_RSA_VERIFY=y and
+# CONFIG_RSA_SOFTWARE_EXP=y in their resolved .config.
+FIT_SIGN_ALG           ?= "rsa4096"
+# Pin the key size. kernel-signing-keys-native generates the dev key from
+# FIT_SIGN_NUMBITS; oe-core leaves it unset, so mkimage would otherwise
+# default to 2048 and match rsa2048 only by coincidence. The assertion below
+# keeps the two in step.
+FIT_SIGN_NUMBITS       ?= "4096"
 FIT_GENERATE_KEYS      ?= "1"
 FIT_SIGN_INDIVIDUAL    ?= "0"
+
+# FIT_SIGN_ALG and FIT_SIGN_NUMBITS must agree: the FIT algo string is built
+# from FIT_SIGN_ALG while the key is generated at FIT_SIGN_NUMBITS bits. A
+# mismatch (e.g. rsa4096 algo, 2048 key) parses clean and fails at mkimage.
+python () {
+    import re
+    alg  = d.getVar('FIT_SIGN_ALG') or ''
+    bits = d.getVar('FIT_SIGN_NUMBITS') or ''
+    m = re.match(r'^rsa(\d+)$', alg)
+    if m and bits != m.group(1):
+        bb.fatal("FIT signing mismatch: FIT_SIGN_ALG=%s implies a %s-bit key "
+                 "but FIT_SIGN_NUMBITS=%s. Set both together in edge-floor.inc."
+                 % (alg, m.group(1), bits or '(unset)'))
+}
 
 # ----- RAUC bundle signing (file-key dev profile) -------------------------
 
 # Chain-rooted PKI: leaf (with codeSigning EKU) signs the bundle; root CA
 # is installed on the device as /etc/rauc/ca.cert.pem. Generate the chain
 # with scripts/rauc-init-certs.sh — keys live under keys/dev/rauc/, same
-# pattern as keys/dev/fit/ for the FIT signing. keys/ is gitignored.
+# pattern as keys/dev/fit/ for the FIT signing.
 #
 # RAUC_DEVICE_KEYRING is a project-local variable consumed by rauc-conf-edge;
 # explicitly pin to the CA so the leaf is NOT installed on the device
 # (only the CA needs to be there for chain verification).
-RAUC_KEY_FILE       ?= "${TOPDIR}/../keys/dev/rauc/rauc-signer.key"
-RAUC_CERT_FILE      ?= "${TOPDIR}/../keys/dev/rauc/rauc-signer.cert.pem"
-RAUC_KEYRING_FILE   ?= "${TOPDIR}/../keys/dev/rauc/rauc-ca.cert.pem"
+RAUC_KEY_FILE       ?= "${EDGE_KEYS_DIR}/dev/rauc/rauc-signer.key"
+RAUC_CERT_FILE      ?= "${EDGE_KEYS_DIR}/dev/rauc/rauc-signer.cert.pem"
+RAUC_KEYRING_FILE   ?= "${EDGE_KEYS_DIR}/dev/rauc/rauc-ca.cert.pem"
 RAUC_DEVICE_KEYRING ?= "${RAUC_KEYRING_FILE}"
 
 # ----- RAUC bundle encryption (crypt format, on by default) ---------------
@@ -209,9 +285,9 @@ RAUC_DEVICE_KEYRING ?= "${RAUC_KEYRING_FILE}"
 #
 # Consumed by: edge-bundle-common.inc (recipients), ota-certs (device key
 # and cert), rauc-conf-edge (the [encryption] stanza that names them).
-EDGE_RAUC_BUNDLE_ENCRYPT_RECIPIENTS ?= "${TOPDIR}/../keys/dev/rauc/rauc-recipients.pem"
-EDGE_RAUC_DECRYPT_KEY_SRC           ?= "${TOPDIR}/../keys/dev/rauc/rauc-recipient.key"
-EDGE_RAUC_DECRYPT_CERT_SRC          ?= "${TOPDIR}/../keys/dev/rauc/rauc-recipient.cert.pem"
+EDGE_RAUC_BUNDLE_ENCRYPT_RECIPIENTS ?= "${EDGE_KEYS_DIR}/dev/rauc/rauc-recipients.pem"
+EDGE_RAUC_DECRYPT_KEY_SRC           ?= "${EDGE_KEYS_DIR}/dev/rauc/rauc-recipient.key"
+EDGE_RAUC_DECRYPT_CERT_SRC          ?= "${EDGE_KEYS_DIR}/dev/rauc/rauc-recipient.cert.pem"
 
 # ----- Build identifier ---------------------------------------------------
 

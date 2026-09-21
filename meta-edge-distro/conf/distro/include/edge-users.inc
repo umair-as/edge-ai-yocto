@@ -18,71 +18,9 @@
 # or
 #   mkpasswd --method=sha-512 'your-password' # → $6$...
 
-# Fail at parse time if the operator forgot to set the hash, set a
-# malformed value, OR set an unescaped value that the shell will eat.
-#
-# Three guards (one is not enough — past incidents proved each layer):
-#  1. presence: empty / unset → fatal
-#  2. shell-escape: every `$` MUST be backslash-prefixed (`\$`).
-#     extrausers.bbclass interpolates EXTRA_USERS_PARAMS into a shell
-#     `var="…"` assignment; unescaped `$6$rounds=…$qO5…$Di…` has every
-#     `$X` token expanded as a shell var ref and silently deleted. The
-#     /etc/shadow entry parses but decodes to nothing. Catch this BEFORE
-#     it ships.
-#  3. format-shape: after the backslashes are conceptually stripped, the
-#     value must match the sha512crypt grammar. The shape check can't
-#     catch "valid format but wrong digest bytes" — that's still the
-#     operator's discipline (`openssl passwd -6` + paste the output
-#     unchanged), but every other class of corruption is caught here.
-python () {
-    import re
-    h = d.getVar('EDGE_DEFAULT_PASSWORD_HASH')
-    if not h:
-        bb.fatal(
-            "EDGE_DEFAULT_PASSWORD_HASH is unset.\n"
-            "  Set it in kas/local.yml (operator-private; gitignored). See\n"
-            "  kas/local.yml.example for the template. Generate a hash with:\n"
-            "    openssl passwd -6 'your-password'\n"
-            "  Building an image without a managed password hash would leave\n"
-            "  default credentials in the artefact — refusing."
-        )
-    # Shell-escape check. Every `$` must be preceded by `\`.
-    # Why: extrausers.bbclass's set_user_group function does
-    #   user_group_settings="${EXTRA_USERS_PARAMS}"
-    # then `echo $user_group_settings`. Bitbake substitutes the hash
-    # verbatim into the shell source. Unescaped `$X` is then expanded
-    # by the shell, eating salt/digest characters and silently shipping
-    # a broken hash to /etc/shadow. The escape `\$` keeps the dollar
-    # literal through both bitbake (which doesn't expand `$X`) and the
-    # shell (which sees `\$` as a literal `$`).
-    if re.search(r'(?<!\\)\$', h):
-        bb.fatal(
-            "EDGE_DEFAULT_PASSWORD_HASH contains an unescaped '$' character.\n"
-            "  Got: %s\n"
-            "  Every '$' in the hash MUST be written as '\\$' so the shell\n"
-            "  doesn't expand it as a variable reference during image\n"
-            "  assembly. Example of CORRECT form:\n"
-            "    \\$6\\$rounds=656000\\$<salt>\\$<digest>\n"
-            "  See edge-users.inc for the full explanation." % h
-        )
-    # sha512crypt shape (after conceptually stripping the escapes).
-    stripped = h.replace('\\$', '$')
-    if not re.match(r'^\$6\$(rounds=\d+\$)?[A-Za-z0-9./]{1,16}\$[A-Za-z0-9./]{86}$', stripped):
-        bb.fatal(
-            "EDGE_DEFAULT_PASSWORD_HASH is not a valid sha512crypt digest.\n"
-            "  Expected: \\$6\\$[rounds=N\\$]<salt 1-16>\\$<digest 86>\n"
-            "  Got:      %s\n"
-            "  Common mistakes:\n"
-            "    - hand-edited digest bytes from a placeholder (superficially\n"
-            "      looks valid, doesn't decode to any password — login fails\n"
-            "      silently after boot)\n"
-            "    - truncated digest segment (must be exactly 86 chars)\n"
-            "    - characters outside the crypt(3) alphabet [A-Za-z0-9./]\n"
-            "  Regenerate with:\n"
-            "    openssl passwd -6 'your-password'\n"
-            "  and paste the output with every '$' replaced by '\\$'." % h
-        )
-}
+# The three EDGE_DEFAULT_PASSWORD_HASH guards (presence, shell-escaping,
+# sha512crypt shape) are enforced in edge-image.bbclass: distro scope would
+# run them for every recipe and make `bitbake -p` fail without a hash.
 
 # extrausers.bbclass runs commands inside the rootfs at image build time
 # to modify /etc/passwd, /etc/shadow, /etc/group. The wrynose-recommended
@@ -104,17 +42,33 @@ INHERIT += "extrausers"
 EXTRA_USERS_PARAMS = " \
     usermod -p '${EDGE_DEFAULT_PASSWORD_HASH}' root; \
     groupadd devel; \
-    useradd -G wheel,systemd-journal,dialout,audio,video,input,tty,render,wayland \
+    useradd -G wheel,systemd-journal,dialout,audio,video,input,tty,render${@',wayland' if d.getVar('EDGE_ENABLE_DISPLAY') == '1' else ''} \
             -m -s /bin/bash \
             -p '${EDGE_DEFAULT_PASSWORD_HASH}' devel; \
 "
 
-# AI images: the dedicated edge-ctr container principal (created by the
-# edge-ctr-user recipe via packagegroup-edge-ai) needs render-group membership
-# to pass /dev/drpai0 + /dev/udmabuf0 into its rootless container (keep-groups).
-# Added at image assembly, not in the recipe useradd: render is created by
-# another recipe and a recipe-level --groups render could race its creation.
-EXTRA_USERS_PARAMS:append = "${@bb.utils.contains('EDGE_ENABLE_AI', '1', ' usermod -aG render edge-ctr;', '', d)}"
+# Accelerator principal group membership. packagegroup-edge-containers
+# creates the principal (edge-ctr), the accelerator stack creates the device
+# groups; this adds
+# the memberships that let it pass the accelerator's device nodes into a
+# rootless container (keep-groups).
+#
+# Added at image assembly, not in the recipe useradd: the groups are created
+# by other recipes and a recipe-level --groups races their creation.
+#
+# EDGE_ACCEL_SUPPLEMENTARY_GROUPS is supplied by the accelerator fragment and
+# empty when none is selected. Entries are "group:user".
+# Format is validated in edge-image.bbclass; a malformed entry is a parse
+# error there rather than a silently skipped membership here.
+EXTRA_USERS_PARAMS:append = "${@''.join(' usermod -aG %s %s;' % (e.split(':', 1)[0], e.split(':', 1)[1]) for e in (d.getVar('EDGE_ACCEL_SUPPLEMENTARY_GROUPS') or '').split() if ':' in e)}"
+
+# Board-declared supplementary groups for devel (EDGE_BOARD_DEVEL_GROUPS,
+# set in conf/machine/include/edge-board-<MACHINE>.inc). The groups are
+# created by the board's own recipes (edge-io-udev: gpio), so they exist
+# only where the board installs them; an entry for a group the image lacks
+# fails do_rootfs, as with tee below.
+EDGE_BOARD_DEVEL_GROUPS ??= ""
+EXTRA_USERS_PARAMS:append = "${@''.join(' usermod -aG %s devel;' % g for g in (d.getVar('EDGE_BOARD_DEVEL_GROUPS') or '').split())}"
 
 # optee-client creates the tee group owning /dev/tee0 (0660, no uaccess ACL);
 # devel joins it to open a TEE context without sudo. Machine-scoped append, not
@@ -122,7 +76,7 @@ EXTRA_USERS_PARAMS:append = "${@bb.utils.contains('EDGE_ENABLE_AI', '1', ' userm
 # machines, where -G tee would fail assembly. EDGE_ENABLE_OPTEE keys it for the
 # same reason — with the packagegroup dropped, the group is absent on this board
 # too, and usermod against a missing group fails the rootfs task.
-EXTRA_USERS_PARAMS:append:smarc-rzv2l = "${@bb.utils.contains('EDGE_ENABLE_OPTEE', '1', ' usermod -aG tee devel;', '', d)}"
+EXTRA_USERS_PARAMS:append = "${@bb.utils.contains('EDGE_ENABLE_OPTEE', '1', ' usermod -aG tee devel;', '', d) if 'packagegroup-edge-optee' in (d.getVar('EDGE_MACHINE_EXTRA_INSTALL') or '') else ''}"
 # Supplementary group choice for devel:
 #   wheel            sudo escalation (paired with edge-sudoers)
 #   systemd-journal  journalctl -f / read all messages without -q
@@ -131,11 +85,12 @@ EXTRA_USERS_PARAMS:append:smarc-rzv2l = "${@bb.utils.contains('EDGE_ENABLE_OPTEE
 #                    ALSA + DRM + evdev for weston / multimedia work
 #   tty              direct /dev/tty* access
 #   render           DRM render nodes (drp-ai, mesa, opencl)
-#   wayland          weston socket access (clients)
-# All of these are created either by base-passwd (wheel/dialout/audio/
-# video/input/tty) or by systemd-journald / weston-init recipes — both
-# of which are in edge-image-base and edge-image-dev, so this -G list is
-# safe for either image.
+#   wayland          weston socket access (clients); only when the display
+#                    stack is on -- weston-init creates the group, and a
+#                    headless image (EDGE_ENABLE_DISPLAY = "0") has no such
+#                    group, where naming it fails useradd at do_rootfs.
+# The rest are created by base-passwd (wheel/dialout/audio/video/input/tty),
+# systemd-journald, or udev (render), all present in every tier.
 
 # Bake an operator-provided SSH public key into /home/devel/.ssh/authorized_keys.
 # EDGE_DEVEL_SSH_PUBKEY_FILE points at a host-side .pub file (path is
@@ -153,4 +108,32 @@ edge_devel_authorized_keys() {
     install -d -m 0700 -o 1000 -g 1000 ${IMAGE_ROOTFS}/home/devel/.ssh
     install -m 0600 -o 1000 -g 1000 "${EDGE_DEVEL_SSH_PUBKEY_FILE}" \
         ${IMAGE_ROOTFS}/home/devel/.ssh/authorized_keys
+}
+
+# Subordinate uid/gid ranges for rootless podman (devel, and edge-ctr when the
+# container principal is present). Non-overlapping, clear of system/login uids:
+# devel 100000-165535, edge-ctr 200000-265535.
+#
+# Must run in ROOTFS_POSTUNINSTALL_COMMAND, not a pkg_postinst or
+# ROOTFS_POSTPROCESS_COMMAND: /etc/sub{u,g}id are owned by the shadow package,
+# and shadow is in ROOTFS_RO_UNNEEDED (image.bbclass), so a read-only-rootfs
+# image erases it in _uninstall_unneeded() — after every postinst and after
+# ROOTFS_POSTPROCESS_COMMAND. That erase deletes shadow's files, taking any
+# appended ranges with them. ROOTFS_POSTUNINSTALL_COMMAND runs after the erase
+# (rootfs.py) and before the verity/SELinux seal, so ranges written here reach
+# the sealed rootfs. A first-boot fixup is impossible: the verity root is
+# read-only.
+ROOTFS_POSTUNINSTALL_COMMAND += "edge_write_subid_ranges;"
+
+edge_write_subid_ranges() {
+    for f in subuid subgid; do
+        target=${IMAGE_ROOTFS}${sysconfdir}/$f
+        grep -q '^devel:100000:' "$target" 2>/dev/null || \
+            echo 'devel:100000:65536' >> "$target"
+        if grep -q '^edge-ctr:' ${IMAGE_ROOTFS}${sysconfdir}/passwd 2>/dev/null; then
+            grep -q '^edge-ctr:200000:' "$target" 2>/dev/null || \
+                echo 'edge-ctr:200000:65536' >> "$target"
+        fi
+        chmod 0644 "$target"
+    done
 }

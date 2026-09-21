@@ -1,6 +1,6 @@
 # Machine overlay: Renesas RZ/V2L SMARC EVK.
 #
-# Composes onto kas/base.yml + kas/kernel.yml. Inlines the machine pick
+# Composes onto kas/base.yml. Inlines the machine pick
 # directly so this repo fully owns the machine selection.
 #
 # Pulls in the Renesas-fork TF-A and U-Boot pins here, not in base.yml.
@@ -12,60 +12,24 @@
 header:
   version: 19
   includes:
+    # Renesas vendor BSP: the meta-renesas repo pin, its two layers, its kas
+    # patch, its BBMASKs and (via that file) the vendor kernel recipe pin.
+    # Without the kernel pin meta-renesas's weak "6.1%" default silently
+    # selects a 6.1 kernel.
+    - kas/bsp/renesas-rz.yml
+    # DRP-AI is part of the RZ/V2L SoC, so the machine composes it like the
+    # BSP rather than as a capability flag.
+    - kas/accel/drpai-v2l.yml
     - kas/trusted-firmware-a/renesas-cip-2.10.yml
     - kas/u-boot/renesas-cip-2024.07.yml
 
 machine: smarc-rzv2l
 
 local_conf_header:
-  wic: |
-    # FIP placement for the RZ/V2L eSD boot ROM. Sector 256 = 0x20000
-    # bytes = 128 KB. This is the SoC boot-ROM expectation for SD boot,
-    # documented in the Renesas RZ/V2L Hardware User's Manual (loader
-    # location section, eSD boot mode).
-    FIP_WIC_OFFSET = "--offset 256s"
-
-    # Make FIP_WIC_OFFSET visible to WIC's WKS preprocessor. WIC only
-    # expands ${VAR} inside .wks files for variables listed in WICVARS;
-    # without this append, ${FIP_WIC_OFFSET} in edge-rzv2l.wks.in
-    # would pass through as a literal string → argparse consumes it as
-    # a positional mountpoint → the --offset argument is silently absent
-    # → the FIP partition lands at byte 0x10000 instead of the SoC ROM's
-    # expected 0x20000 (RZG2L_SD_FIP_BASE in TF-A's
-    # plat/renesas/rz/common/include/rz_soc_def.h). Boot silently dies
-    # in BL2 before its banner.
-    WICVARS:append = " FIP_WIC_OFFSET"
-
-  boot: |
-    # Per-board boot artifacts. edge-ab-image.bbclass consumes these.
-    # See the comment block on EDGE_BOOT_* in that file for contract.
-    #
-    # The DTB filename is the flat deploy basename consumed when the image
-    # task creates its signed slot FITs. splash.bmp remains a standalone
-    # U-Boot asset.
-    EDGE_BOOT_DTB         = "r9a07g054l2-smarc.dtb"
-    EDGE_BOOT_EXTRA       = "splash.bmp"
-    EDGE_BOOT_DEPLOY_DEPS = "edge-splash-assets:do_deploy trusted-firmware-a:do_deploy edge-kernel-fit:do_deploy"
-
-    # WIC layout — selected by EDGE_BOOT_TARGET (edge-ab-image.bbclass):
-    #   esd  → edge-rzv2l.wks.in       (MBR, BL2 at sector 0, raw env, A/B)
-    #   emmc → edge-rzv2l-emmc.wks.in  (GPT user area, BL2 in mmcblk0boot0)
-    # Both are RZ/V2L SoC-ROM specific; a sibling board adds its own .wks.
-    #
-    # Override-form (:smarc-rzv2l) is load-bearing: bitbake's parse order
-    # is local.conf → distro.conf → machine.conf, so a plain `WKS_FILE =`
-    # in local_conf_header gets overwritten by smarc-rzv2l.conf:44's
-    # conditional. The machine override takes priority over plain `=`
-    # regardless of parse order.
-    WKS_FILE:smarc-rzv2l = "${@oe.utils.conditional('EDGE_BOOT_TARGET', 'emmc', 'edge-rzv2l-emmc.wks.in', 'edge-rzv2l.wks.in', d)}"
-
-    # FIT runtime addresses. RZ/V2L: 0x48080000 matches the SoC's
-    # kernel text base and the U-Boot bootcmd's loadaddr. Consumed by
-    # linux-renesas (FIT signing context) and by edge-kernel-fit
-    # (UBOOT_LOADADDRESS / UBOOT_ENTRYPOINT). Conf-level so both see it.
-    EDGE_FIT_LOADADDRESS = "0x48080000"
-    EDGE_FIT_ENTRYPOINT  = "0x48080000"
-
+  # PMIC_SUPPORT stays at local.conf scope: smarc-rzv2l.conf:44 reads it to
+  # pick its WKS_FILE, and the vendor machine conf parses at
+  # bitbake.conf:825 -- before the board include at :828. Setting it in
+  # conf/machine/include/edge-board-smarc-rzv2l.inc would be too late.
   pmic: |
     # Build the PMIC variants of BL2/BL31/FIP. The SMARC RZ/V2L EVK
     # DDR4 carrier ships with the Renesas RAA215300 PMIC; BL2's DDR/

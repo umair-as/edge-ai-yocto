@@ -6,6 +6,7 @@ the wired entry has KAS overlays today.
 | Board | Machine | KAS machine overlay | Status | Notes |
 |---|---|---|---|---|
 | Renesas RZ/V2L SMARC EVK | `smarc-rzv2l` | `kas/machines/rzv2l.yml` | wired (v0) | First board; dev-board for the EDGE AI OS platform. |
+| Raspberry Pi 5 | `raspberrypi5` | `kas/machines/raspberrypi5.yml` | wired | Second board. Mainline 6.18 kernel (ADR-0011), U-Boot 2026.01, GPT layout, board facts in `conf/machine/include/edge-board-raspberrypi5.inc`. DEEPX DX-M1 composed via `kas/accel/dxm1.yml`. Boot, RAUC install/slot switch, DX-M1 device identification and rootless inference through the shipped Quadlet all hardware-validated; the rollback matrix has been run on RZ/V2L only. |
 | _slot_ | _tbd_ | `kas/machines/<board>.yml` | not wired | Add new machine overlays here as siblings are added. |
 
 ## Adding a new board

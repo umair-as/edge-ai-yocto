@@ -11,6 +11,10 @@
 #     (BOOT_ORDER/counters, EDGE_VERITY_A/B markers)
 #   - RAUC agrees with the cmdline about the booted slot
 #
+# Board-neutral: slot devices come from the by-rauc-slot udev links the image
+# ships, the FIT trust anchor is checked where the board keeps it (RPi5: the
+# board DTB on /boot; RZ/V2L: inside the FIP, not a file). Runs on both.
+#
 # Complements edge-smoke-test.sh (persistence, containers, SELinux); run both.
 # Non-destructive: the only write attempted is a probe at / that must FAIL
 # with EROFS on a verity rootfs.
@@ -43,6 +47,9 @@ fail()    { printf "  ${C_RED}FAIL${C_RESET}  %s\n" "$*"; FAIL_COUNT=$((FAIL_COU
 warn()    { printf "  ${C_YELLOW}WARN${C_RESET}  %s\n" "$*"; WARN_COUNT=$((WARN_COUNT+1)); }
 info()    { printf "  ${C_DIM}%s${C_RESET}\n" "$*"; }
 
+EDGE_MACHINE=$(awk -F= '/^MACHINE=/{print $2; exit}' /etc/buildinfo 2>/dev/null)
+info "MACHINE=${EDGE_MACHINE:-?} kernel $(uname -r)"
+
 # ---------------- 1. kernel cmdline (signed FIT contract) ----------------
 
 section "Kernel cmdline (signed slot FIT)"
@@ -74,19 +81,21 @@ if [ -n "${dmc}" ]; then
         *restart_on_corruption*) pass "restart_on_corruption set (corruption triggers reboot + counter fallback)" ;;
         *) fail "restart_on_corruption missing from verity table" ;;
     esac
-    verity_dev=$(printf '%s' "${dmc}" | grep -o '/dev/mmcblk0p[0-9]' | head -1)
+    verity_dev=$(printf '%s' "${dmc}" | grep -oE '/dev/[a-z0-9]+p[0-9]+' | head -1)
     root_hash=$(printf '%s' "${dmc}" | grep -oE '\b[0-9a-f]{64}\b' | head -1)
     info "backing device: ${verity_dev:-?}  root hash: ${root_hash:-?}"
-    # Slot identity is partition number by contract: A=p2, B=p3.
-    expect_dev=""
-    [ "${slot}" = "A" ] && expect_dev="/dev/mmcblk0p2"
-    [ "${slot}" = "B" ] && expect_dev="/dev/mmcblk0p3"
+    # Slot identity: the image ships /dev/disk/by-rauc-slot/rootfs{A,B}
+    # (device names on MBR, partition names on GPT), so the booted slot's link
+    # must resolve to the device the signed table names.
+    expect_dev=$(readlink -f "/dev/disk/by-rauc-slot/rootfs${slot}" 2>/dev/null || true)
     if [ -n "${expect_dev}" ]; then
         if [ "${verity_dev}" = "${expect_dev}" ]; then
-            pass "slot ${slot} maps to ${verity_dev} (matches A=p2/B=p3 contract)"
+            pass "slot ${slot} maps to ${verity_dev} (= by-rauc-slot/rootfs${slot})"
         else
-            fail "slot ${slot} but verity backing dev is ${verity_dev:-absent} (expected ${expect_dev})"
+            fail "slot ${slot}: verity backing dev ${verity_dev:-absent} but by-rauc-slot/rootfs${slot} -> ${expect_dev}"
         fi
+    else
+        fail "/dev/disk/by-rauc-slot/rootfs${slot} missing — edge-slot-udev rules not keyed for this layout"
     fi
 else
     fail "no dm-mod.create in cmdline — verity table not passed by FIT DTB"
@@ -185,6 +194,39 @@ booted_fit="/boot/fitImage-${slot:-A}"
 if [ -s "${booted_fit}" ]; then
     info "booted slot FIT: ${booted_fit} sha256 $(sha256sum "${booted_fit}" | cut -c1-16)…"
 fi
+
+# ---------------- 5b. FIT trust anchor on the boot medium ----------------
+
+section "FIT trust anchor"
+
+case "${EDGE_MACHINE}" in
+    raspberrypi5)
+        # The firmware loads the board DTB from /boot and hands it to U-Boot as
+        # its control FDT; the FIT public key must be in that file.
+        anchor=/boot/bcm2712-rpi-5-b.dtb
+        if [ -s "${anchor}" ] && command -v fdtget >/dev/null 2>&1; then
+            algo=$(fdtget "${anchor}" /signature/key-edge-fit-dev algo 2>/dev/null || true)
+            [ -n "${algo}" ] && pass "${anchor} carries /signature/key-edge-fit-dev (${algo})" \
+                             || fail "${anchor} has no /signature/key-edge-fit-dev — U-Boot boots FITs unverified"
+        else
+            warn "${anchor} or fdtget unavailable; trust anchor not inspected"
+        fi
+        # The kernel booted with the FIT's own DTB (the cmdline above proves
+        # that). U-Boot rewrites its memory node from the firmware DTB; the
+        # mainline placeholder is 640 MiB, so seeing the board's real RAM
+        # proves the fixup path worked.
+        memtotal_kb=$(awk '/MemTotal/{print $2}' /proc/meminfo)
+        if [ "${memtotal_kb}" -gt 2000000 ]; then
+            pass "MemTotal ${memtotal_kb} kB — U-Boot memory fixup reached the FIT DTB"
+        else
+            fail "MemTotal ${memtotal_kb} kB — kernel is running on the DTS placeholder memory node (U-Boot fixup missing)"
+        fi
+        ;;
+    smarc-rzv2l)
+        info "anchor is the signed control DTB inside the FIP (raw MMC), not a file on /boot; verified by the build's edge_check_fit_anchor" ;;
+    *)
+        info "no anchor check for MACHINE '${EDGE_MACHINE:-?}'" ;;
+esac
 
 # ---------------- 6. managed U-Boot environment ----------------
 

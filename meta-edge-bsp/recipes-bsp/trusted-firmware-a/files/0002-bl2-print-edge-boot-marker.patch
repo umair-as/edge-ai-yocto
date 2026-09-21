@@ -1,0 +1,33 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+Date: Fri, 17 Apr 2026 10:00:00 +0100
+Subject: [PATCH] rz/common/bl2: print the EDGE boot marker during platform setup
+
+When EDGE_BOOT_VERSION is defined at compile time, emit a NOTICE line after the
+standard LSI register dump so the build identity is visible on serial
+immediately after BL2 platform setup completes.  The marker is injected via
+-DEDGE_BOOT_VERSION='"<string>"' in EXTRA_OEMAKE; absent the define the code
+compiles away with no overhead.
+
+Upstream-Status: Inappropriate [local build identification only]
+
+Signed-off-by: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+---
+ plat/renesas/rz/common/bl2_plat_setup.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/plat/renesas/rz/common/bl2_plat_setup.c b/plat/renesas/rz/common/bl2_plat_setup.c
+index edf08cb..f4b1c2d 100644
+--- a/plat/renesas/rz/common/bl2_plat_setup.c
++++ b/plat/renesas/rz/common/bl2_plat_setup.c
+@@ -238,4 +238,10 @@ void bl2_platform_setup(void)
+ 	NOTICE("BL2: SYS_LSI_MODE: 0x%x\n", mmio_read_32(SYS_LSI_MODE));
+ 	NOTICE("BL2: SYS_LSI_DEVID: 0x%x\n", mmio_read_32(SYS_LSI_DEVID));
+ 	NOTICE("BL2: SYS_LSI_PRR: 0x%x\n", mmio_read_32(SYS_LSI_PRR));
++#ifdef EDGE_BOOT_VERSION
++	NOTICE("[EDGE] BL2   version=%s profile=%s machine=%s\n",
++	       EDGE_BOOT_VERSION, EDGE_BOOT_PROFILE, EDGE_BOOT_MACHINE);
++#else
++	NOTICE("[EDGE] BL2   version=unset\n");
++#endif
+ }

@@ -55,15 +55,11 @@ do_install() {
         ${D}${sysconfdir}/systemd/user/podman-user-wait-network-online.service.d/10-edge-noop.conf
 }
 
-# Subordinate uid/gid ranges for rootless podman as edge-ctr. Distinct from
-# devel's 100000 block. /etc/sub{u,g}id are owned by shadow, so append in
-# postinst rather than shipping the files (a shipped copy collides at do_rootfs).
-pkg_postinst:${PN}() {
-    for f in subuid subgid; do
-        grep -q '^edge-ctr:200000:' $D${sysconfdir}/$f 2>/dev/null || \
-            echo 'edge-ctr:200000:65536' >> $D${sysconfdir}/$f
-    done
-}
+# Subordinate uid/gid ranges (edge-ctr 200000-265535) are provisioned at image
+# seal by edge_write_subid_ranges in edge-users.inc, not here. A pkg_postinst
+# cannot deliver them: /etc/sub{u,g}id are owned by shadow, which a
+# read-only-rootfs image erases after all postinsts, deleting the appended
+# ranges with it. Only ROOTFS_POSTUNINSTALL_COMMAND runs after that erase.
 
 FILES:${PN} = " \
     ${nonarch_libdir}/tmpfiles.d/edge-ctr.conf \

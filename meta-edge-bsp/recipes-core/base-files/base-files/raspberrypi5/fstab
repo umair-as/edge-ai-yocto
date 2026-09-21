@@ -1,0 +1,28 @@
+# EDGE AI OS fstab (raspberrypi5).
+#
+# Layout per meta-edge-bsp/recipes-core/images/files/wic/edge-rpi5.wks.in:
+#   /dev/mmcblk0p1  PARTLABEL=boot   vfat   shared boot assets (config.txt,
+#                                           U-Boot, DTB, fitImage-A/-B)
+#   /dev/mmcblk0p2  rootfs A         ext4   RAUC slot A
+#   /dev/mmcblk0p3  rootfs B         ext4   RAUC slot B
+#   /dev/mmcblk0p4  PARTLABEL=data   ext4   persistent state, grown on first boot
+#
+# Active root slot comes via U-Boot (/dev/root). GPT partition names, not
+# filesystem labels, identify /boot and /data: a FAT volume label is
+# case-mangled by the tools that write it, and the partition name is what
+# the slot udev rules key on too. Options as on the RZ/V2L fstab; /boot is
+# FAT and takes no dir-atime option.
+
+# nofail on /boot and /data: a broken persistent partition does not block
+# boot — the system still comes up so an operator can recover via SSH.
+/dev/root            /                    auto       ro                    0  0
+PARTLABEL=boot       /boot                vfat       noatime,nofail        0  0
+PARTLABEL=data       /data                ext4       defaults,noatime,nodiratime,commit=60,nofail    0  0
+proc                 /proc                proc       defaults              0  0
+devpts               /dev/pts             devpts     mode=0620,ptmxmode=0666,gid=5    0  0
+tmpfs                /run                 tmpfs      mode=0755,nodev,nosuid,strictatime    0  0
+tmpfs                /var/volatile        tmpfs      defaults              0  0
+# /tmp on the dm-verity root is a read-only directory; without a tmpfs every
+# /tmp consumer fails with EROFS. Early oneshots must still use /run — this
+# mount is not ordered before DefaultDependencies=no units.
+tmpfs                /tmp                 tmpfs      mode=1777,nodev,nosuid,strictatime    0  0

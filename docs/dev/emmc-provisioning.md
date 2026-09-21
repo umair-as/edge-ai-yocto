@@ -27,7 +27,7 @@ eMMC (TF-A reads a boot register to pick the source).
 
 1. Build the eMMC image:
    ```
-   make dev VIRT=1 EDGE_BOOT_TARGET=emmc
+   make dev EDGE_BOOT_TARGET=emmc
    ```
    Deploy dir then has the GPT `…-emmc` wic plus the loaders:
    `bl2_bp_mmc-smarc-rzv2l_pmic.{bin,srec}`, `fip-smarc-rzv2l_pmic.{bin,srec}`.
