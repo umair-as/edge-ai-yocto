@@ -115,6 +115,8 @@ docs/
   rules/recipe-metadata.md             # recipe header layout — read before a new .bb
   rules/comment-style.md               # comment rules — read before a recipe/config comment
   rules/cross-compilation.md           # aarch64-edgeai-linux SDK notes
+  settings.json                        # registers the hook below (Claude Code only)
+  hooks/no-parallel-bitbake.py         # refuses a second bitbake/kas/make build or parse
 meta-edge-distro/                      # brand identity + DISTRO=edge-ai
   conf/distro/edge-ai.conf
   recipes-core/psplash/                # EDGE AI OS brand splash
