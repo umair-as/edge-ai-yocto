@@ -64,10 +64,6 @@ def starts_build(command, depth=0):
             rest = args[args.index("-c") + 1:]
             if rest and starts_build(rest[0], depth + 1):
                 return True
-        # `tpane run <pane> <command...>` types the command into another pane.
-        if word == "tpane" and len(args) > 2 and args[0] == "run":
-            if starts_build(" ".join(args[2:]), depth + 1):
-                return True
     return False
 
 
