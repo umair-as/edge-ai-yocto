@@ -650,10 +650,32 @@ if [ "${accel}" = "dxm1" ]; then
         || fail "edge-ctr is not in the dxrt group"
     if sudo -n test -f /data/dxm1/bin/run_model 2>/dev/null; then
         pass "/data/dxm1 inference payload present"
-        if sudo -n journalctl _UID=608 -b --no-pager 2>/dev/null | grep -iE 'dxm1|run_model' >/dev/null; then
-            pass "DX-M1 inference Quadlet ran this boot (user-608 journal)"
+        # The unit's own result decides; journal text alone cannot, because a
+        # failed start logs the unit name too.
+        dx_unit=$(sudo -n -u edge-ctr env XDG_RUNTIME_DIR=/run/user/608 systemctl --user show dxm1-inference.service \
+                      -p ActiveState -p Result -p ExecMainStatus -p ConditionResult -p NRestarts 2>/dev/null)
+        dx_prop() { printf '%s\n' "${dx_unit}" | sed -n "s/^$1=//p"; }
+        dx_fps=$(sudo -n journalctl _UID=608 -b --no-pager -t dxm1-inference 2>/dev/null | grep -E 'FPS *:' | tail -1 | sed 's/.*FPS *: *//')
+        dx_result="ActiveState=$(dx_prop ActiveState) Result=$(dx_prop Result) ExecMainStatus=$(dx_prop ExecMainStatus)"
+        if [ -z "${dx_unit}" ]; then
+            fail "cannot read dxm1-inference.service state (edge-ctr user manager not reachable)"
+        elif [ "$(dx_prop ConditionResult)" != yes ]; then
+            fail "payload present but dxm1-inference.service did not start this boot (start condition unmet)"
         else
-            fail "payload present but the dxm1-inference Quadlet left no trace this boot"
+            case "$(dx_prop ActiveState)/$(dx_prop Result)" in
+                inactive/success)
+                    if [ -n "${dx_fps}" ]; then
+                        pass "DX-M1 inference completed this boot (${dx_fps} FPS)"
+                        [ "$(dx_prop NRestarts)" -gt 0 ] 2>/dev/null \
+                            && info "started after $(dx_prop NRestarts) restart(s): dxrtd IPC was not ready on the first attempt"
+                    else
+                        fail "dxm1-inference.service exited 0 without a benchmark result (${dx_result})"
+                    fi ;;
+                activating/* | active/*)
+                    warn "dxm1-inference.service still running or waiting for dxrtd (${dx_result})" ;;
+                *)
+                    fail "dxm1-inference.service failed (${dx_result})" ;;
+            esac
         fi
     else
         info "no /data/dxm1 payload — Quadlet skips (expected on a fresh flash; stage runtime libs + model + run_model there to enable)"
