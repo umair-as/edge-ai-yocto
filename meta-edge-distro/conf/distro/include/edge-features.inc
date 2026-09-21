@@ -1,8 +1,9 @@
 # Operator-facing toggles for the edge-ai distro.
 #
-# All declared with ?= so kas/local.yml or environment overrides win.
-# Operator-flippable values are added to BB_ENV_PASSTHROUGH_ADDITIONS
-# so they can be set per-invocation without editing files.
+# All declared with ?= so kas/local.yml wins. A shell environment override
+# does NOT win unless the variable is on the Makefile's shell-level
+# BB_ENV_PASSTHROUGH_ADDITIONS list -- bitbake discards the rest of the
+# environment before this file is parsed.
 
 # ----- Choice variables (string-valued) ------------------------------------
 
@@ -24,14 +25,72 @@ EDGE_OTA_BACKEND ?= "rauc"
 # Display stack (wayland + opengl in DISTRO_FEATURES; weston in image).
 EDGE_ENABLE_DISPLAY ?= "1"
 
-# Container userspace. Kernel-side cgroup / overlay / netns support is
-# already on via kernel fragments; this toggle gates the userspace runtime.
-EDGE_ENABLE_CONTAINERS ?= "0"
+# Container userspace is unconditional base OS content on every tier and
+# machine, with no toggle (ADR-0012): the accelerator runtimes ship Quadlet
+# units.
 
-# DRP-AI accelerator stack (RZ/V2L only). Gates packagegroup-edge-ai: the
-# drpai kernel driver + u-dma-buf. Kernel-side CMA/DMABUF is already on via
-# ai-compute.cfg; the drpai DT node + reserved memory come from the BSP.
-EDGE_ENABLE_AI ?= "0"
+# Accelerator selection, single-valued: one accelerator per image.
+#
+#   EDGE_ACCEL            what this image is built for; set by kas/accel/<name>.yml
+#   EDGE_ACCEL_SUPPORTED  what this machine can carry; set by the board include
+#
+# edge-image.bbclass checks the pair at parse. EDGE_ACCEL has no distro
+# default; unset is a build error there.
+EDGE_ACCEL_SUPPORTED ??= ""
+
+# Supplementary groups the accelerator's runtime principal needs. Applied at
+# image assembly by edge-users.inc, not by a recipe useradd: the groups are
+# created by other recipes and a recipe-level --groups races their creation.
+EDGE_ACCEL_SUPPLEMENTARY_GROUPS ??= ""
+
+# Accelerator-supplied test/measurement packages for dev images, set by the
+# accelerator fragment so image recipes stay board-neutral.
+EDGE_ACCEL_TEST_INSTALL ??= ""
+
+# Board-fact declarations use ??=, never ?=: this file is required before
+# the board include (edge-ai.conf), so a ?= default here would turn the
+# board's own ?= into a no-op.
+#
+# Boot-chain family: firmware -> U-Boot -> signed FIT verified against a key
+# in U-Boot's control DTB -> raw U-Boot env for RAUC's boot-count. Only
+# "uboot-fit" is implemented; edge-image.bbclass refuses anything else.
+EDGE_BOOT_CHAIN ??= ""
+
+# Network interface roles. Board facts: which interfaces systemd-networkd must
+# leave alone (a netboot board reserves its NFS-root interface for the
+# kernel's ip=dhcp path), and which carries the DHCP uplink. Empty
+# EDGE_UNMANAGED_IFACES is valid; an empty uplink is not.
+EDGE_UNMANAGED_IFACES ??= ""
+EDGE_UPLINK_IFACE ??= ""
+
+# Boot and data partitions, as device paths. Needed only where the partition
+# layout carries no identity (MBR/eSD): a GPT board finds them by PARTLABEL
+# and leaves these empty. The A/B slot devices are EDGE_SLOT_A/B_DEVICE.
+EDGE_BOOT_DEVICE ??= ""
+EDGE_DATA_DEVICE ??= ""
+
+# Partition table of the boot medium: "msdos" or "gpt". Decides where slot
+# identity comes from -- device names on MBR, which carries no partition
+# names, or GPT partition names. Set by the board include.
+EDGE_PTABLE ??= ""
+
+# Raw U-Boot environment area, where RAUC keeps its boot-count. Board facts:
+# the block device and the two redundant offsets/size. They must agree with
+# CONFIG_ENV_OFFSET / CONFIG_ENV_OFFSET_REDUND / CONFIG_ENV_SIZE in the
+# board's U-Boot, or RAUC's state silently never persists.
+EDGE_UBOOT_ENV_DEVICE ??= ""
+EDGE_UBOOT_ENV_OFFSET ??= ""
+EDGE_UBOOT_ENV_OFFSET_REDUND ??= ""
+EDGE_UBOOT_ENV_SIZE ??= ""
+
+# The deployed DTB that is U-Boot's control FDT at runtime -- the file whose
+# /signature node is the FIT trust anchor. Board fact because how the key
+# reaches the control FDT differs per board (concatenated signed U-Boot DTB
+# on RZ/V2L, fdt_add_pubkey into the board DTB on RPi5).
+EDGE_FIT_PUBKEY_DTB ??= ""
+
+# No EDGE_ENABLE_AI: an accelerator is always selected. EDGE_ACCEL names it,
+# and is "none" only in an EDGE_ALLOW_NO_ACCEL bring-up composition.
 
 # OP-TEE normal-world userspace. On by default for boards that wire BL32 — the
 # secure world is unreachable from Linux without the client stack — but a build
@@ -93,18 +152,6 @@ EDGE_RAUC_BUNDLE_FORMAT ?= "${@bb.utils.contains('EDGE_ENABLE_RAUC_BUNDLE_ENCRYP
 #                             edge-image-dev: ships bpftool. OFF by default —
 #                             un-reduced DWARF + module BTF bloat the OTA bundle
 
-# ----- Passthrough so operators can flip from the environment --------------
-
-BB_ENV_PASSTHROUGH_ADDITIONS .= " EDGE_PROFILE EDGE_OTA_BACKEND"
-BB_ENV_PASSTHROUGH_ADDITIONS .= " EDGE_ENABLE_DISPLAY EDGE_ENABLE_CONTAINERS EDGE_ENABLE_OBSERVABILITY EDGE_ENABLE_AI"
-BB_ENV_PASSTHROUGH_ADDITIONS .= " EDGE_DEV_NETBOOT EDGE_DEV_DBG_PKGS EDGE_KERNEL_DEV_FRAGMENTS EDGE_ENABLE_JTAG_DEBUG EDGE_ENABLE_BTF_CORE_DEV"
-
-# RAUC / OTA knobs — declared in their respective recipes (rauc-conf-edge,
-# edge-bundle-common.inc, ota-certs). Passthrough so operators can flip
-# them from the environment without editing kas/local.yml.
-BB_ENV_PASSTHROUGH_ADDITIONS .= " EDGE_RAUC_STREAMING_KEY_MODE EDGE_RAUC_PKCS11_TLS_KEY"
-BB_ENV_PASSTHROUGH_ADDITIONS .= " EDGE_RAUC_KEYRING_CERTS EDGE_RAUC_ALLOWED_SIGNER_CNS EDGE_RAUC_CHECK_PURPOSE"
-BB_ENV_PASSTHROUGH_ADDITIONS .= " EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION EDGE_RAUC_ENCRYPTION_KEY EDGE_RAUC_ENCRYPTION_CERT"
-BB_ENV_PASSTHROUGH_ADDITIONS .= " EDGE_RAUC_BUNDLE_ENCRYPT_RECIPIENTS EDGE_RAUC_BUNDLE_FORMAT EDGE_RAUC_BUNDLE_FORMATS EDGE_OTA_CERT_DIR"
-BB_ENV_PASSTHROUGH_ADDITIONS .= " EDGE_RAUC_DECRYPT_KEY_SRC EDGE_RAUC_DECRYPT_CERT_SRC"
-BB_ENV_PASSTHROUGH_ADDITIONS .= " EDGE_ENABLE_OPTEE EDGE_ENABLE_OPTEE_EXAMPLES"
+# No BB_ENV_PASSTHROUGH_ADDITIONS here: bitbake reads it from the environment
+# at startup, before any conf file is parsed, so an append in conf has no
+# effect. The Makefile sets it in the shell that runs bitbake.

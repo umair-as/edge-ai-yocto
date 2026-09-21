@@ -70,3 +70,56 @@ EDGE_DATA_SIZE_MB ?= "1024"
 # Default esd; the eSD path is unchanged when unset. The machine overlay maps
 # this to the matching WKS_FILE.
 EDGE_BOOT_TARGET ?= "esd"
+
+# FIT trust anchor, asserted on the artifact rather than assumed from config.
+#
+# UBOOT_SIGN_ENABLE = "1" only requests signing. The public key reaches
+# U-Boot's control FDT through board-specific wiring (concat_dtb on RZ/V2L,
+# fdt_add_pubkey on RPi5); without it the slot FITs are signed but boot
+# unverified. This checks the deployed DTB carries the signing key.
+do_image_wic[depends] += "u-boot-tools-native:do_populate_sysroot dtc-native:do_populate_sysroot"
+do_image_wic[prefuncs] += "edge_check_fit_anchor"
+
+python edge_check_fit_anchor() {
+    import subprocess, os
+    if d.getVar('UBOOT_SIGN_ENABLE') != '1':
+        bb.note("UBOOT_SIGN_ENABLE is not 1; FIT anchor check skipped.")
+        return
+
+    dtb_name = (d.getVar('EDGE_FIT_PUBKEY_DTB') or '').strip()
+    if not dtb_name:
+        bb.fatal(
+            "EDGE_FIT_PUBKEY_DTB is unset while UBOOT_SIGN_ENABLE = '1'.\n"
+            "  Set it in conf/machine/include/edge-board-%s.inc to the DTB that\n"
+            "  is U-Boot's control FDT at runtime. Without it the FIT would be\n"
+            "  signed at build time and unverified at boot."
+            % d.getVar('MACHINE'))
+
+    deploy = d.getVar('DEPLOY_DIR_IMAGE')
+    dtb = os.path.join(deploy, dtb_name)
+    if not os.path.exists(dtb):
+        bb.fatal("FIT anchor DTB not deployed: %s\n"
+                 "  EDGE_FIT_PUBKEY_DTB names it; nothing produced it." % dtb)
+
+    keyname = d.getVar('UBOOT_SIGN_KEYNAME')
+    want = "%s,%s" % (d.getVar('FIT_HASH_ALG'), d.getVar('FIT_SIGN_ALG'))
+    node = "/signature/key-%s" % keyname
+    try:
+        got = subprocess.check_output(
+            ['fdtget', dtb, node, 'algo'], stderr=subprocess.STDOUT).decode().strip()
+    except subprocess.CalledProcessError as e:
+        bb.fatal(
+            "No FIT verification key in the deployed control DTB.\n"
+            "  DTB:  %s\n"
+            "  Node: %s (from UBOOT_SIGN_KEYNAME)\n"
+            "  fdtget: %s\n"
+            "  UBOOT_SIGN_ENABLE = '1', so the slot FITs are signed -- but with\n"
+            "  no key in the control FDT U-Boot cannot verify them and boots\n"
+            "  them unverified. The key injection is board-specific wiring in\n"
+            "  the U-Boot or kernel recipe, and it did not run for this board."
+            % (dtb, node, e.output.decode().strip()))
+    if got != want:
+        bb.fatal("FIT anchor algo mismatch in %s %s: got '%s', expected '%s'"
+                 % (dtb, node, got, want))
+    bb.note("FIT anchor OK: %s carries %s (%s)" % (dtb_name, node, got))
+}

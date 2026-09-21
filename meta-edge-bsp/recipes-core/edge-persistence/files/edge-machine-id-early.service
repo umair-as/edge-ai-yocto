@@ -1,0 +1,23 @@
+# Every service that reads /etc/machine-id at start (journald names its
+# journal directory by it, networkd derives the DHCP DUID, userdbd stamps
+# user records) sees the id PID 1 installed, which on a verity root is a
+# new transient one per boot. This restores the persisted id from the raw
+# /data partition before those services start. Wanted, not required, by
+# sysinit.target: a first boot has no persisted id and must not be gated.
+
+[Unit]
+Description=Restore /etc/machine-id from the raw /data device before services start
+DefaultDependencies=no
+Before=systemd-journald.service systemd-udevd.service systemd-userdbd.service
+Before=systemd-networkd.service systemd-resolved.service systemd-logind.service
+Before=systemd-machine-id-commit.service edge-machine-id-persist.service sysinit.target
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/edge-machine-id-early
+TimeoutStartSec=30
+
+[Install]
+WantedBy=sysinit.target

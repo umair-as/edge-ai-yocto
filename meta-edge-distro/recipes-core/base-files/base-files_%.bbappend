@@ -19,14 +19,7 @@
 
 FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
 
-# /data mountpoint must exist in the rootfs image: the dm-verity root is
-# immutable, so systemd cannot create it at mount time and the LABEL=data
-# fstab entry fails, taking every /data-dependent unit down with it.
-# /boot is already in base-files' stock dirs755.
-dirs755:append = " /data"
-
 SRC_URI += " \
-    file://fstab \
     file://edge-issue.tmpl \
     file://edge-issue-net.tmpl \
     file://edge-motd.tmpl \
@@ -37,12 +30,6 @@ SRC_URI += " \
 # placeholder motd (issue/issue.net are not rendered by base-files
 # because BASEFILESISSUEINSTALL is empty — see edge.conf).
 do_install:append () {
-    # Install edge fstab over base-files' stock one — adds LABEL=boot
-    # and LABEL=data so systemd-fstab-generator creates the matching
-    # .mount units. Without this, edge-persistence's binds and the
-    # identity-persist services skip on ConditionPathIsMountPoint=/data.
-    install -m 0644 ${UNPACKDIR}/fstab ${D}${sysconfdir}/fstab
-
     # Templates carry ANSI colour codes as plain "[N;Nm" so they stay
     # text-editable; sed prefixes each match with the literal ESC byte
     # (0x1b) so login(1) / sshd render them as colour escapes rather than

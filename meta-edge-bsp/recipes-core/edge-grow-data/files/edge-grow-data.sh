@@ -25,9 +25,11 @@ resolve_data_part() {
         readlink -f /dev/disk/by-label/data
         return 0
     fi
-    # First-boot fallback: partition can exist but be unformatted/unlabeled.
-    if [ -b /dev/mmcblk0p4 ]; then
-        echo /dev/mmcblk0p4
+    # First-boot fallback: the partition exists but is unformatted, so it has
+    # no filesystem label yet. edge-slot-udev provides this symlink on both
+    # partition layouts, so no device name is needed here.
+    if [ -b /dev/disk/by-rauc-slot/data ]; then
+        readlink -f /dev/disk/by-rauc-slot/data
         return 0
     fi
     lsblk -rno KNAME,LABEL | awk '$2=="data"{print "/dev/"$1; found=1} END{exit (found?0:1)}'

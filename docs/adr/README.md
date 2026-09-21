@@ -21,7 +21,7 @@ and the reasoning behind them.
 
 ## Index
 
-- [ADR-0001](0001-kernel-base.md) — kernel base (linux-cip 6.12 SLTS)
+- [ADR-0001](0001-kernel-base.md) — RZ/V2L kernel base (linux-cip 6.12 SLTS); scope narrowed to that board by ADR-0011
 - [ADR-0002](0002-layer-hosting.md) — layer hosting (kas-managed `.kas/`)
 - [ADR-0003](0003-block-layer-integrity-confidentiality.md) — block-layer integrity + confidentiality
 - [ADR-0004](0004-persistent-state-architecture.md) — persistent state architecture
@@ -31,3 +31,5 @@ and the reasoning behind them.
 - [ADR-0008](0008-runtime-rootfs-verity.md) — runtime rootfs dm-verity
 - [ADR-0009](0009-rauc-encrypted-bundle-key-lifecycle.md) — RAUC encrypted-bundle recipient-key lifecycle
 - [ADR-0010](0010-model-artifact-delivery.md) — model artifact format, schema contract and delivery trust boundary
+- [ADR-0011](0011-per-board-kernel-base.md) — kernel base is a per-board property
+- [ADR-0012](0012-container-runtime-baseline.md) — container userspace is OS baseline on every tier

@@ -33,7 +33,7 @@ Platform Super-Long-Term-Support (SLTS) 6.12 series.
 
 The build recipe is **`linux-renesas`**, which fetches Renesas's
 `rz_linux-cip` tree (`github.com/renesas-rz/rz_linux-cip.git`,
-branch `rz-6.12-cip7`). `rz_linux-cip` is the CIP SLTS source with
+branch `rz-6.12-cip14`). `rz_linux-cip` is the CIP SLTS source with
 RZ hardware enablement layered on top, maintained by Renesas in
 lockstep with CIP backports — the same CIP base, not a divergent
 vendor kernel. The recipe name `linux-renesas` is the `meta-renesas`
@@ -43,7 +43,9 @@ Concrete configuration:
 
 - **Provider**: `linux-renesas` (machine-selected via `meta-renesas/meta-rz-bsp`)
 - **Version pin**: `PREFERRED_VERSION_linux-renesas = "6.12%"` in `kas/kernel.yml`
-- **Source branch**: `rz-6.12-cip7` from `github.com/renesas-rz/rz_linux-cip.git`
+- **Source branch**: `rz-6.12-cip14` from `github.com/renesas-rz/rz_linux-cip.git`
+- **Shipped version**: `6.12.59-cip14` (`linux-renesas_6.12.bbappend:13-15`, the
+  authoritative pin; this document records it, it does not set it)
 - **Bbappend**: `meta-edge-bsp/recipes-kernel/linux/linux-renesas_6.12.bbappend`
 
 ## Rationale

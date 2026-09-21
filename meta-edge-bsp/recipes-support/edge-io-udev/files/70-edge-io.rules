@@ -1,0 +1,5 @@
+# GPIO character devices (/dev/gpiochipN, libgpiod) for the gpio group.
+# Replaces the parts of meta-raspberrypi's 99-com.rules that apply to a
+# mainline kernel; the sysfs-gpio chgrp hooks, gpiomem, spidev, vcsm,
+# rpivid and serial-alias rules there target the vendor kernel.
+SUBSYSTEM=="gpio", KERNEL=="gpiochip*", GROUP="gpio", MODE="0660"

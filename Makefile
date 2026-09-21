@@ -30,37 +30,64 @@ KAS_WORK_DIR     ?= $(CURDIR)/.kas
 # kas would default KAS_BUILD_DIR to ${KAS_WORK_DIR}/build (= .kas/build),
 # which works but doesn't match the universal Yocto convention every
 # operator and doc references. .kas/ is for upstream layer clones only.
-KAS_BUILD_DIR    ?= $(CURDIR)/build
-export KAS_REPO_REF_DIR KAS_WORK_DIR KAS_BUILD_DIR
+
+export KAS_REPO_REF_DIR KAS_WORK_DIR
 
 # === Stack composition ===
 #
 # The kas stack is image-agnostic: base + machine. The image is selected
 # via the bitbake target (`bitbake edge-image-base|edge-image-dev`), not
-# via a kas overlay. This follows the proven sibling-project pattern.
+# via a kas overlay.
 #
-# If kas/local.yml exists (operator-private overlay for paths,
-# parallelism, credentials), it is the entry point and already composes
-# base + machine through its `includes:`. Otherwise we compose the
-# tracked base + machine fragments directly.
-BASE_DEFAULT = kas/base.yml:kas/machines/rzv2l.yml
-ifneq ($(wildcard kas/local.yml),)
-  BASE = kas/local.yml
-else
-  BASE = $(BASE_DEFAULT)
+# BOARD=<name> selects kas/machines/<name>.yml. Named BOARD rather than
+# MACHINE because the fragment name (rzv2l) and the bitbake MACHINE it sets
+# (smarc-rzv2l) differ: the vendor MACHINE name is a frozen external
+# interface (RAUC_BUNDLE_COMPATIBLE, fielded devices).
+BOARD ?= rzv2l
+ifeq ($(wildcard kas/machines/$(BOARD).yml),)
+  $(error BOARD=$(BOARD) is unknown; kas/machines/$(BOARD).yml does not exist. \
+Available: $(patsubst kas/machines/%.yml,%,$(wildcard kas/machines/*.yml)))
 endif
+# The tracked composition always leads: base + the selected machine.
+# kas/local.yml, when present, is appended last as an additive host overlay
+# (cache paths, parallelism, credentials); it never selects the board. Being
+# last, its local_conf_header wins over the tracked fragments.
+BASE = kas/base.yml:kas/machines/$(BOARD).yml$(if $(wildcard kas/local.yml),:kas/local.yml,)
+
+# Per-machine build directory, sharing DL_DIR and SSTATE_DIR. Two machines in
+# one tree race on build/conf regeneration and tmp/; sstate keys on task
+# signatures, not paths, so separate trees cost no cache.
+#
+# An existing single-dir build/ stays in use for rzv2l only: TMPDIR is not
+# relocatable (sanity.bbclass: "Error, TMPDIR has changed location"), and
+# another board must not share its conf/.
+#
+# override, not ?=, on every branch: a KAS_BUILD_DIR already in the
+# environment (scripts/env.sh, loaded by direnv before BOARD=$(BOARD) was
+# known, or simply left over from a shell that last built the other board)
+# is never trustworthy once BOARD is known here. An explicit BOARD= must
+# determine the build dir on every invocation, in both directions -- an
+# inherited value winning for rzv2l specifically is the same bug as an
+# inherited value winning for any other board.
+ifneq ($(and $(wildcard $(CURDIR)/build/conf),$(filter rzv2l,$(BOARD))),)
+  override KAS_BUILD_DIR := $(CURDIR)/build
+else
+  override KAS_BUILD_DIR := $(CURDIR)/build/$(BOARD)
+endif
+export KAS_BUILD_DIR
+
 
 # === Capability fragments (opt-in via make flags) ===
 #
 #   make dev TPM=1         # add meta-secure-core TPM2 + IMA/EVM stack
-#   make dev VIRT=1        # add meta-virtualization (Podman/runc/crun)
-#   make dev AI=1          # add the DRP-AI inference stack (RZ/V2L)
+#   (container userspace is baseline; VIRT=1 is a retained no-op)
+#   make dev ACCEL=drpai-v2l  # select an accelerator (AI=1 is the old spelling)
 #   make dev SBOM_TUNE=1   # add SBOM/CVE per-build tuning knobs
 #   make dev JTAG=1        # KASLR off + kgdb + debug-safe (JTAG kernel labs)
 #   make dev BPF=1         # kernel BTF + bpftool (libbpf CO-RE labs; size-heavy)
 #   make dev OPTEE_EXAMPLES=1    # add the OP-TEE demo TAs (bring-up only)
 #
-# Flags compose: `make dev TPM=1 VIRT=1` adds both. Each fragment is a
+# Flags compose: `make dev TPM=1 ACCEL=drpai-v2l` adds both. Each fragment is a
 # pure additive overlay with no `includes:` — composition is explicit.
 #
 # Capability defaults (board-gated): the RZ/V2L SMARC EVK has no
@@ -70,11 +97,25 @@ CAPABILITY_YMLS :=
 ifeq ($(TPM),1)
   CAPABILITY_YMLS += kas/tpm.yml
 endif
+# VIRT=1 is a warned no-op: container userspace is baseline (ADR-0012).
 ifeq ($(VIRT),1)
-  CAPABILITY_YMLS += kas/virtualization.yml
+  $(warning note: VIRT=1 is a no-op; container userspace is baseline (ADR-0012))
 endif
+# ACCEL=<name> overrides the accelerator; the machine fragment already
+# composes one (kas/machines/<board>.yml -> kas/accel/<name>.yml), so a bare
+# `make dev` builds with it. ACCEL=none composes no extra fragment and does
+# not remove the machine's own. An unknown name fails here rather than as a
+# missing kas include.
+ifneq ($(filter-out none,$(ACCEL)),)
+  ifeq ($(wildcard kas/accel/$(ACCEL).yml),)
+    $(error ACCEL=$(ACCEL) is unknown; kas/accel/$(ACCEL).yml does not exist. \
+Available: none $(patsubst kas/accel/%.yml,%,$(wildcard kas/accel/*.yml)))
+  endif
+  CAPABILITY_YMLS += kas/accel/$(ACCEL).yml
+endif
+# AI=1 is a warned no-op: the machine fragment composes the accelerator.
 ifeq ($(AI),1)
-  CAPABILITY_YMLS += kas/ai-drpai.yml
+  $(warning note: AI=1 is a no-op; the machine fragment composes the accelerator)
 endif
 ifeq ($(SBOM_TUNE),1)
   CAPABILITY_YMLS += kas/sbom-cve.yml
@@ -161,8 +202,10 @@ help:
 	@echo ""
 	@echo "Capability flags (composable; combine freely):"
 	@echo "  TPM=1                        + meta-secure-core (TPM2 + IMA/EVM userspace)"
-	@echo "  VIRT=1                       + meta-virtualization (Podman/runc/crun)"
-	@echo "  AI=1                         + DRP-AI inference stack (RZ/V2L; pair with VIRT=1)"
+	@echo "  VIRT=1                       no-op; containers are baseline (ADR-0012)"
+	@echo "  BOARD=<name>                 select board: kas/machines/<name>.yml (rzv2l, raspberrypi5)"
+	@echo "  ACCEL=<name>                 override the machine's accelerator (rarely needed)"
+	@echo "  AI=1                         no-op; the accelerator is baseline and machine-composed"
 	@echo "  SBOM_TUNE=1                  + kas/sbom-cve.yml tuning knobs"
 	@echo "  NETBOOT=1                    + U-Boot 'netboot' env macro (TFTP/NFS dev workflow)"
 	@echo "  JTAG=1                       + KASLR off, kgdb, debug-safe boot (JTAG kernel labs)"
@@ -181,9 +224,9 @@ help:
 	@echo "  make shell                   Interactive KAS shell"
 	@echo "  make info                    Show build configuration"
 	@echo "  make lock                    Resolve floating branches to SHAs (writes kas/base.lock.yml)"
-	@echo "  make verify-pins             Print every repo's HEAD; diff against base.yml/base.lock.yml"
+	@echo "  make verify-pins             Print every composed repo's checked-out HEAD"
 	@echo "  make purge CONFIRM=1         Wipe .kas/ + build/ (repo tree only; KAS_REPO_REF_DIR untouched)"
-	@echo "  make clean-lock              Remove build/bitbake.lock if unheld"
+	@echo "  make clean-lock              Remove the build dir's bitbake.lock if unheld"
 	@echo ""
 	@echo "Standalone kas (outside make):"
 	@echo "  . scripts/env.sh             Export KAS_WORK_DIR + KAS_REPO_REF_DIR into your shell"
@@ -227,7 +270,7 @@ bundle: | $(KAS_WORK_DIR)
 	@echo "==> Building edge-bundle (EDGE_PROFILE=$(EDGE_PROFILE)) [$(STACK)]"
 	$(KAS) shell -c 'BB_ENV_PASSTHROUGH_ADDITIONS="$$BB_ENV_PASSTHROUGH_ADDITIONS EDGE_PROFILE EDGE_OTA_BACKEND BUNDLE_IMAGE_NAME EDGE_BOOT_TARGET EDGE_KERNEL_DEV_FRAGMENTS" EDGE_PROFILE=$(EDGE_PROFILE) $(BOOT_TARGET_ENV)bitbake edge-bundle' $(STACK)
 	@echo "==> Bundle artefacts:"
-	@find build/tmp/deploy/images -name '*.raucb' -printf '    %p\n'
+	@find $(KAS_BUILD_DIR)/tmp/deploy/images -name '*.raucb' -printf '    %p\n'
 
 parse: | $(KAS_WORK_DIR)
 	@echo "==> Parsing BitBake recipes (EDGE_PROFILE=$(EDGE_PROFILE)) [$(STACK)]"
@@ -254,27 +297,27 @@ info:
 	@echo ""
 
 # bitbake decides whether to start a cooker or attach to a running one purely by
-# whether it can acquire build/bitbake.lock (bitbake/lib/bb/main.py, "Starting
+# whether it can acquire $(KAS_BUILD_DIR)/bitbake.lock (bitbake/lib/bb/main.py, "Starting
 # bitbake server" vs "Reconnecting"). Removing the file while a server holds it
 # leaves that flock on the unlinked inode, so the next invocation creates a new
 # lock, takes it, and starts a SECOND server against the same TMPDIR. Only a
 # lock nothing holds is stale. bitbake writes the server pid into the file.
 clean-lock:
-	@if [ ! -e build/bitbake.lock ]; then \
-	    echo "no build/bitbake.lock — nothing to clean"; \
-	elif flock -n build/bitbake.lock true 2>/dev/null; then \
-	    rm -f build/bitbake.lock; \
-	    echo "removed stale build/bitbake.lock"; \
+	@if [ ! -e $(KAS_BUILD_DIR)/bitbake.lock ]; then \
+	    echo "no $(KAS_BUILD_DIR)/bitbake.lock — nothing to clean"; \
+	elif flock -n $(KAS_BUILD_DIR)/bitbake.lock true 2>/dev/null; then \
+	    rm -f $(KAS_BUILD_DIR)/bitbake.lock; \
+	    echo "removed stale $(KAS_BUILD_DIR)/bitbake.lock"; \
 	else \
-	    holder=$$(cat build/bitbake.lock 2>/dev/null | tr -d '\n'); \
-	    echo "build/bitbake.lock is held by $${holder:-another process (pid not recorded)}"; \
+	    holder=$$(cat $(KAS_BUILD_DIR)/bitbake.lock 2>/dev/null | tr -d '\n'); \
+	    echo "$(KAS_BUILD_DIR)/bitbake.lock is held by $${holder:-another process (pid not recorded)}"; \
 	    echo "A bitbake server is live; removing the lock would make the next"; \
 	    echo "bitbake start a second server on this build directory."; \
 	    echo "Shut it down instead:  make shell  then  bitbake -m"; \
 	    exit 1; \
 	fi
-	@if [ -S build/bitbake.sock ] && [ ! -e build/bitbake.lock ]; then \
-	    echo "warning: build/bitbake.sock exists with no lock file; a server may"; \
+	@if [ -S $(KAS_BUILD_DIR)/bitbake.sock ] && [ ! -e $(KAS_BUILD_DIR)/bitbake.lock ]; then \
+	    echo "warning: $(KAS_BUILD_DIR)/bitbake.sock exists with no lock file; a server may"; \
 	    echo "         still be running unlocked (pgrep -f bitbake-server)"; \
 	fi
 
@@ -295,9 +338,11 @@ lock: | $(KAS_WORK_DIR)
 	@echo "==> Resolving floating branches to SHAs [$(STACK)]"
 	$(KAS) lock $(STACK)
 
-# Verify every cloned repo's HEAD matches what kas/base.yml (or the
-# lock file) pinned. Run this as a sanity check before a release build:
-#   make verify-pins | diff -u <(grep commit: kas/base.yml | awk '{print $$2}') -
+# Report the checked-out HEAD of every repo in the composition. Reads the
+# composition, so it covers pins wherever they live -- kas/base.yml and the
+# kas/bsp/*.yml BSP fragments alike.
+# A repo carrying a kas patch (meta-renesas) reports the patched commit, not
+# its `commit:` pin, so a raw diff against the pins always shows it drifted.
 verify-pins: | $(KAS_WORK_DIR)
 	@echo "==> Reporting HEAD per repo [$(STACK)]"
 	$(KAS) for-all-repos $(STACK) 'echo "$$(basename $$(pwd)): $$(git rev-parse HEAD)"'

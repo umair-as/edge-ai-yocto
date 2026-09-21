@@ -2,9 +2,10 @@
 
 **Container-native inference on the Renesas RZ/V2L accelerator.**
 
-A ResNet-18 classifier auto-starts at boot inside a **rootless Podman container**,
-executes on the **DRP-AI** accelerator in **~28 ms**, and never touches an interactive
-login or a graphical session — on a hardened, RAUC A/B, OTA-updatable platform.
+A ResNet-18 classifier is designed to auto-start at boot inside a **rootless Podman
+container**, executing on the **DRP-AI** accelerator in **~28 ms** and never touching
+an interactive login or a graphical session — on a hardened, RAUC A/B, OTA-updatable
+platform.
 
 ![EDGE AI OS — RZ/V2L DRP-AI: author and export a model to ONNX, compile it on the build host, deploy the compiled artifact to persistent /data on the device, and run it in a rootless container on the DRP-AI NPU.](diagrams/rzv2l-drpai-pipeline.svg)
 
@@ -22,7 +23,7 @@ login or a graphical session — on a hardened, RAUC A/B, OTA-updatable platform
 | **Privilege** | no root, no `--privileged` — device access by `render`-group membership |
 | **Boot** | starts automatically once a model payload is present; the payload persists across OTA slot switches |
 | **Kernel** | linux-cip 6.12 (CIP Super-LTS, [ADR-0001](../adr/0001-kernel-base.md)) |
-| **Status** | validated on hardware under **permissive** SELinux — [details](#status--roadmap) |
+| **Status** | accelerator inference validated on hardware under **permissive** SELinux; rootless-container auto-start fix landed, on-target re-validation pending — [details](#status--roadmap) |
 
 **What you need to reproduce it** — the split that shapes the whole integration:
 
@@ -106,8 +107,8 @@ the container-native, least-privilege, OTA-aware delivery is the durable part.**
 
 ## Reproduce & evaluate
 
-- **Build it** — `make dev AI=1 VIRT=1` for `smarc-rzv2l` (`AI=1` adds the DRP-AI
-  stack, `VIRT=1` the container runtime the Quadlet needs). A freshly flashed device
+- **Build it** — `make dev ACCEL=drpai-v2l` for `smarc-rzv2l` (adds the DRP-AI
+  stack; the container runtime the Quadlet needs is baseline, see ADR-0012). A freshly flashed device
   boots with an empty `/data` and therefore **no model payload**, so nothing infers
   until one is placed at `/data/drpai` — the inference unit's
   `ConditionPathExists=` skips cleanly and the smoke test reports it. Automatic
@@ -132,13 +133,23 @@ Stated honestly — the value of these docs depends on it.
 
 **✅ Validated on hardware (permissive SELinux)** — driver builds and binds on
 linux-cip 6.12 (`/dev/drpai0` present, accelerator confirmed via the interrupt
-witness); runtime + app run natively and rootless; all three buffer regions in use;
-rootless inference starts at boot under the dedicated principal, end-to-end, subject
-to the intermittent race noted below.
-Re-validated unchanged after three platform changes it predates: the CIP kernel
-bump to 6.12.59-cip14, a **dm-verity read-only rootfs**, and **enforced kernel
-module signing** — native 32.75 ms and containerized 28.54 ms, both in the proven
-band. Validated from a fresh full image build and reflash, not only as deployed.
+witness); runtime + app run natively and rootless on the accelerator — in-image
+`drpai-classify` and the `drpai-tutorial-app` binary both execute against real
+input in ~25 ms with the correct ResNet-18 result; all three buffer regions in
+use. Container timing and interrupt-witness parity with the native run — native
+32.75 ms and containerized 28.54 ms, both in the proven band — were captured
+before the fresh-image container gap below was found; re-validated unchanged
+across the CIP kernel bump to 6.12.59-cip14, a **dm-verity read-only rootfs**,
+and **enforced kernel module signing**.
+
+**⚠️ Container auto-start needed two fixes** — a freshly flashed image shipped
+no `/etc/subuid` / `/etc/subgid`, so `edge-ctr`'s rootless user namespace mapped a
+single ID and could not unpack a normal OCI image; and rootless `podman pull` used
+`/var/tmp` — read-only on the dm-verity root — for unpack scratch and failed there
+too. The image now writes subuid/subgid ranges for `edge-ctr` at rootfs assembly,
+and the pull scratch directory is on `/data`. Egress to docker.io and the `edge-ctr` linger are otherwise fine. A
+fresh-pull, on-target container run has not been re-validated against these
+fixes yet — that is pending a rebuild, not claimed as done.
 
 **⚠️ One known defect** — an **intermittent boot race** in `logind` linger
 enumeration (`Couldn't add lingering user`, `ESRCH`): when it hits, the principal's
@@ -153,8 +164,9 @@ separately as its own correctness issue.
 
 **⏭ Next, not done** — **SELinux enforcing** (needs a device-label policy for the
 accelerator nodes and correct labels on the persistent state; not claimed as
-achieved); the **linger race** above; and **model delivery** — the model is still
-placed on `/data` by hand, so a freshly flashed device is not yet self-contained.
+achieved); the **linger race** above; the **fresh-pull container re-validation**
+above; and **model delivery** — the model is still placed on `/data` by hand, so
+a freshly flashed device is not yet self-contained.
 
 **🧭 Roadmap** — a reproducible model-compile environment; a baked, trust-pinned
 container base image; and a digest-addressed, signature-verified model artifact

@@ -1,5 +1,13 @@
 # Netboot — TFTP + NFS-root for fast dev iteration
 
+**Scope:** RZ/V2L only. The Raspberry Pi 5 U-Boot is built with networking
+off (`edge-rpi5-net-off.cfg`), so it has no TFTP path; the Pi iteration
+loop is `make dev BOARD=raspberrypi5` plus a RAUC bundle install
+(`make bundle BOARD=raspberrypi5`, see `ota-updates.md`). Build-directory
+paths below are for the first board (`build/`); a later board builds in
+`build/<BOARD>/` with its own machine name in the image path, e.g.
+`build/raspberrypi5/tmp/deploy/images/raspberrypi5/`.
+
 After one-time setup, the iteration loop is:
 
 ```

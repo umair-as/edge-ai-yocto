@@ -1,0 +1,54 @@
+# DXRT daemon for the DEEPX DX-M1 accelerator. Replaces the vendor's SysV
+# script (dxrt-init), which this distro never runs.
+[Unit]
+Description=DEEPX DXRT daemon (DX-M1 accelerator)
+Documentation=https://github.com/DEEPX-AI/dx_rt
+# /dev/dxrt* exists once dxrt_driver is loaded; dx_dma is autoloaded by udev
+# from its PCI modalias when the endpoint enumerates and its softdep pulls
+# dxrt_driver behind it. The path condition covers a board with no card
+# fitted: the unit does not start rather than crash-looping.
+#
+# After= alone does not pull systemd-udev-settle.service into the boot
+# transaction -- nothing else on this image wants it either, so without an
+# explicit Wants= the ordering can be vacuous and the condition below can
+# race udev. A lost race is not a failure (ConditionPathExistsGlob skips
+# rather than fails), so Restart=on-failure would never recover it.
+Wants=systemd-udev-settle.service
+After=systemd-modules-load.service systemd-udev-settle.service
+ConditionPathExistsGlob=/dev/dxrt*
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/dxrtd
+Restart=on-failure
+RestartSec=2s
+User=dxrt
+Group=dxrt
+StateDirectory=dxrt
+# libdxrt's default dynamic-IPC lookup (@dxrt_dynamic_ipc.sock in the host
+# network namespace, then /tmp/dxrt_dynamic_ipc.sock — unreachable behind
+# PrivateTmp=yes) has no path a rootless Podman Quadlet in a private netns
+# can reach. RuntimeDirectory + the endpoint override publish a fixed,
+# group-readable socket that a container can bind-mount in
+# (meta-deepx-m1/.../dxm1-inference.container).
+RuntimeDirectory=dxrt
+RuntimeDirectoryMode=0750
+Environment=DXRT_DYNAMIC_IPC_ENDPOINT=/run/dxrt/ipc.sock
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target
