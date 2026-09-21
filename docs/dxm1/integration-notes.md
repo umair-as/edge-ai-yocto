@@ -40,14 +40,24 @@ starts can receive `/dev/dxrt0` with `keep-groups`. The Quadlet
 
 ```
 [Unit]      After=data.mount   ConditionPathExists=/data/dxm1/bin/run_model
+            StartLimitIntervalSec=600  StartLimitBurst=3
 [Container] Image=docker.io/library/debian:trixie-slim  AddDevice=/dev/dxrt0
             GroupAdd=keep-groups  PodmanArgs=--pid=host
             Volume=/run/dxrt:/run/dxrt  Volume=/data/dxm1:/dxm1:ro
             WorkingDir=/tmp
             Environment=DXRT_DYNAMIC_IPC_ENDPOINT=/run/dxrt/ipc.sock
             Exec=/dxm1/bin/run_model -m /dxm1/model/model.dxnn -b
-[Service]   Type=oneshot
+[Service]   Type=oneshot  Restart=on-failure  RestartSec=5s
+            ExecStartPre=/usr/bin/timeout 60 /bin/sh -c 'until [ -S /run/dxrt/ipc.sock ]; do sleep 1; done'
 ```
+
+`dxrtd` is a system unit and the Quadlet runs in `edge-ctr`'s user manager,
+so `After=`/`Requires=` cannot order one against the other. `dxrtd.service`
+is also `Type=simple`: it counts as started when the process is exec'd,
+before `/run/dxrt/ipc.sock` exists. The `ExecStartPre` waits up to 60 s for
+the socket; `Restart=on-failure` retries a start that still lost the race,
+and the start limit ends the retries after three attempts, leaving the unit
+`failed` for `edge-smoke-test.sh` to report.
 
 `--pid=host` shares the host PID namespace: libdxrt's client liveness
 check scans `/proc/*/cmdline` for `dxrtd`, which a private PID namespace

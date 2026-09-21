@@ -3,6 +3,9 @@ Description=DX-M1 inference (rootless, edge-ctr)
 # Payload (runner + runtime libs + compiled .dxnn model) lives on /data.
 After=data.mount
 ConditionPathExists=/data/dxm1/bin/run_model
+# Gives up after three failed starts instead of retrying indefinitely.
+StartLimitIntervalSec=600
+StartLimitBurst=3
 
 [Container]
 Image=docker.io/library/debian:trixie-slim
@@ -30,6 +33,12 @@ Notify=false
 
 [Service]
 Type=oneshot
+# dxrtd is a system unit; a user unit cannot order against it, and Type=simple
+# reports started at exec, before /run/dxrt/ipc.sock exists. Wait for the
+# socket (bounded), and retry a start that still lost the race.
+ExecStartPre=/usr/bin/timeout 60 /bin/sh -c 'until [ -S /run/dxrt/ipc.sock ]; do sleep 1; done'
+Restart=on-failure
+RestartSec=5s
 
 [Install]
 WantedBy=default.target
