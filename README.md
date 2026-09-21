@@ -4,7 +4,8 @@
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Yocto](https://img.shields.io/badge/Yocto-Wrynose%206.0-orange.svg)](https://www.yoctoproject.org/)
-[![Platform](https://img.shields.io/badge/platform-Renesas%20RZ%2FV2L-blue.svg)](https://www.renesas.com/en/products/microcontrollers-microprocessors/rz-mpus/rzv2l)
+[![RZ/V2L](https://img.shields.io/badge/board-Renesas%20RZ%2FV2L-blue.svg)](https://www.renesas.com/en/products/microcontrollers-microprocessors/rz-mpus/rzv2l)
+[![Raspberry Pi 5](https://img.shields.io/badge/board-Raspberry%20Pi%205-blue.svg)](https://www.raspberrypi.com/products/raspberry-pi-5/)
 [![RAUC](https://img.shields.io/badge/OTA-RAUC-green.svg)](https://rauc.io/)
 
 </div>
