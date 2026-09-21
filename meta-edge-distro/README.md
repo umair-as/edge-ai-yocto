@@ -10,6 +10,8 @@ psplash assets.
 | Layer collection | Purpose |
 |------------------|---------|
 | `core` | OpenEmbedded-Core recipes, classes, and distro infrastructure |
+| `openembedded-layer` | Recipes extended by the userland appends (`jq`, `tmux`) |
+| `selinux` | `selinux-image` class and the recipes the SELinux policy layer extends |
 
 ## Maintainer
 
