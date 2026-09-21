@@ -20,6 +20,15 @@ hardware root. U-Boot is also an interactive shell whose remaining commands can
 bypass the managed boot macro. This document describes the normal A/B path and
 surface reduction; it does not claim console-resistant secure boot.
 
+RPi5 has no TF-A/OP-TEE stage: the boot ROM hands off directly to the
+EEPROM-loaded firmware, which loads U-Boot (oe-core, not a Renesas fork) and a
+board DTB. Authentication starts at the same place — U-Boot's embedded FIT
+public key — but *where* that key is embedded differs by board; see "FIT
+verification chain" below. The command-surface hardening tokens
+(`surface_reduce`, `net_off`, `fit_enforce`) apply to both boards through
+per-board `.cfg` fragments; the symbol tables in "What is hardened" enumerate
+the RZ/V2L fragment content specifically.
+
 The hardening addresses three orthogonal objectives:
 
 1. **Verify the managed boot artifact** — disable legacy uImage and require a
@@ -113,13 +122,37 @@ boot_fit            → load fitImage-A/B; signed DTB supplies verity cmdline
 
 ### FIT verification chain
 
-`CONFIG_FIT_SIGNATURE=y` is on in the base defconfig. The U-Boot DTB
-embeds the public key (`UBOOT_SIGN_ENABLE=1` +
-`UBOOT_SIGN_KEYDIR=keys/dev/fit/`). The FIT itself is signed
-`sha256,rsa2048` at the configuration node level — `bootm` rejects an
-unsigned or mis-signed config.
+`CONFIG_FIT_SIGNATURE=y` is on in both boards' resolved `.config`. The
+signing key pair is `keys/dev/fit/edge-fit-dev.{key,crt}` — one key pair,
+shared distro-wide via `FIT_SIGN_ALG`/`FIT_SIGN_NUMBITS` in
+`edge-floor.inc`, currently `sha256,rsa4096`. `bootm` rejects an unsigned or
+mis-signed slot config on both boards. Where the public key ends up embedded,
+and which recipe puts it there, differs by board:
 
-`fit_enforce` adds a legacy-format regression guard: even if a future Renesas
+| | RZ/V2L | RPi5 |
+|---|---|---|
+| Pubkey-carrying DTB | `u-boot-smarc-rzv2l.dtb` — U-Boot's own control FDT | `bcm2712-rpi-5-b.dtb` — one of the kernel's `KERNEL_DEVICETREE` targets, loaded by firmware as U-Boot's `CONFIG_OF_BOARD` control FDT |
+| Compiled by | U-Boot's own recipe (`u-boot_2024.07.bbappend`) | the kernel recipe (`kernel-devicetree.bbclass`'s `do_compile:append()`, invoked from `linux-edge-mainline_6.18.bb`) — a different recipe than the one that builds U-Boot |
+| Pubkey injected by | the same U-Boot recipe: `concat_dtb()` (overridden from `uboot-sign.bbclass`) calls `mkimage -K <dtb>`, which writes the key node into the control DTB as a side effect of nominally signing a throwaway dummy FIT | the same kernel recipe's `do_deploy:append()`, which runs `fdt_add_pubkey` against `EDGE_FIT_PUBKEY_DTB` after the kernel build finishes |
+
+In both cases the recipe that compiles the control-FDT artifact is the same
+recipe that injects the pubkey into it — the difference is *which* recipe
+that is. RZ/V2L's own U-Boot recipe owns both steps; RPi5's kernel recipe
+owns both steps instead, and U-Boot only receives the result because
+firmware hands it the compiled DTB as `CONFIG_OF_BOARD`. Neither DTB carries
+a signature over itself: the injected node is a verification key that
+U-Boot's FIT code reads when checking the *other* signed artifact (the slot
+FIT's configuration node), not a self-signature.
+
+Both anchor DTBs are bootloader/firmware artifacts, not part of the rootfs —
+neither ships inside the OTA-updated FIT/rootfs payload. A key or algorithm
+change on either board therefore needs a fresh flash of the boot media, not a
+RAUC OTA update: the old anchor stays in place until the media itself is
+rewritten, so an OTA-delivered FIT signed under a new algorithm fails
+verification against the still-old anchor and RAUC's bootcount fallback rolls
+back to the last-good slot — the correct failure mode, not a hang.
+
+`fit_enforce` adds a legacy-format regression guard: even if a future
 defconfig sync flipped `CONFIG_LEGACY_IMAGE_FORMAT=y` back on, the
 fragment overlay restores it to off. It does not remove `booti`, memory access,
 or every alternate command reachable from an interrupted shell.
@@ -430,8 +463,12 @@ help                              # expected: no usb / loadb / loads;
                                   # ums present (gadget flash path retained)
 printenv EXTRA_KERNEL_ARGS        # expected: security=selinux
 fdt addr ${fdtcontroladdr}; fdt print /signature
-# Expected: key-edge-fit-dev with required="conf", sha256,rsa2048
+# Expected: key-edge-fit-dev with required="conf", sha256,rsa4096
 ```
+
+Same commands on RPi5; `${fdtcontroladdr}` resolves to `bcm2712-rpi-5-b.dtb`
+there instead of `u-boot-smarc-rzv2l.dtb` — see "FIT verification chain"
+above for why the anchor DTB differs by board.
 
 Kernel-side check (the cmdline appendix actually landed):
 

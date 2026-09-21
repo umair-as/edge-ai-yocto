@@ -232,12 +232,18 @@ UBOOT_SIGN_ENABLE      ?= "1"
 UBOOT_SIGN_KEYDIR      ?= "${EDGE_KEYS_DIR}/dev/fit"
 UBOOT_SIGN_KEYNAME     ?= "edge-fit-dev"
 FIT_HASH_ALG           ?= "sha256"
-FIT_SIGN_ALG           ?= "rsa2048"
+# rsa4096: RSA_MAX_KEY_BITS is a 4096 compile-time ceiling in U-Boot's RSA
+# verify code (include/u-boot/rsa.h), not a Kconfig option, so it applies
+# identically on both boards -- confirmed against the actual pinned/built
+# sources (Renesas CIP u-boot 2024.07 and oe-core u-boot 2026.01), both of
+# which already carry CONFIG_FIT_SIGNATURE=y, CONFIG_RSA_VERIFY=y and
+# CONFIG_RSA_SOFTWARE_EXP=y in their resolved .config.
+FIT_SIGN_ALG           ?= "rsa4096"
 # Pin the key size. kernel-signing-keys-native generates the dev key from
-# FIT_SIGN_NUMBITS; oe-core leaves it unset, so mkimage defaults to 2048 and
-# matches rsa2048 only by coincidence. The assertion below keeps the two in
-# step.
-FIT_SIGN_NUMBITS       ?= "2048"
+# FIT_SIGN_NUMBITS; oe-core leaves it unset, so mkimage would otherwise
+# default to 2048 and match rsa2048 only by coincidence. The assertion below
+# keeps the two in step.
+FIT_SIGN_NUMBITS       ?= "4096"
 FIT_GENERATE_KEYS      ?= "1"
 FIT_SIGN_INDIVIDUAL    ?= "0"
 
