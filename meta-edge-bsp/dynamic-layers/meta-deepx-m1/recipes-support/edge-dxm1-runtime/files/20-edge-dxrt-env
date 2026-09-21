@@ -1,5 +1,0 @@
-# /etc/profile.d/edge-dxrt-env.sh only reaches interactive/login shells;
-# sudo resets the environment (env_reset, sudoers default) and this image's
-# sudo PAM stack does not run pam_env, so a sudo'd dxrt client would
-# otherwise lose the endpoint override even in a session that has it.
-Defaults env_keep += "DXRT_DYNAMIC_IPC_ENDPOINT"

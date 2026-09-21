@@ -7,6 +7,13 @@ Documentation=https://github.com/DEEPX-AI/dx_rt
 # from its PCI modalias when the endpoint enumerates and its softdep pulls
 # dxrt_driver behind it. The path condition covers a board with no card
 # fitted: the unit does not start rather than crash-looping.
+#
+# After= alone does not pull systemd-udev-settle.service into the boot
+# transaction -- nothing else on this image wants it either, so without an
+# explicit Wants= the ordering can be vacuous and the condition below can
+# race udev. A lost race is not a failure (ConditionPathExistsGlob skips
+# rather than fails), so Restart=on-failure would never recover it.
+Wants=systemd-udev-settle.service
 After=systemd-modules-load.service systemd-udev-settle.service
 ConditionPathExistsGlob=/dev/dxrt*
 

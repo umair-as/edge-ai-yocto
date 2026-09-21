@@ -16,7 +16,10 @@ shape mirrors the DRP-AI integration (`docs/drp-ai/integration-notes.md`).
   `RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6` and the usual
   namespace/personality restrictions; `ConditionPathExistsGlob=/dev/dxrt*`
   so a board without the card has no failed unit. It replaces the vendor's
-  SysV `dxrt-init`.
+  SysV `dxrt-init`. `Wants=systemd-udev-settle.service` alongside the
+  matching `After=` — the `After=` alone does not pull that unit into the
+  boot transaction, and a lost race against udev is a condition skip, not
+  a failure, so `Restart=on-failure` would never recover it.
 - `RuntimeDirectory=dxrt` plus `Environment=DXRT_DYNAMIC_IPC_ENDPOINT=/run/dxrt/ipc.sock`
   fix the daemon's IPC socket at a bind-mountable path. libdxrt's default
   lookup — an abstract `@dxrt_dynamic_ipc.sock` in the host's network
@@ -24,9 +27,8 @@ shape mirrors the DRP-AI integration (`docs/drp-ai/integration-notes.md`).
   `PrivateTmp=yes` — is unreachable from a rootless Podman Quadlet in a
   private network namespace; the fixed endpoint is what the Quadlet binds
   in (below) and what host-side `dxrt-cli`/`run_model` need the same
-  variable for, via `edge-dxrt-env.sh` (profile.d) and a sudoers
-  `env_keep` (both shipped by `edge-dxm1-runtime`, since `sudo`'s PAM
-  stack here does not run `pam_env`).
+  variable for, via `edge-dxrt-env.sh` (profile.d, shipped by
+  `edge-dxm1-runtime`).
 
 ## Rootless inference path (`edge-dxm1-quadlet`)
 
