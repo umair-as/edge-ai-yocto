@@ -61,18 +61,17 @@ BASE = kas/base.yml:kas/machines/$(BOARD).yml$(if $(wildcard kas/local.yml),:kas
 # An existing single-dir build/ stays in use for rzv2l only: TMPDIR is not
 # relocatable (sanity.bbclass: "Error, TMPDIR has changed location"), and
 # another board must not share its conf/.
-ifneq ($(wildcard $(CURDIR)/build/conf),)
-  ifeq ($(BOARD),rzv2l)
-    KAS_BUILD_DIR ?= $(CURDIR)/build
-  endif
-endif
-ifeq ($(BOARD),rzv2l)
-  KAS_BUILD_DIR ?= $(CURDIR)/build/$(BOARD)
+#
+# override, not ?=, on every branch: a KAS_BUILD_DIR already in the
+# environment (scripts/env.sh, loaded by direnv before BOARD=$(BOARD) was
+# known, or simply left over from a shell that last built the other board)
+# is never trustworthy once BOARD is known here. An explicit BOARD= must
+# determine the build dir on every invocation, in both directions -- an
+# inherited value winning for rzv2l specifically is the same bug as an
+# inherited value winning for any other board.
+ifneq ($(and $(wildcard $(CURDIR)/build/conf),$(filter rzv2l,$(BOARD))),)
+  override KAS_BUILD_DIR := $(CURDIR)/build
 else
-  # `?=` would keep a KAS_BUILD_DIR already in the environment (scripts/env.sh,
-  # loaded by direnv before BOARD=$(BOARD) was known) -- for any board but the
-  # legacy default that inherited value is never correct, so it is overridden
-  # rather than merely defaulted.
   override KAS_BUILD_DIR := $(CURDIR)/build/$(BOARD)
 endif
 export KAS_BUILD_DIR
@@ -271,7 +270,7 @@ bundle: | $(KAS_WORK_DIR)
 	@echo "==> Building edge-bundle (EDGE_PROFILE=$(EDGE_PROFILE)) [$(STACK)]"
 	$(KAS) shell -c 'BB_ENV_PASSTHROUGH_ADDITIONS="$$BB_ENV_PASSTHROUGH_ADDITIONS EDGE_PROFILE EDGE_OTA_BACKEND BUNDLE_IMAGE_NAME EDGE_BOOT_TARGET EDGE_KERNEL_DEV_FRAGMENTS" EDGE_PROFILE=$(EDGE_PROFILE) $(BOOT_TARGET_ENV)bitbake edge-bundle' $(STACK)
 	@echo "==> Bundle artefacts:"
-	@find build/tmp/deploy/images -name '*.raucb' -printf '    %p\n'
+	@find $(KAS_BUILD_DIR)/tmp/deploy/images -name '*.raucb' -printf '    %p\n'
 
 parse: | $(KAS_WORK_DIR)
 	@echo "==> Parsing BitBake recipes (EDGE_PROFILE=$(EDGE_PROFILE)) [$(STACK)]"
