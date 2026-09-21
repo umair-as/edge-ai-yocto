@@ -5,7 +5,7 @@
 
 ## Context
 
-edge-ai-yocto, wrynose baseline, post-rename to the `edge-ai` distro.
+edge-ai-yocto on the wrynose baseline, `edge-ai` distro.
 
 ## Decision
 
@@ -37,9 +37,9 @@ drift.
 
 ### Vendoring upstream layers in the repo tree
 
-Previously kas cloned every upstream into the repo root (`bitbake/`,
-`openembedded-core/`, etc.), and `.gitignore` carried a hand-maintained
-denylist naming each one. Rejected because:
+Cloning every upstream into the repo root (`bitbake/`,
+`openembedded-core/`, etc.), with a hand-maintained `.gitignore` denylist
+naming each one, was rejected because:
 
 - Adding a new dependency required editing `.gitignore` — easy to
   forget; reviewer noise on every layer addition.
@@ -126,12 +126,16 @@ bit-for-bit reproducibility.
   kas ≥ 3.0. CI does not run kas at all (the lint workflow is text-only),
   so there is no CI-side kas pin; the build host's version is the only one
   that matters.
+- The build host runs kas 5.5 (config format version 19, inside its
+  supported range). No fragment uses the removed `refspec:` key and every
+  repo carries an explicit `commit:`, so kas's "branch without commit or
+  lock file" warning does not fire.
 - `kas lock` requires network access to resolve floating branches.
   It's not run at build time — only when the operator explicitly
   wants to bump pins.
 - `kas purge` (the kas plugin) wipes `KAS_REPO_REF_DIR` contents in
-  addition to `.kas/`; that's why our `make purge` does scoped `rm`
-  directly instead of calling `kas purge`. See Makefile:`purge`.
+  addition to `.kas/`, so `make purge` does a scoped `rm` directly
+  instead of calling `kas purge`. See Makefile:`purge`.
 
 ## Vendor layer series compatibility
 
@@ -153,35 +157,26 @@ wrynose-compatible branch.**
 
 ## Follow-on work
 
-Items raised during the restructure that we deliberately deferred —
-each is a single-pass adoption when the time comes:
+Kas features available on the pinned kas version and not adopted; each is
+a single-pass change:
 
 - **`buildtools:` adoption** — `kas/base.yml` `buildtools:` key (kas
   ≥ 5.0) pins the host toolchain bundle (gcc/python/ninja/…) by
   version + sha256. Decouples builds from host package state. Strong
-  CRA-posture fit for release builds. **Now unblocked** (kas 5 is in
-  place) and motivated by a build-host OS upgrade that moved gcc 15 → 16
-  and Python 3.13 → 3.14 in one step. Warm sstate absorbed it because
-  `uninative` keys native output as `universal`, but any recipe that
-  misses sstate compiles against an unpinned host toolchain. The
-  sstate-signature impact is unevaluated.
+  CRA-posture fit for release builds. `uninative` keys native output as
+  `universal`, so warm sstate does not depend on the host toolchain, but any
+  recipe that misses sstate compiles against the unpinned host toolchain.
+  The sstate-signature impact of pinning is unevaluated.
 - **`signers:` + `signed: true`** — verify GPG signatures on each
   upstream layer's commit/tag before checkout. Hard CRA-posture
   statement; real setup cost (key distribution, signer policy).
-- **Top-level `env:` for feature-gate passthrough** — when we add
-  IOTGW-style runtime toggles, kas's top-level `env:` block forwards
-  listed vars into `BB_ENV_PASSTHROUGH_ADDITIONS` automatically;
-  replaces hand-wired Makefile passthrough.
+- **Top-level `env:` for feature-gate passthrough** — kas's top-level
+  `env:` block forwards listed vars into `BB_ENV_PASSTHROUGH_ADDITIONS`
+  automatically, which would replace the hand-wired Makefile passthrough
+  for runtime toggles.
 - **`kas/sdk.yml` with `task: populate_sdk`** — dedicated stack
   fragment so `make sdk` becomes a one-line wrapper. Only useful once
   the SDK is a deliverable.
-- ~~**kas 5 upgrade**~~ — **done 2026-09-09** (kas 5.5). No configuration
-  change was needed: format version 19 is inside 5.5's supported range
-  (earliest compatible 1, current 23), no fragment uses the removed
-  `refspec:` key, and every repo carries an explicit `commit:`, so the
-  "branch without commit or lock file" warning does not fire. `make parse`
-  is clean on kas 5.5. This unblocks `buildtools:` above and brings the
-  "fail on fetch errors" semantics and the 5.3 CVE fixes.
 
 ## References
 
