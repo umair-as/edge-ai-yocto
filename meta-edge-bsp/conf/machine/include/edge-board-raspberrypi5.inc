@@ -11,6 +11,11 @@
 
 EDGE_BOARD_INC = "1"
 
+# --- Identity -----------------------------------------------------------
+# Network-visible name: the serial login prompt, ssh target and DHCP lease
+# name, so boards on one network are told apart.
+EDGE_HOSTNAME ?= "edge-rpi5"
+
 # --- Accelerator ---------------------------------------------------------
 # DEEPX DX-M1 on the PCIe M.2 slot. Allowlist only; the selection is
 # EDGE_ACCEL from kas/accel/dxm1.yml.

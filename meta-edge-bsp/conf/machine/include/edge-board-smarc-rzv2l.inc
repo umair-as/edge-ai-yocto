@@ -13,6 +13,11 @@
 
 EDGE_BOARD_INC = "1"
 
+# --- Identity -----------------------------------------------------------
+# Network-visible name: the serial login prompt, ssh target and DHCP lease
+# name, so boards on one network are told apart.
+EDGE_HOSTNAME ?= "edge-rzv2l"
+
 # --- Accelerator ---------------------------------------------------------
 # DRP-AI is RZ/V2L-only SoC IP. This is the allowlist for the machine, not
 # the selection; the selection is EDGE_ACCEL from kas/accel/<name>.yml.
