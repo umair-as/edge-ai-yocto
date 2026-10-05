@@ -24,6 +24,8 @@ make base BOARD=raspberrypi5   # same for the second board; builds in build/rasp
 make dev | prod           # dev / hardened-prod image tiers
 make bundle               # RAUC .raucb for OTA install
 make parse                # bitbake -p (parse-only sanity — cheapest validation)
+make ci                   # parse-check the committed origin/main in a worktree and
+                          #   post GitHub commit statuses (docs/dev/ci.md)
 make layers               # bitbake-layers show-layers
 make shell                # interactive KAS shell
 make clean-lock           # remove a stale build/bitbake.lock
