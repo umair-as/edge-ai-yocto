@@ -43,7 +43,9 @@ jobs:
         # and `make … | tee` would then report tee's status, not make's.
         shell: bash
         run: |
-          : "${EDGE_REPO:?EDGE_REPO is not set in the runner's .env}"
+          # No single quote inside the message: bash reads one inside "${…:?…}"
+          # as an opening quote and the whole step fails to parse.
+          : "${EDGE_REPO:?EDGE_REPO is not set in the runner .env file}"
           # Operator-typed, but it reaches a shell through CI_ARGS.
           [[ "$BUILD" =~ ^[a-z0-9,]*$ ]] || { echo "invalid build input: $BUILD"; exit 1; }
           args="--ref $REF --matrix $MATRIX --no-status"
