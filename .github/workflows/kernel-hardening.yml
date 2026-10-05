@@ -1,21 +1,21 @@
 name: Kernel hardening
 
 # Hosted, seconds: runs kernel-hardening-checker on the kernel .config
-# committed under docs/security/kernel-config/ and fails on any FAIL the
-# matching baseline does not accept. Whether the committed .config still
-# matches the build is the `khc` stage of the Yocto check (docs/dev/ci.md),
-# which needs the build host.
+# snapshot committed under docs/security/kernel-config/ against the board's
+# baseline in the BSP layer. The same gate runs inside every prod kernel
+# build (do_edge_khc_gate, edge-kernel-policy.inc); whether the snapshot still
+# matches the build is the `khc` stage of the Yocto check (docs/dev/ci.md).
 on:
   pull_request:
     paths:
       - "docs/security/kernel-config/**"
-      - "scripts/ci/khc-gate.py"
+      - "meta-edge-bsp/recipes-kernel/linux/files/khc/**"
       - ".github/workflows/kernel-hardening.yml"
   push:
     branches: [main]
     paths:
       - "docs/security/kernel-config/**"
-      - "scripts/ci/khc-gate.py"
+      - "meta-edge-bsp/recipes-kernel/linux/files/khc/**"
       - ".github/workflows/kernel-hardening.yml"
 
 permissions:
@@ -38,9 +38,9 @@ jobs:
 
       - name: Gate committed .config against its baseline
         run: |
-          python3 scripts/ci/khc-gate.py \
+          python3 meta-edge-bsp/recipes-kernel/linux/files/khc/khc-gate.py \
             --config   "docs/security/kernel-config/${{ matrix.board }}-prod.config" \
-            --baseline "docs/security/kernel-config/${{ matrix.board }}-prod.baseline.json" \
+            --baseline "meta-edge-bsp/recipes-kernel/linux/files/khc/${{ matrix.board }}-prod.baseline.json" \
             --report   "$RUNNER_TEMP/khc-${{ matrix.board }}.md"
 
       - name: Summary

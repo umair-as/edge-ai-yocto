@@ -29,8 +29,8 @@ Documents here:
   fix vs not-affected vs mitigation vs risk acceptance, and the
   coarse-justification caveat.
 - [`kernel-config/`](kernel-config/README.md) — per-board prod kernel
-  `.config` and the accepted-failure baseline of kernel-hardening-checker;
-  gated in CI.
+  `.config` snapshot and the kernel-hardening-checker gate that every prod
+  kernel build runs against the board's accepted-failure baseline.
 - [`kernel-cve-triage.md`](kernel-cve-triage.md) — the config-reachability
   method for the kernel CVE line (OQ-5), its validation gate, and CIP-safety
   rules.
@@ -54,7 +54,7 @@ Documents here:
 | Build-time userspace hardening | `security_flags.bbclass` (auto-inherit via `defaultsetup.conf`) — PIE / SSP-strong / FORTIFY_SOURCE / Wformat | distro-wide; verify `bitbake-getvar -r <recipe> SECURITY_CFLAGS` |
 | Default credentials | `extrausers` with `EDGE_DEFAULT_PASSWORD_HASH` from operator's `kas/local.yml` (gitignored). Build fails noisily if unset. | `meta-edge-distro/conf/distro/include/edge-users.inc`, `kas/local.yml.example` |
 | Login policy | `root` shell allowed on physical serial only; SSH denies root, allows `devel` (in `wheel` group). | `edge-sshd-hardening` ships `sshd_config.d/99-edge-hardening.conf`; `edge-sudoers` ships `sudoers.d/10-edge-wheel` (password required, no NOPASSWD) |
-| Kernel hardening | KASLR + kstack randomization, init-on-{alloc,free}, slab-freelist-{random,hardened}, hardened usercopy, stack-protector-strong, kexec off, /proc/kcore off, ldisc_autoload off, unpriv BPF off-default. LSM stack `lockdown,yama,landlock,selinux,bpf` | `meta-edge-bsp/recipes-kernel/linux/files/security-hardening.cfg` |
+| Kernel hardening | KASLR + kstack randomization, init-on-{alloc,free}, slab-freelist-{random,hardened}, hardened usercopy, stack-protector-strong, kexec off, /proc/kcore off, ldisc_autoload off, unpriv BPF off-default. LSM stack `lockdown,yama,landlock,selinux,bpf`. The prod `.config` is gated against a KSPP baseline in every prod kernel build (`do_edge_khc_gate`) | `meta-edge-bsp/recipes-kernel/linux/files/cfg/security-hardening.cfg`, `edge-kernel-policy.inc`, `files/khc/`; snapshot in [`kernel-config/`](kernel-config/README.md) |
 | Kernel cmdline (boot args) | Signed slot DTB carries dm-verity geometry and hardening arguments | `meta-edge-distro/classes/edge-verity-image.bbclass` |
 | Runtime rootfs integrity | Read-only ext4 with appended dm-verity tree; root hash authenticated by the slot FIT | `edge-verity-image.bbclass`, RAUC raw slots, `fitImage-A/B` |
 | Sysctl drops | CIS L1 — dmesg/kptr restrict, unpriv BPF off (userns left enabled for rootless containers), ptrace_scope=1, protected_{symlinks,hardlinks,fifos,regular}, rp_filter, no ICMP redirects, no source route, no IP forward, SYN-cookies on, log_martians | `meta-edge-bsp/recipes-core/edge-sysctl-hardening/files/70-edge-hardening.conf` |

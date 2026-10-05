@@ -374,8 +374,9 @@ Two questions need separate answers. Wave 3 answered them as one:
 The four hand-installed Renesas modules are now signed by their bbappends. The
 Lockdown LSM remains built but inactive. KHC scores the
 absent `lockdown=` cmdline as `FAIL: lockdown != confidentiality`.
-That FAIL is **a declared interim**, gated on signing the out-of-tree
-modules (task #58 below). It is not the target posture.
+That FAIL is **a declared interim**, accepted in the board's KSPP baseline
+(`kernel-config/README.md`); the remaining step is `lockdown=integrity` on
+the signed cmdline (step 2 below). It is not the target posture.
 
 #### Target posture
 

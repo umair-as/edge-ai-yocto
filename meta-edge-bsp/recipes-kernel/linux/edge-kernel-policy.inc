@@ -179,3 +179,56 @@ python do_edge_kernel_policy_assert() {
 # configme and configure would read a .config that is not the one built.
 addtask edge_kernel_policy_assert after do_configure before do_compile
 do_edge_kernel_policy_assert[dirs] = "${B}"
+
+# KSPP baseline gate on the prod kernel. kernel-hardening-checker, from the
+# native sysroot, runs against the resolved .config; any failure the board's
+# baseline (files/khc/<board>-prod.baseline.json) does not accept with a
+# reason, and a baseline recorded with another checker version, fail the
+# build before compilation. The dev kernel carries debug fragments and is
+# not under claim, so it is not gated. The assertion above is independent of
+# this gate: a baseline entry cannot waive a required symbol.
+#
+# Gate script and baseline enter the task signature by checksum, so editing
+# either re-runs the gate and everything after it. EDGE_KHC_BOARD is the
+# kas/machines/<name>.yml name, set by the board include; the snapshot of
+# the same .config lives in docs/security/kernel-config/.
+EDGE_KHC_BOARD ?= ""
+EDGE_KHC_GATE = "${@'1' if d.getVar('EDGE_KERNEL_DEV_FRAGMENTS') != '1' else '0'}"
+EDGE_KHC_DIR = "${EDGE_BSP_LAYERDIR}/recipes-kernel/linux/files/khc"
+EDGE_KHC_BASELINE = "${EDGE_KHC_DIR}/${EDGE_KHC_BOARD}-prod.baseline.json"
+DEPENDS:append = "${@' kernel-hardening-checker-native python3-native' if d.getVar('EDGE_KHC_GATE') == '1' else ''}"
+
+python do_edge_khc_gate() {
+    import os
+    import subprocess
+
+    if d.getVar('EDGE_KHC_GATE') != '1':
+        bb.note('edge khc gate: dev kernel (EDGE_KERNEL_DEV_FRAGMENTS=1), not gated')
+        return
+    board = d.getVar('EDGE_KHC_BOARD')
+    if not board:
+        bb.fatal('edge khc gate: EDGE_KHC_BOARD is empty; set it in '
+                 'conf/machine/include/edge-board-%s.inc' % d.getVar('MACHINE'))
+    baseline = d.getVar('EDGE_KHC_BASELINE')
+    if not os.path.exists(baseline):
+        bb.fatal('edge khc gate: no baseline for board %s at %s' % (board, baseline))
+
+    b = d.getVar('B')
+    report = os.path.join(b, 'khc-report.md')
+    cmd = [os.path.join(d.getVar('STAGING_BINDIR_NATIVE'), 'python3-native', 'python3'),
+           os.path.join(d.getVar('EDGE_KHC_DIR'), 'khc-gate.py'),
+           '--config', os.path.join(b, '.config'),
+           '--baseline', baseline,
+           '--report', report]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    for line in (r.stdout + r.stderr).splitlines():
+        bb.note(line)
+    if r.returncode != 0:
+        bb.fatal('edge khc gate: the resolved .config fails the KSPP baseline for '
+                 '%s (rc=%d).\n%s\nReport: %s\nAccept a failure only with a reason in '
+                 '%s; a mandatory symbol is asserted separately above.'
+                 % (board, r.returncode, (r.stdout + r.stderr).strip(), report, baseline))
+}
+addtask edge_khc_gate after do_edge_kernel_policy_assert before do_compile
+do_edge_khc_gate[dirs] = "${B}"
+do_edge_khc_gate[file-checksums] += "${@'%s/khc-gate.py:True %s:True' % (d.getVar('EDGE_KHC_DIR'), d.getVar('EDGE_KHC_BASELINE')) if d.getVar('EDGE_KHC_GATE') == '1' else ''}"

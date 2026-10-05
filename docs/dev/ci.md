@@ -1,7 +1,8 @@
 # CI
 
-Two halves. GitHub-hosted runners do the text-only checks on every pull
-request. The Yocto checks run on a build host with the layer and sstate
+Two halves. GitHub-hosted runners do the checks that need no build host:
+text lint on every pull request, the kernel-hardening gate when its inputs
+change. The Yocto checks run on a build host with the layer and sstate
 caches, when the operator runs them, and report back as commit statuses.
 
 ## Hosted (automatic)
@@ -9,6 +10,7 @@ caches, when the operator runs them, and report back as commit statuses.
 | Workflow | Checks | Trigger |
 |---|---|---|
 | `.github/workflows/lint.yml` | `scripts/ci/repo-lint.sh` (override syntax, `Upstream-Status`, leaked host paths and key material, doc links, commit trailers), the ModelPack unit tests, the staged-private-key guard | every pull request, push to `main` |
+| `.github/workflows/kernel-hardening.yml` | `khc-gate.py` on each board's committed prod `.config` snapshot against its baseline (`docs/security/kernel-config/`), checker pinned to the baselines' version | pull request, push to `main` — only when a snapshot, the gate, a baseline or the workflow changes |
 | `.github/workflows/release-notes.yml` | git-cliff release notes → GitHub Release | `v*` tag push |
 
 Action versions are SHA-pinned and bumped by Dependabot (`.github/dependabot.yml`).
@@ -75,7 +77,7 @@ to start while another build is running.
 | `yocto/parse` | `make parse` for each cell of the matrix |
 | `yocto/image-<board>` | `make dev BOARD=<board>` (`--build`) |
 | `yocto/bundle-<board>` | `make bundle BOARD=<board>` (`--build`) |
-| `yocto/khc-<board>` | `make kernel-config-export BOARD=<board>` (prod kernel, configure only), `khc-gate.py` against the committed baseline, and the exported `.config` must equal the committed one (`--khc`; `docs/security/kernel-config/`) |
+| `yocto/khc-<board>` | `make kernel-config-export BOARD=<board>` (prod kernel, configure only), the KSPP gate against the board's baseline, and the exported `.config` must equal the committed snapshot (`--khc`; `docs/security/kernel-config/`; needs `kernel-hardening-checker` on the host's `PATH`) |
 
 Matrix cells are one uncached parse each (about two minutes on an 8-core host):
 
