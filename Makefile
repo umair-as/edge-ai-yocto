@@ -1,4 +1,4 @@
-.PHONY: help base dev prod bundle parse layers shell info clean-lock netboot-sync lock verify-pins purge hooks
+.PHONY: help base dev prod bundle parse layers shell info clean-lock netboot-sync lock verify-pins purge hooks ci
 
 KAS ?= kas
 
@@ -183,10 +183,12 @@ define check_rauc_keys
 	fi
 endef
 
-# kas refuses to run if KAS_WORK_DIR is set to a non-existent dir
-# (kas/context.py: os.path.abspath but no mkdir). Order-only prereq so
-# every kas-invoking target finds .kas/ already created on a fresh tree.
-$(KAS_WORK_DIR):
+# kas refuses to run if KAS_WORK_DIR or KAS_BUILD_DIR is set to a non-existent
+# dir (kas/context.py: os.path.abspath but no mkdir). Order-only prereq so
+# every kas-invoking target finds both created on a fresh tree — build/<BOARD>/
+# for a board that has never been built here is the common case.
+KAS_DIRS := $(KAS_WORK_DIR) $(KAS_BUILD_DIR)
+$(KAS_WORK_DIR) $(KAS_BUILD_DIR):
 	@mkdir -p $@
 
 help:
@@ -220,6 +222,8 @@ help:
 	@echo "Utility targets:"
 	@echo "  make hooks                   Install the git hooks (run once per clone)"
 	@echo "  make parse                   bitbake -p (parse-only sanity check)"
+	@echo "  make ci                      Parse-check origin/main in a worktree, post commit statuses"
+	@echo "                               (CI_ARGS='--ref pr/N --matrix full --build rzv2l --no-status')"
 	@echo "  make layers                  bitbake-layers show-layers"
 	@echo "  make shell                   Interactive KAS shell"
 	@echo "  make info                    Show build configuration"
@@ -236,17 +240,17 @@ help:
 	@echo ""
 	@echo "See AGENTS.md for the full orientation."
 
-base: | $(KAS_WORK_DIR)
+base: | $(KAS_DIRS)
 	$(call check_rauc_keys)
 	@echo "==> Building edge-image-base (dev tier) [$(STACK)]"
 	$(call edge_build,dev,edge-image-base)
 
-dev: | $(KAS_WORK_DIR)
+dev: | $(KAS_DIRS)
 	$(call check_rauc_keys)
 	@echo "==> Building edge-image-dev [$(STACK)]"
 	$(call edge_build,dev,edge-image-dev)
 
-prod: | $(KAS_WORK_DIR)
+prod: | $(KAS_DIRS)
 	$(call check_rauc_keys)
 	@echo "==> Building edge-image-prod [$(STACK)]"
 	$(call edge_build,prod,edge-image-prod)
@@ -260,7 +264,7 @@ prod: | $(KAS_WORK_DIR)
 #     make bundle EDGE_BOOT_TARGET=emmc    # else the slot rootfs ships the
 # esd grow path, which fails on the GPT layout.
 EDGE_PROFILE ?= dev
-bundle: | $(KAS_WORK_DIR)
+bundle: | $(KAS_DIRS)
 	@if [ ! -f keys/dev/rauc/rauc-signer.key ]; then \
 		echo "RAUC signing keys missing at keys/dev/rauc/."; \
 		echo "Run: ./scripts/rauc-init-certs.sh"; \
@@ -272,15 +276,22 @@ bundle: | $(KAS_WORK_DIR)
 	@echo "==> Bundle artefacts:"
 	@find $(KAS_BUILD_DIR)/tmp/deploy/images -name '*.raucb' -printf '    %p\n'
 
-parse: | $(KAS_WORK_DIR)
+parse: | $(KAS_DIRS)
 	@echo "==> Parsing BitBake recipes (EDGE_PROFILE=$(EDGE_PROFILE)) [$(STACK)]"
 	$(KAS) shell -c 'BB_ENV_PASSTHROUGH_ADDITIONS="$$BB_ENV_PASSTHROUGH_ADDITIONS EDGE_PROFILE EDGE_OTA_BACKEND EDGE_BOOT_TARGET EDGE_KERNEL_DEV_FRAGMENTS" EDGE_PROFILE=$(EDGE_PROFILE) $(BOOT_TARGET_ENV)bitbake -p' $(STACK)
 
-layers: | $(KAS_WORK_DIR)
+# Operator-run Yocto check of a committed tree, reported as GitHub commit
+# statuses. Runs in a detached worktree outside this tree; see the script
+# header for the stages and options. BOARD/flags do not apply — the script
+# owns its matrix.
+ci:
+	scripts/ci/local-check.sh $(CI_ARGS)
+
+layers: | $(KAS_DIRS)
 	@echo "==> Showing layers [$(STACK)]"
 	$(KAS) shell -c 'bitbake-layers show-layers' $(STACK)
 
-shell: | $(KAS_WORK_DIR)
+shell: | $(KAS_DIRS)
 	@echo "==> Entering KAS shell [$(STACK)]"
 	$(KAS) shell $(STACK)
 
@@ -334,7 +345,7 @@ hooks:
 # concrete SHA. Writes kas/base.lock.yml next to kas/base.yml; commit
 # the lock file so the build is bit-for-bit reproducible at this point
 # in time. Re-run when you deliberately want to bump a floating branch.
-lock: | $(KAS_WORK_DIR)
+lock: | $(KAS_DIRS)
 	@echo "==> Resolving floating branches to SHAs [$(STACK)]"
 	$(KAS) lock $(STACK)
 
@@ -343,7 +354,7 @@ lock: | $(KAS_WORK_DIR)
 # kas/bsp/*.yml BSP fragments alike.
 # A repo carrying a kas patch (meta-renesas) reports the patched commit, not
 # its `commit:` pin, so a raw diff against the pins always shows it drifted.
-verify-pins: | $(KAS_WORK_DIR)
+verify-pins: | $(KAS_DIRS)
 	@echo "==> Reporting HEAD per repo [$(STACK)]"
 	$(KAS) for-all-repos $(STACK) 'echo "$$(basename $$(pwd)): $$(git rev-parse HEAD)"'
 

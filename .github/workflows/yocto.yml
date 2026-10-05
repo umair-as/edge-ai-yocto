@@ -1,0 +1,54 @@
+name: Yocto check
+
+# Operator-dispatched only. Runs on the self-hosted runner the operator starts
+# by hand on the build host (docs/dev/ci.md). Nothing here runs on push,
+# pull_request or schedule: the repo is public and a self-hosted runner must
+# never execute code it did not get from the operator.
+on:
+  workflow_dispatch:
+    inputs:
+      matrix:
+        description: "parse matrix"
+        type: choice
+        options: [quick, full]
+        default: quick
+      build:
+        description: "boards to image + bundle, comma-separated (empty = parse only)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+# One bitbake per host; a second dispatch waits for the first.
+concurrency:
+  group: yocto-host
+  cancel-in-progress: false
+
+jobs:
+  yocto:
+    runs-on: [self-hosted, yocto-host]
+    timeout-minutes: 300
+    steps:
+      # No actions/checkout and no third-party action: the job runs `make ci`
+      # in the operator's checkout (EDGE_REPO from the runner's .env), and the
+      # script makes its own clean worktree of the dispatched commit. The run
+      # itself is the check, so the script posts no commit status.
+      - name: make ci
+        env:
+          REF: ${{ github.sha }}
+          MATRIX: ${{ inputs.matrix }}
+          BUILD: ${{ inputs.build }}
+        # An explicit `bash` runs with -o pipefail; the default shell does not,
+        # and `make … | tee` would then report tee's status, not make's.
+        shell: bash
+        run: |
+          : "${EDGE_REPO:?EDGE_REPO is not set in the runner's .env}"
+          # Operator-typed, but it reaches a shell through CI_ARGS.
+          [[ "$BUILD" =~ ^[a-z0-9,]*$ ]] || { echo "invalid build input: $BUILD"; exit 1; }
+          args="--ref $REF --matrix $MATRIX --no-status"
+          [ -n "$BUILD" ] && args="$args --build $BUILD"
+          rc=0
+          make -C "$EDGE_REPO" ci CI_ARGS="$args" 2>&1 | tee "$RUNNER_TEMP/ci.out" || rc=$?
+          { echo '```'; cat "$RUNNER_TEMP/ci.out"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc

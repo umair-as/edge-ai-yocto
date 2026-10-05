@@ -31,6 +31,10 @@ jobs:
           LINT_RANGE: ${{ github.event_name == 'pull_request' && format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) || 'HEAD~1..HEAD' }}
         run: scripts/ci/repo-lint.sh
 
+      # stdlib-only unittest suite; no pip install, well under a second.
+      - name: ModelPack host tests
+        run: python3 -m unittest scripts/modelpack/tests/test_modelpack.py
+
       - name: Staged private-key guard (same hook as commit stage)
         run: |
           pipx install pre-commit >/dev/null 2>&1 || pip install --quiet pre-commit
