@@ -23,6 +23,7 @@
     "CONFIG_DEVMEM": "Kept for devmem2 on the bench with STRICT_DEVMEM=y and IO_STRICT_DEVMEM=y (security-hardening.cfg); candidate to drop in prod.",
     "CONFIG_EFI_DISABLE_PCI_DMA": "Fixable: disable CONFIG_EFI; the board boots TF-A/firmware -> U-Boot -> signed FIT, no EFI firmware. Accepted at baseline creation 2026-10-05; tracked for the prod kernel fragment.",
     "CONFIG_FB": "VT_CONSOLE on HDMI and fbdev emulation for DRM; whether a prod appliance needs a text console is an open product decision.",
+    "CONFIG_FTRACE": "Menu dependency of UPROBE_EVENTS (BPF LSM chain); FUNCTION_TRACER and KPROBES stay dev-only.",
     "CONFIG_GCC_PLUGIN_LATENT_ENTROPY": "Fixable: enable; GCC_PLUGINS=y. Accepted at baseline creation 2026-10-05; tracked for the prod kernel fragment.",
     "CONFIG_HARDENED_USERCOPY_DEFAULT_ON": "Symbol does not exist in 6.12; HARDENED_USERCOPY=y is set.",
     "CONFIG_INET_DIAG": "ss and systemd-networkd socket diagnostics; candidate to drop in prod.",
@@ -49,6 +50,7 @@
     "CONFIG_STATIC_USERMODEHELPER": "Needs a single trusted dispatcher binary for every usermode helper; a later hardening step.",
     "CONFIG_TRIM_UNUSED_KSYMS": "Breaks out-of-tree modules (accelerator, vendor media drivers).",
     "CONFIG_UBSAN_TRAP": "Fixable: unset UBSAN_ENUM (enum checks trap on valid code); UBSAN_TRAP=y is already set. Accepted at baseline creation 2026-10-05; tracked for the prod kernel fragment.",
+    "CONFIG_UPROBE_EVENTS": "Required by the BPF LSM: BPF_LSM depends on BPF_EVENTS, which needs a dynamic event source. Userspace probes are the smaller source (CAP_PERFMON under perf_event_paranoid=3); KPROBES stay dev-only.",
     "CONFIG_USER_NS": "Rootless Podman (the edge-ctr principal) requires user namespaces.",
     "CONFIG_VT": "Text console on HDMI; whether a prod appliance needs it is an open product decision.",
     "CONFIG_ZERO_CALL_USED_REGS": "Fixable: enable; CC_HAS_ZERO_CALL_USED_REGS=y. Accepted at baseline creation 2026-10-05; tracked for the prod kernel fragment."
