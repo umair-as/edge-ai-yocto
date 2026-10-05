@@ -294,7 +294,8 @@ ci:
 # adds debug fragments to the dev kernel.
 KHC_PROFILE ?= prod
 KHC_OUT     ?= $(CURDIR)/build/khc/$(BOARD)-$(KHC_PROFILE).config
-KHC_BASELINE = docs/security/kernel-config/$(BOARD)-$(KHC_PROFILE).baseline.json
+KHC_DIR      = meta-edge-bsp/recipes-kernel/linux/files/khc
+KHC_BASELINE = $(KHC_DIR)/$(BOARD)-$(KHC_PROFILE).baseline.json
 
 # Absolute script path: kas shell runs its command in the build directory.
 kernel-config-export: | $(KAS_DIRS)
@@ -302,7 +303,7 @@ kernel-config-export: | $(KAS_DIRS)
 	$(KAS) shell -c 'BB_ENV_PASSTHROUGH_ADDITIONS="$$BB_ENV_PASSTHROUGH_ADDITIONS EDGE_PROFILE EDGE_OTA_BACKEND EDGE_BOOT_TARGET EDGE_KERNEL_DEV_FRAGMENTS" EDGE_PROFILE=$(KHC_PROFILE) $(BOOT_TARGET_ENV)$(CURDIR)/scripts/ci/kernel-config-export.sh $(KHC_OUT)' $(STACK)
 
 kernel-hardening-check: kernel-config-export
-	scripts/ci/khc-gate.py --config $(KHC_OUT) --baseline $(KHC_BASELINE) \
+	$(KHC_DIR)/khc-gate.py --config $(KHC_OUT) --baseline $(KHC_BASELINE) \
 	    --report $(CURDIR)/build/khc/$(BOARD)-$(KHC_PROFILE)-report.md
 
 layers: | $(KAS_DIRS)

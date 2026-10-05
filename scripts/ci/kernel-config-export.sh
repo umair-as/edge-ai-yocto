@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Export the expanded kernel .config from the build stack without compiling.
 # Runs inside `kas shell` (bitbake on PATH); `make kernel-config-export` wraps
-# it. The output is what scripts/ci/khc-gate.py consumes.
+# it. The output is what the KSPP gate (files/khc/khc-gate.py in the BSP
+# layer) consumes.
 #
 #   kernel-config-export.sh <output-path>
 set -euo pipefail

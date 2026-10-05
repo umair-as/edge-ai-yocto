@@ -107,7 +107,7 @@ def write_baseline(path: Path, accepted: dict[str, str], config: Path) -> None:
         "_comment": (
             "Options kernel-hardening-checker reports as FAIL that this platform "
             "accepts, each with the reason. Regenerate with "
-            "scripts/ci/khc-gate.py --update, then fill in every empty reason."
+            "khc-gate.py --update, then fill in every empty reason."
         ),
         "tool": TOOL,
         "tool_version": tool_version(),
@@ -213,7 +213,7 @@ def main() -> int:
     ok = sum(1 for r in rows if r.get("check_result_bool"))
     print(
         f"[khc-gate] {args.config.name}: {len(rows)} checks, {ok} OK, {len(fails)} FAIL "
-        f"({len(accepted)} accepted)"
+        f"({len(accepted)} accepted; {TOOL} {tool_version()})"
     )
     for k in fixed:
         print(f"[khc-gate] now passing, drop from baseline: {k}")
