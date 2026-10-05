@@ -38,8 +38,10 @@ able to cause such an event would be running code on the build host. The job
 has one step, `make ci` in the operator's checkout (`EDGE_REPO` from the
 runner's `.env`), with `--no-status` because the workflow run is the check.
 The script's one-line-per-cell output is copied into the run summary; the full
-logs stay on the host. Run logs are public — the script prints no host paths
-beyond its work directory.
+logs stay on the host. Run logs are public: the step rewrites the home
+directory to `~` in everything it writes, registers `$HOME` and `$EDGE_REPO`
+as masked values, and runs make with `--no-print-directory`; the script
+prints no host paths beyond its work directory.
 
 The runner (`~/actions-runner`, label `yocto-host`) is registered to this
 repository and runs as the operator's user, so it sees the same `kas/local.yml`,
