@@ -13,7 +13,8 @@ import subprocess
 import sys
 
 # Makefile targets that end up running bitbake; keep in step with the Makefile.
-MAKE_BUILD_TARGETS = {"base", "dev", "prod", "bundle", "parse", "layers", "shell", "ci"}
+MAKE_BUILD_TARGETS = {"base", "dev", "prod", "bundle", "parse", "layers", "shell", "ci",
+                      "kernel-config-export", "kernel-hardening-check"}
 KAS_BUILD_SUBCOMMANDS = {"build", "shell"}
 # Words that only wrap the real command.
 WRAPPERS = {"nice", "ionice", "nohup", "time", "exec", "setsid", "env", "stdbuf",
