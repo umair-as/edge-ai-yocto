@@ -35,7 +35,7 @@ about the others.
 ## Mechanism under test
 
 Slot selection is a U-Boot env state machine
-(`meta-edge-bsp/recipes-bsp/u-boot/files/rauc-uboot-env.defaults`):
+(`meta-edge-bsp/recipes-bsp/u-boot/files/rauc-uboot-env.defaults.in`):
 
 - `rauc_select_slot` walks `BOOT_ORDER`, picks the first slot with
   `BOOT_<slot>_LEFT > 0`, decrements that counter, and `saveenv` persists the
@@ -255,5 +255,5 @@ crash never persisted to journal/pstore.
 - `docs/security/CRA-CONTROLS.md` — 8.a availability control this validates.
 - `docs/adr/0005-image-class-ota-backend.md` — `virtual-ota-confirm-boot` (health-gated mark-good) deferral.
 - `docs/security/uboot-hardening.md` — U-Boot env layout, bootcount variables.
-- `meta-edge-bsp/recipes-bsp/u-boot/files/rauc-uboot-env.defaults` — the slot-selection state machine.
+- `meta-edge-bsp/recipes-bsp/u-boot/files/rauc-uboot-env.defaults.in` — the slot-selection state machine.
 - `meta-edge-bsp/recipes-ota/rauc/files/system.conf` — `boot-attempts`, slot map.

@@ -7,6 +7,9 @@
 [![RZ/V2L](https://img.shields.io/badge/board-Renesas%20RZ%2FV2L-blue.svg)](https://www.renesas.com/en/products/microcontrollers-microprocessors/rz-mpus/rzv2l)
 [![Raspberry Pi 5](https://img.shields.io/badge/board-Raspberry%20Pi%205-blue.svg)](https://www.raspberrypi.com/products/raspberry-pi-5/)
 [![RAUC](https://img.shields.io/badge/OTA-RAUC-green.svg)](https://rauc.io/)
+[![Repo lint](https://github.com/umair-as/edge-ai-yocto/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/umair-as/edge-ai-yocto/actions/workflows/lint.yml)
+[![Kernel hardening](https://github.com/umair-as/edge-ai-yocto/actions/workflows/kernel-hardening.yml/badge.svg?branch=main)](https://github.com/umair-as/edge-ai-yocto/actions/workflows/kernel-hardening.yml)
+[![Yocto check](https://github.com/umair-as/edge-ai-yocto/actions/workflows/yocto.yml/badge.svg)](https://github.com/umair-as/edge-ai-yocto/actions/workflows/yocto.yml)
 
 </div>
 
@@ -45,8 +48,9 @@ $EDITOR kas/local.yml          # set EDGE_DEFAULT_PASSWORD_HASH (openssl passwd 
 ./scripts/rauc-init-certs.sh
 
 # 3. Build
-make base                      # edge-image-base  (~1–3 h cold cache; fast on warm sstate)
-make dev                       # edge-image-dev — adds shell tools, OP-TEE userspace
+make base                      # edge-image-base for RZ/V2L (~1–3 h cold cache; fast on warm sstate)
+make dev                       # edge-image-dev — adds shell tools (and OP-TEE userspace on RZ/V2L)
+make base BOARD=raspberrypi5   # same for the Raspberry Pi 5; output under build/raspberrypi5/
 
 # 4. Flash
 sudo bmaptool copy \

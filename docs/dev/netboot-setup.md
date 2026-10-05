@@ -1,6 +1,8 @@
 # Dev netboot (TFTP + NFS-root) runbook
 
-This note covers the dev-only network-boot workflow: the board fetches the
+This note covers the dev-only network-boot workflow on the RZ/V2L SMARC EVK
+(the Raspberry Pi 5 U-Boot is built with networking off and has no TFTP
+path; see [`netboot.md`](netboot.md)): the board fetches the
 signed FIT over TFTP and mounts its rootfs over NFS, replacing the
 eject-reflash-reseat loop with a ~5-second sync. It is also the recommended
 setup for **JTAG/kgdb labs** — an NFS rootfs survives a sustained core halt,

@@ -29,8 +29,7 @@ session:
 
 ## Stack components
 
-After the next image rebuild lands (passt + e2fsprogs-tune2fs + SELinux
-labels + WIC fstab fix), the on-board stack is:
+The on-board stack is:
 
 | Component        | Role                                     | Package                   |
 | ---              | ---                                      | ---                       |
@@ -155,9 +154,8 @@ Pick by what the workload needs, not by what's convenient:
 | User-defined       | `podman network create my-net`, then `--network my-net` | App needs an isolated subnet + per-net DNS | netavark + aardvark-dns; pasta-backed on rootless |
 | `slirp4netns`      | `podman run --network slirp4netns`        | Fallback on images that ship slirp4netns but not pasta | Per-container netns; lacks aardvark-dns binding |
 
-On the next image (with `pasta` installed), the default rootless mode
-is pasta. On the current bench image (no pasta), `--network slirp4netns`
-is the operator workaround until reflash.
+The default rootless mode is pasta; `--network slirp4netns` is the
+fallback on an image that lacks it.
 
 ## Inter-container DNS via aardvark-dns
 
@@ -242,9 +240,12 @@ Limited but real, all gated by the host's `--device` and group memberships:
 | /sys/class/* read access        | Default (rootless can read /sys, can't write most)             |
 | /dev/mem, /dev/kmem             | Rootful only; rootless is denied by capability                 |
 
-The `devel` user is in `video`, `audio`, `render`, `input`, `dialout`,
-and `wayland` groups by default (per `meta-edge-distro/recipes-core/users/`).
-That covers most of the bring-up surface without `sudo`.
+The `devel` user is in `video`, `audio`, `render`, `input` and `dialout`
+by default, plus `wayland` where the display stack is on (not on the
+headless Raspberry Pi 5 composition) and the board's I/O groups from
+`EDGE_BOARD_DEVEL_GROUPS` (`gpio` on the Pi); see
+`meta-edge-distro/conf/distro/include/edge-users.inc`. That covers most of
+the bring-up surface without `sudo`.
 
 ## Known gotchas
 

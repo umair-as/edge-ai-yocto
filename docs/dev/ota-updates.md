@@ -30,8 +30,9 @@ selection and rollback.
   `boot-attempts=3`, slots `rootfs.0`/`A` and `rootfs.1`/`B`. Install marks the
   target slot bad *before* writing and active *only* after a fully successful
   install (write + hooks).
-- **U-Boot** (`meta-edge-bsp/recipes-bsp/u-boot/files/rauc-uboot-env.defaults`):
-  `rauc_select_slot` walks `BOOT_ORDER`, picks the first slot with
+- **U-Boot** (`meta-edge-bsp/recipes-bsp/u-boot/files/rauc-uboot-env.defaults.in`;
+  the Raspberry Pi 5 variant under `files/raspberrypi5/` differs only in load
+  address and FIT load path): `rauc_select_slot` walks `BOOT_ORDER`, picks the first slot with
   `BOOT_<slot>_LEFT > 0`, decrements that counter, and `saveenv`s the decrement
   **before** `bootm` — so a slot that hangs or crashes mid-boot still consumes an
   attempt. When a slot's counter hits 0, the next slot in `BOOT_ORDER` is tried.
@@ -90,9 +91,9 @@ install` from slot A, the post-install hook wrote the target slot's signed
 FIT to the FAT `/boot` partition, U-Boot selected `conf-B` on reboot, the
 slot booted with `rauc.slot=B` and was marked good, and the late-fallback
 policy then marked A bad exactly as on RZ/V2L. The T1-T8 rollback matrix
-above has been run on RZ/V2L only; the Pi shares the managed U-Boot env
-script and RAUC configuration, but its rollback paths are not yet
-tested on hardware.
+above has been run on RZ/V2L only; the Pi runs the same slot-selection
+macros and RAUC configuration from its board-specific env file, and its
+rollback paths are untested on hardware.
 
 ## Kernel and root-hash coupling
 
@@ -111,7 +112,7 @@ bundle used modules built against a different shared kernel:
   a kernel list; `CONFIG_DEBUG_LIST` catches it as
   `kernel BUG at lib/list_debug.c:29` → `Kernel panic`.
 - The panic reboots (via `CONFIG_PANIC_TIMEOUT`); after `boot-attempts` the
-  bootcount reverts to the previous slot. Observed on hardware (2026-07-09): a
+  bootcount reverts to the previous slot. Observed on RZ/V2L hardware (2026-07-09): a
   freshly-installed slot panicked at t≈10 s in `systemd-modules-load` and rolled
   back automatically.
 
@@ -131,7 +132,8 @@ RAUC A/B updates remain supported.
 ## Building and installing a bundle
 
 ```bash
-make bundle                       # -> build/tmp/deploy/images/<machine>/edge-image-dev-bundle.raucb
+make bundle                       # -> build/tmp/deploy/images/smarc-rzv2l/edge-image-dev-bundle.raucb
+make bundle BOARD=raspberrypi5    # -> build/raspberrypi5/tmp/deploy/images/raspberrypi5/edge-image-dev-bundle.raucb
 ```
 
 On the target (device `/data` is not user-writable — stage in the operator's
@@ -145,7 +147,7 @@ sudo reboot                       # flips to the new slot
 
 Notes:
 
-- The full ext4 write to eMMC takes several minutes; the `rauc.service` daemon
+- The full ext4 write to the slot's SD/eMMC device takes several minutes; the `rauc.service` daemon
   completes the install even if the `rauc install` client is disconnected —
   track completion with `journalctl -u rauc.service` by installation ID.
 - mTLS HTTPS streaming install is wired and hardware-validated. `rauc install
@@ -336,4 +338,4 @@ and the production per-device direction, is recorded in
 - [`adr/0005-image-class-ota-backend.md`](../adr/0005-image-class-ota-backend.md) — backend abstraction, deferred confirm-boot.
 - [`adr/0006-emmc-gpt-boot-target.md`](../adr/0006-emmc-gpt-boot-target.md) — boot layout, env location.
 - [`security/uboot-hardening.md`](../security/uboot-hardening.md) — U-Boot env + bootcount variables.
-- `meta-edge-bsp/recipes-ota/rauc/files/system.conf`, `.../rauc-uboot-env.defaults` — the wiring.
+- `meta-edge-bsp/recipes-ota/rauc/files/system.conf`, `.../rauc-uboot-env.defaults.in` — the wiring.

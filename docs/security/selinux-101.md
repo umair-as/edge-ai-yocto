@@ -489,7 +489,7 @@ kept in sync with `PREFERRED_PROVIDER_virtual/refpolicy` in
 A/B image class removes `/.autorelabel` and fails the build if image-time
 `setfiles` fails; first-boot relabelling would invalidate dm-verity.
 
-### 5.4 Kernel cmdline — `meta-edge-bsp/recipes-bsp/u-boot/files/rauc-uboot-env.defaults`
+### 5.4 Kernel cmdline — `meta-edge-bsp/recipes-bsp/u-boot/files/rauc-uboot-env.defaults.in`
 
 ```
 EDGE_VERITY_KERNEL_ARGS=... security=selinux ...
