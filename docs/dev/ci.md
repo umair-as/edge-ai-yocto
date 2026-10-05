@@ -19,7 +19,7 @@ Two ways to run the same check, both started by the operator:
 
 ```bash
 # From GitHub: start the runner on the build host, then dispatch.
-~/actions-runner/run.sh                              # Ctrl-C when the run is done
+~/actions-runner/run.sh --once                       # takes one job, then exits
 gh workflow run yocto.yml --ref main -f matrix=quick # or Actions → "Yocto check" → Run workflow
 
 # Without GitHub Actions: run locally, report as commit statuses.
@@ -38,16 +38,17 @@ able to cause such an event would be running code on the build host. The job
 has one step, `make ci` in the operator's checkout (`EDGE_REPO` from the
 runner's `.env`), with `--no-status` because the workflow run is the check.
 The script's one-line-per-cell output is copied into the run summary; the full
-logs stay on the host. Run logs are public: the step rewrites the home
-directory to `~` in everything it writes, registers `$HOME` and `$EDGE_REPO`
-as masked values, and runs make with `--no-print-directory`; the script
-prints no host paths beyond its work directory.
+logs stay on the host. Run logs are public and carry no host paths.
 
 The runner (`~/actions-runner`, label `yocto-host`) is registered to this
 repository and runs as the operator's user, so it sees the same `kas/local.yml`,
-caches and `keys/` as an interactive build. It is not a service: start it with
-`run.sh` before dispatching and stop it afterwards. A job dispatched while the
-runner is offline queues and fails after 24 hours. The runner's `.env` carries
+caches and `keys/` as an interactive build. It is not a service: start it
+before dispatching. `run.sh --once` exits after one job; plain `run.sh` keeps
+listening until stopped. The runner marks `--once` as deprecated in favour of
+`--ephemeral`, which de-registers after every job and needs a new registration
+token each time — a poor fit for a hand-started runner, so `--once` stays until
+it is removed. A job dispatched while the runner is offline queues and fails
+after 24 hours. The runner's `.env` carries
 `EDGE_REPO` and `KAS_REPO_REF_DIR`; its `.path` must include the directory that
 holds `kas`.
 

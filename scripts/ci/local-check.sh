@@ -137,7 +137,6 @@ mkdir -p "$KAS_WORK_DIR"
 # Same default as the Makefile. Absent, kas clones every layer from upstream
 # instead of from local alternates — correct, but slow and network-bound.
 export KAS_REPO_REF_DIR="${KAS_REPO_REF_DIR:-/mnt/yocto-nvme/layers-wrynose}"
-# stdout may end up in a public Actions log: no host paths beyond the workdir.
 if [ -d "$KAS_REPO_REF_DIR" ]; then refdir=present; else
     refdir="MISSING — layers clone from upstream"; fi
 
@@ -172,7 +171,6 @@ cell() {
     else
         # bitbake: "ERROR: …"; kas: "<timestamp> - ERROR - …"; make: "*** …".
         err=$(grep -m1 -E '^ERROR|ERROR +- |^\*\*\* ' "$log" | sed -E 's/^.* - ERROR +- //' || true)
-        # stdout may be public; the full line stays in the log file.
         err=${err//$HOME/\~}
         printf 'FAIL %-32s %4ds  %s\n' "$name" $(( $(date +%s) - start )) "${err:0:80}"
         FAILED+=("$name")
