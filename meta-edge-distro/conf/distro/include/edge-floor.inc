@@ -201,6 +201,12 @@ BB_GIT_SHALLOW_DEPTH:pn-sbom-cve-check-update-cvelist-native = "1"
 SOURCE_MIRROR_URL ?= "https://downloads.yoctoproject.org/mirror/sources/"
 INHERIT += "own-mirrors"
 
+# The kernel's KSPP gate refuses a baseline recorded with another checker
+# version, and the baselines record 0.6.17.1. Pinned so a meta-openembedded
+# bump does not change the rule set under the prod kernel build; bump the pin
+# and re-baseline together.
+PREFERRED_VERSION_kernel-hardening-checker-native = "0.6.17.1"
+
 # The sbom-cve-check fragment hard-codes the SPDX compiled-sources flag for
 # linux-yocto only, so every other kernel provider needs it set explicitly or
 # its SPDX output omits compiled sources and kernel CVE source-attribution

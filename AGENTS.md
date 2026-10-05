@@ -26,6 +26,8 @@ make bundle               # RAUC .raucb for OTA install
 make parse                # bitbake -p (parse-only sanity — cheapest validation)
 make ci                   # parse-check the committed origin/main in a worktree and
                           #   post GitHub commit statuses (docs/dev/ci.md)
+make kernel-hardening-check  # export the prod kernel .config (configure only) and run
+                          #   the KSPP gate on it (docs/security/kernel-config/)
 make layers               # bitbake-layers show-layers
 make shell                # interactive KAS shell
 make clean-lock           # remove a stale build/bitbake.lock
@@ -105,6 +107,10 @@ AGENTS.md                              # this file
 CLAUDE.md                              # Claude-Code-specific extras
 Makefile                               # build wrapper around kas
 kas/                                   # KAS composition
+.github/workflows/                     # hosted lint + kernel-hardening checks;
+                                       #   dispatch-only Yocto check (docs/dev/ci.md)
+scripts/ci/                            # repo-lint.sh, local-check.sh (`make ci`),
+                                       #   kernel-config-export.sh
 docs/
   adr/                                 # Architecture Decision Records — read
                                        #   before re-deriving settled choices.
@@ -156,7 +162,9 @@ build/                                 # bitbake output (gitignored)
   boot files; the kernel is this repo's `linux-edge-mainline` (kernel.org
   stable 6.18, `dynamic-layers/raspberrypi/`), U-Boot is oe-core's.
   Kernel policy shared by every board lives in
-  `recipes-kernel/linux/edge-kernel-policy.inc`.
+  `recipes-kernel/linux/edge-kernel-policy.inc`, including the KSPP gate
+  every prod kernel build runs against the board's baseline in
+  `files/khc/` (`docs/security/kernel-config/README.md`).
 - **Layer ownership** — `meta-edge-distro` owns brand + distro identity;
   `meta-edge-bsp` owns image recipes and board-level patches. Do not
   mix.
@@ -374,7 +382,8 @@ deferred until the first release needs them.
 | Prose in `docs/` and `README.md` (what may and may not be written) | `.claude/rules/docs-style.md` |
 | Cross-compiling apps outside bitbake | `.claude/rules/cross-compilation.md` |
 | Settled architecture decisions | `docs/adr/README.md` (index) |
-| Security docs — SBOM/CVE triage, SELinux, U-Boot hardening, vuln mgmt | `docs/security/README.md` (index) |
+| Security docs — SBOM/CVE triage, SELinux, U-Boot hardening, kernel-config gate, vuln mgmt | `docs/security/README.md` (index) |
+| CI — hosted lint, operator-run Yocto check (`make ci`), kernel-hardening gate | `docs/dev/ci.md` |
 | OTA updates + rollback testing | `docs/dev/ota-updates.md`, `docs/dev/ota-rollback-test-plan.md` |
 | Netboot dev workflow | `docs/dev/netboot-setup.md` |
 | eMMC provisioning | `docs/dev/emmc-provisioning.md` |

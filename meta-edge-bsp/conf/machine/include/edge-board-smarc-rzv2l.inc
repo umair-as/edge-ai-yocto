@@ -17,6 +17,9 @@ EDGE_BOARD_INC = "1"
 # Network-visible name: the serial login prompt, ssh target and DHCP lease
 # name, so boards on one network are told apart.
 EDGE_HOSTNAME ?= "edge-rzv2l"
+# kas/machines/<name>.yml name; selects files/khc/<name>-prod.baseline.json
+# for the kernel's KSPP gate (edge-kernel-policy.inc).
+EDGE_KHC_BOARD ?= "rzv2l"
 
 # --- Accelerator ---------------------------------------------------------
 # DRP-AI is RZ/V2L-only SoC IP. This is the allowlist for the machine, not

@@ -11,7 +11,8 @@
 #   yocto/image-<board>   `make dev BOARD=<board>`          (--build only)
 #   yocto/bundle-<board>  `make bundle BOARD=<board>`       (--build only)
 #   yocto/khc-<board>     prod kernel .config exported, gated against the
-#                         committed baseline, identical to the committed copy
+#                         board's baseline (BSP layer, files/khc/), identical
+#                         to the snapshot under docs/security/kernel-config/
 #                         (--khc only; needs kernel-hardening-checker on PATH)
 #
 # Nothing runs unless the operator runs this. Hosted CI stays text-only
@@ -284,7 +285,7 @@ done
 # ---------------------------------------------------------------- khc
 
 # Prod kernel .config from this commit's stack, gated against the committed
-# baseline and compared with the committed copy under docs/security/.
+# baseline (BSP layer) and compared with the snapshot under docs/security/.
 if [ "$KHC" -eq 1 ]; then
     if ! command -v kernel-hardening-checker >/dev/null; then
         echo "FAIL khc: kernel-hardening-checker not on PATH"
@@ -302,9 +303,10 @@ if [ "$KHC" -eq 1 ] && command -v kernel-hardening-checker >/dev/null; then
         fi
         exported="$WT/build/khc/$b-prod.config"
         committed="$WT/docs/security/kernel-config/$b-prod.config"
-        baseline="$WT/docs/security/kernel-config/$b-prod.baseline.json"
+        khc="$WT/meta-edge-bsp/recipes-kernel/linux/files/khc"
+        baseline="$khc/$b-prod.baseline.json"
         gate_rc=0
-        "$WT/scripts/ci/khc-gate.py" --config "$exported" --baseline "$baseline" \
+        "$khc/khc-gate.py" --config "$exported" --baseline "$baseline" \
             --report "$LOGS/khc-$b-report.md" >"$LOGS/khc-gate-$b.log" 2>&1 || gate_rc=$?
         drift=0
         diff -u "$committed" "$exported" >"$LOGS/khc-drift-$b.diff" 2>&1 || drift=1
