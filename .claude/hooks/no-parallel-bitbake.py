@@ -13,7 +13,7 @@ import subprocess
 import sys
 
 # Makefile targets that end up running bitbake; keep in step with the Makefile.
-MAKE_BUILD_TARGETS = {"base", "dev", "prod", "bundle", "parse", "layers", "shell"}
+MAKE_BUILD_TARGETS = {"base", "dev", "prod", "bundle", "parse", "layers", "shell", "ci"}
 KAS_BUILD_SUBCOMMANDS = {"build", "shell"}
 # Words that only wrap the real command.
 WRAPPERS = {"nice", "ionice", "nohup", "time", "exec", "setsid", "env", "stdbuf",
@@ -54,7 +54,7 @@ def starts_build(command, depth=0):
         if not seg:
             continue
         word, args = seg[0].rsplit("/", 1)[-1], seg[1:]
-        if word.startswith("bitbake"):
+        if word.startswith("bitbake") or word == "local-check.sh":
             return True
         if word in ("kas", "kas-container") and KAS_BUILD_SUBCOMMANDS & set(args):
             return True
