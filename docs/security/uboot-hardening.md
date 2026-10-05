@@ -489,7 +489,9 @@ cat /proc/cmdline | grep -o 'security=selinux'
   net_off fragment.
 - `meta-edge-bsp/recipes-bsp/u-boot/files/edge-uboot-fit-enforce.cfg` —
   fit_enforce fragment.
-- `meta-edge-bsp/recipes-bsp/u-boot/files/rauc-uboot-env.defaults` —
-  managed env defaults (BOOT_ORDER, bootcmd, EXTRA_KERNEL_ARGS).
+- `meta-edge-bsp/recipes-bsp/u-boot/files/rauc-uboot-env.defaults.in` —
+  managed env defaults (BOOT_ORDER, bootcmd, EXTRA_KERNEL_ARGS); the RPi5
+  variant under `files/raspberrypi5/` has no legacy path and no
+  `EXTRA_KERNEL_ARGS`.
 - [CRA-CONTROLS.md](CRA-CONTROLS.md) — CRA Annex I requirement table.
 - [README.md](README.md) — security-posture orientation.

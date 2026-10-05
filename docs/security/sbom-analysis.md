@@ -1,7 +1,9 @@
 # SBOM analysis
 
 The `sbom-cve-check` class (wrynose) emits an SBOM per image into
-`build/tmp/deploy/images/<machine>/`:
+`build/tmp/deploy/images/<machine>/` (`build/<BOARD>/tmp/deploy/images/<machine>/`
+for every board after the first, e.g. `build/raspberrypi5/`; pass that file
+with `-i`):
 
 | File | Format | Contents |
 |---|---|---|

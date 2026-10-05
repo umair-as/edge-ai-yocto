@@ -1,8 +1,9 @@
 # Porting the DRP-AI driver to linux-cip 6.12
 
 Notes on forward-porting the Renesas DRP-AI kernel driver from its **6.1** baseline
-to the **linux-cip 6.12** the platform standardises on (the CIP Super-LTS base, see
-[ADR-0001](../adr/0001-kernel-base.md)), and on how the driver is sourced. Orientation
+to the **linux-cip 6.12** the RZ/V2L board runs (the CIP Super-LTS base, see
+[ADR-0001](../adr/0001-kernel-base.md); the kernel base is per board,
+[ADR-0011](../adr/0011-per-board-kernel-base.md)), and on how the driver is sourced. Orientation
 for this integration lives in the [README](README.md); this is the how.
 
 Driver source: **[github.com/umair-as/rzv2l-drpai-driver](https://github.com/umair-as/rzv2l-drpai-driver)**

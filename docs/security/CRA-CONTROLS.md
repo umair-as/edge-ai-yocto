@@ -19,7 +19,7 @@ EU Cyber Resilience Act, Annex I (essential cybersecurity requirements). This ta
 
 | Sub-requirement | Status | Implementation |
 |---|---|---|
-| 1.a — Minimum attack surface (no unnecessary services) | ✅ | Base image is minimal Weston; dev image opt-in via packagegroups. `tools-debug` / `tools-profile` only in `edge-image-dev`. No demo / sample daemons. U-Boot surface reduction via `EDGE_UBOOT_FEATURES` — see [uboot-hardening.md](uboot-hardening.md). |
+| 1.a — Minimum attack surface (no unnecessary services) | ✅ | Base image is minimal (Weston only where `EDGE_ENABLE_DISPLAY=1`; the Raspberry Pi 5 composition is headless); dev image opt-in via packagegroups. `tools-debug` / `tools-profile` only in `edge-image-dev`. No demo / sample daemons. U-Boot surface reduction via `EDGE_UBOOT_FEATURES` — see [uboot-hardening.md](uboot-hardening.md). |
 | 1.b — Hardened build flags | ✅ | `security_flags.bbclass` auto-inherited. `SECURITY_CFLAGS` = `-fstack-protector-strong -O2 -D_FORTIFY_SOURCE=2 -Wformat -Wformat-security -Werror=format-security`. Userspace built PIE. U-Boot stack canary deferred — `CONFIG_STACKPROTECTOR` off pending a proof build (see uboot-hardening.md "Explicit deferrals"). |
 | 1.c — Kernel hardening | ✅ | `security-hardening.cfg` plus hardening arguments embedded in the signed slot DTBs. LSM stack includes lockdown, yama, landlock, SELinux, and BPF (BPF last, or it shadows SELinux's procattr hooks); lockdown is compiled but not activated. The prod `.config` is gated against a KSPP baseline in every prod kernel build (`do_edge_khc_gate`, `edge-kernel-policy.inc`); snapshot and baseline in [kernel-config/](kernel-config/README.md). |
 | 1.d — Sysctl baseline | ✅ | `edge-sysctl-hardening` — CIS L1. |
@@ -51,7 +51,7 @@ EU Cyber Resilience Act, Annex I (essential cybersecurity requirements). This ta
 | Sub-requirement | Status | Implementation |
 |---|---|---|
 | 4.a — DM-VERITY rootfs (immutable) | ✅ | RAUC raw-writes `ext4.verity`; the signed slot FIT supplies the root hash and early `dm-mod.create`, mounting `/dev/dm-0` read-only. On-target flash, boot, deliberate corruption detection, and OTA replacement/rollback validation are complete. |
-| 4.b — `/data` LUKS encryption | 🟡 | `cryptsetup` (LUKS + `veritysetup`) userspace ships in `packagegroup-edge-security`. No wiring yet. Needs TPM2 chip on the board (RZ/V2L doesn't have internal TPM) OR PBKDF-derived key from per-device secret. |
+| 4.b — `/data` LUKS encryption | 🟡 | `cryptsetup` (LUKS + `veritysetup`) userspace ships in `packagegroup-edge-security`. No wiring yet. Needs an external TPM2 chip (neither board has an internal TPM) OR PBKDF-derived key from per-device secret. |
 | 4.c — Key material protection | ⏸ | TPM-sealed LUKS key. Same blocker as 4.b. |
 
 ### 5. Confidentiality + integrity of data in transit
@@ -67,10 +67,10 @@ EU Cyber Resilience Act, Annex I (essential cybersecurity requirements). This ta
 
 | Sub-requirement | Status | Implementation |
 |---|---|---|
-| 6.a — Signed boot chain | 🟡 | U-Boot verifies FIT configurations and RAUC verifies bundles, but TF-A has `TRUSTED_BOARD_BOOT=0`; BL2 through BL33 are not hardware-authenticated. |
+| 6.a — Signed boot chain | 🟡 | U-Boot verifies FIT configurations and RAUC verifies bundles on both boards, but nothing below U-Boot is hardware-authenticated: on RZ/V2L TF-A has `TRUSTED_BOARD_BOOT=0` (BL2 through BL33 unauthenticated); on the Raspberry Pi 5 the firmware loads U-Boot unauthenticated. |
 | 6.b — Signed FIT image | ✅ | `sha256,rsa2048:edge-fit-dev` covers the kernel and slot DTB, including the root hash. Interactive U-Boot commands can still bypass the managed boot macro. |
 | 6.c — DM-VERITY at runtime | ✅ | See 4.a; the mapped root was validated on target through flash, boot, deliberate corruption detection, and OTA replacement/rollback. |
-| 6.d — Module signing | ✅ | `MODULE_SIG=y`, `MODULE_SIG_ALL=y`, and `MODULE_SIG_FORCE=y`; hand-installed Renesas modules use the shared signing include. |
+| 6.d — Module signing | ✅ | `MODULE_SIG=y`, `MODULE_SIG_ALL=y`, and `MODULE_SIG_FORCE=y` on every kernel provider; on RZ/V2L the hand-installed Renesas modules use the shared signing include. |
 | 6.e — IMA appraisal | 🟡 | Kernel `CONFIG_IMA=y`, `IMA_LSM_RULES=y`. `ima_appraise=enforce` cmdline + signed policy deferred. |
 
 ### 7. Minimisation of data processed
@@ -84,7 +84,7 @@ EU Cyber Resilience Act, Annex I (essential cybersecurity requirements). This ta
 | Sub-requirement | Status | Implementation |
 |---|---|---|
 | 8.a — A/B rootfs with rollback | ✅ | RAUC `rootfs.0` + `rootfs.1` + boot-attempts counter in U-Boot env. |
-| 8.b — Watchdog | ✅ | `watchdog@12800800` started in U-Boot + kept by kernel. |
+| 8.b — Watchdog | ✅ | systemd runtime watchdog policy (`edge-watchdog`, `packagegroup-edge-base`) on every board; on RZ/V2L `watchdog@12800800` is started in U-Boot and kept by the kernel. |
 | 8.c — Bounded log usage | ✅ | journald `SystemMaxUse=200M`, `SystemMaxFileSize=50M`. |
 
 ### 9. Protective measures against DoS
@@ -104,7 +104,7 @@ EU Cyber Resilience Act, Annex I (essential cybersecurity requirements). This ta
 | 10.b — Tamper-evident logs | 🟡 | Integrity at rest is the journald structural hash chain, validated by `journalctl --verify`. FSS (`Seal=yes`) was upstream-deprecated in systemd 257 and is a no-op on wrynose (systemd 259); a sealed remote aggregator is the planned path. |
 | 10.c — Privilege separation | ✅ | `root` not SSH-reachable; `devel` sudo with password; no NOPASSWD shortcuts. |
 | 10.d — Mandatory access control | 🟡 | SELinux MCS — `DISTRO_FEATURES += selinux`, `refpolicy-mcs` + `selinux-autorelabel`, `CONFIG_DEFAULT_SECURITY_SELINUX=y`, in the `CONFIG_LSM` stack; AppArmor explicitly off. Permissive baseline; `enforcing=1` validated on-board via controlled reboot, full AVC-clean policy set deferred. |
-| 10.e — Rootless-container isolation | ✅ | DRP-AI inference runs in rootless Podman under a dedicated `edge-ctr` principal (uid 608, per-principal subuid namespace) with SELinux `container_t` — no root, no capability widening. HW-validated, zero AVC denials. |
+| 10.e — Rootless-container isolation | ✅ | Accelerator inference (DRP-AI on RZ/V2L, DX-M1 on the Raspberry Pi 5) runs in rootless Podman under a dedicated `edge-ctr` principal (uid 608, per-principal subuid namespace) with SELinux `container_t` — no root, no capability widening. HW-validated on both boards; zero AVC denials on RZ/V2L. |
 
 ### 11. Security-relevant info recording
 
@@ -112,7 +112,7 @@ EU Cyber Resilience Act, Annex I (essential cybersecurity requirements). This ta
 |---|---|---|
 | 11.a — System events logged | ✅ | journald persistent + auditd. |
 | 11.b — Build provenance | ✅ | `EDGE_BUILD_ID` from `SOURCE_DATE_EPOCH` in `/etc/issue` + RAUC bundle name (planned). |
-| 11.c — Boot provenance | ✅ | BL2 banner carries `EDGE_BUILD_TAG`; U-Boot banner same. |
+| 11.c — Boot provenance | ✅ | On RZ/V2L the BL2 and U-Boot banners carry the boot marker (`EDGE_BOOT_VERSION` / `EDGE_BOOT_PROFILE` / `EDGE_BOOT_MACHINE`, TF-A and U-Boot bbappends); the Raspberry Pi 5 U-Boot carries no marker. `/etc/buildinfo` (`edge-rootfs.bbclass`) records the per-build id on every board. |
 
 ### 12. Secure updates
 
@@ -140,7 +140,7 @@ EU Cyber Resilience Act, Annex I (essential cybersecurity requirements). This ta
 | Coordinated disclosure process | 📅 | Need `docs/security/SECURITY.md` + intake email + GitHub Security Advisory enablement. |
 | Vulnerability response SLAs | 📅 | Need policy document. |
 | SBOM-driven patch path | 🟡 | We have SBOMs at every build; CI gate that diffs SBOMs across releases not yet wired. |
-| Free security updates over supported lifetime | 📅 | Lifetime not yet declared. CIP-aligned implies ≥10y; needs commitment. |
+| Free security updates over supported lifetime | 📅 | Lifetime not yet declared. The kernel horizon is per board (ADR-0011): CIP SLTS on RZ/V2L implies ≥10y; the Raspberry Pi 5 follows the kernel.org longterm lifetime of its 6.18 line, years rather than a decade. Needs commitment. |
 
 ---
 

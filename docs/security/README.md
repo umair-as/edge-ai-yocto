@@ -4,9 +4,9 @@ EDGE AI OS is designed to satisfy the essential cybersecurity requirements of EU
 
 - Every credential is **operator-supplied**, not committed.
 - The normal boot path verifies a signed kernel, DTB, and root hash at U-Boot,
-  with RAUC-managed A/B rollback. TF-A is currently built with
-  `TRUSTED_BOARD_BOOT=0` and `MEASURED_BOOT=0`, so the chain is not yet
-  hardware-rooted or measured.
+  with RAUC-managed A/B rollback. Neither chain is hardware-rooted or
+  measured: on RZ/V2L, TF-A is built with `TRUSTED_BOARD_BOOT=0` and
+  `MEASURED_BOOT=0`; on the Pi, the firmware loads U-Boot unauthenticated.
 - The runtime is **CIS Level 1-aligned by default**, with additional hardening controls on the prod-tier roadmap.
 - Every control is **documented and verifiable on-board**, so the implementation can be mapped to CRA Annex I requirements.
 
@@ -50,11 +50,11 @@ Documents here:
 
 | Surface | Mechanism | Recipe / config |
 |---|---|---|
-| Boot integrity | U-Boot verifies image-specific signed FITs (`sha256,rsa2048:edge-fit-dev`); TF-A authentication remains off | `meta-edge-bsp/recipes-bsp/{trusted-firmware-a,u-boot,...}`, `meta-edge-distro/classes/edge-verity-image.bbclass` |
+| Boot integrity | U-Boot verifies image-specific signed FITs (`sha256,rsa2048:edge-fit-dev`) on both boards; TF-A authentication (RZ/V2L) remains off | `meta-edge-bsp/recipes-bsp/{trusted-firmware-a,u-boot,...}`, per-board U-Boot bbappends under `meta-edge-bsp/dynamic-layers/`, `meta-edge-distro/classes/edge-verity-image.bbclass` |
 | Build-time userspace hardening | `security_flags.bbclass` (auto-inherit via `defaultsetup.conf`) — PIE / SSP-strong / FORTIFY_SOURCE / Wformat | distro-wide; verify `bitbake-getvar -r <recipe> SECURITY_CFLAGS` |
 | Default credentials | `extrausers` with `EDGE_DEFAULT_PASSWORD_HASH` from operator's `kas/local.yml` (gitignored). Build fails noisily if unset. | `meta-edge-distro/conf/distro/include/edge-users.inc`, `kas/local.yml.example` |
 | Login policy | `root` shell allowed on physical serial only; SSH denies root, allows `devel` (in `wheel` group). | `edge-sshd-hardening` ships `sshd_config.d/99-edge-hardening.conf`; `edge-sudoers` ships `sudoers.d/10-edge-wheel` (password required, no NOPASSWD) |
-| Kernel hardening | KASLR + kstack randomization, init-on-{alloc,free}, slab-freelist-{random,hardened}, hardened usercopy, stack-protector-strong, kexec off, /proc/kcore off, ldisc_autoload off, unpriv BPF off-default. LSM stack `lockdown,yama,landlock,selinux,bpf`. The prod `.config` is gated against a KSPP baseline in every prod kernel build (`do_edge_khc_gate`) | `meta-edge-bsp/recipes-kernel/linux/files/cfg/security-hardening.cfg`, `edge-kernel-policy.inc`, `files/khc/`; snapshot in [`kernel-config/`](kernel-config/README.md) |
+| Kernel hardening | KASLR + kstack randomization, init-on-{alloc,free}, slab-freelist-{random,hardened}, hardened usercopy, stack-protector-strong, kexec off, /proc/kcore off, ldisc_autoload off, unpriv BPF off-default. LSM stack `lockdown,yama,landlock,selinux,bpf`. The prod `.config` is gated against a KSPP baseline in every prod kernel build (`do_edge_khc_gate`) | `meta-edge-bsp/recipes-kernel/linux/files/cfg/security-hardening.cfg`, applied to every kernel provider via `edge-kernel-policy.inc`; baselines in `files/khc/`; snapshot in [`kernel-config/`](kernel-config/README.md) |
 | Kernel cmdline (boot args) | Signed slot DTB carries dm-verity geometry and hardening arguments | `meta-edge-distro/classes/edge-verity-image.bbclass` |
 | Runtime rootfs integrity | Read-only ext4 with appended dm-verity tree; root hash authenticated by the slot FIT | `edge-verity-image.bbclass`, RAUC raw slots, `fitImage-A/B` |
 | Sysctl drops | CIS L1 — dmesg/kptr restrict, unpriv BPF off (userns left enabled for rootless containers), ptrace_scope=1, protected_{symlinks,hardlinks,fifos,regular}, rp_filter, no ICMP redirects, no source route, no IP forward, SYN-cookies on, log_martians | `meta-edge-bsp/recipes-core/edge-sysctl-hardening/files/70-edge-hardening.conf` |
@@ -67,10 +67,10 @@ Documents here:
 
 | Surface | Status | What's missing |
 |---|---|---|
-| Module signing | `CONFIG_MODULE_SIG_FORCE=y`; in-tree and four hand-installed Renesas modules are signed | Lockdown activation remains deferred |
+| Module signing | `CONFIG_MODULE_SIG_FORCE=y`; in-tree modules and, on RZ/V2L, the four hand-installed Renesas modules are signed | Lockdown activation remains deferred |
 | IMA/EVM | `CONFIG_INTEGRITY=y`, `IMA=y`, `EVM=y` | `ima_appraise=enforce` cmdline + signed policy chain |
 | SELinux enforcing | MCS policy validated in permissive | `selinux=1 enforcing=1` boot with full AVC-clean policy set |
-| TPM2 binding | `meta-tpm2` loaded via `kas/tpm.yml` | TPM2 driver on RZ/V2L (likely SPI/I2C external chip), LUKS-volume key sealing flow |
+| TPM2 binding | `meta-tpm2` loaded via `kas/tpm.yml` | An external SPI/I2C TPM2 chip and its driver (neither board has an on-board TPM), LUKS-volume key sealing flow |
 
 ## What's deliberately deferred (prod tier scope)
 

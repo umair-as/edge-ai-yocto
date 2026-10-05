@@ -16,15 +16,17 @@ optional and is not touched by anything here; see
 ## Overview
 
 `packagegroup-edge-optee` is the single entry point for OP-TEE userspace.
-`edge-image.bbclass` installs it on `smarc-rzv2l` — the only machine in
-this repo that wires BL32 — and every part of it is individually
+The RZ/V2L board include (`edge-board-smarc-rzv2l.inc`) names it in
+`EDGE_MACHINE_EXTRA_INSTALL`, which `edge-image.bbclass` installs;
+`smarc-rzv2l` is the only machine in this repo that wires BL32 (the
+Raspberry Pi 5 has no OP-TEE), and every part of it is individually
 selectable.
 
 The packagegroup declares `COMPATIBLE_MACHINE` on itself, but BitBake does
 not fail-soft on a `COMPATIBLE_MACHINE`-incompatible dependency: an image
 on another machine listing it errors at parse with `Nothing provides
-packagegroup-edge-optee`. Hence the machine-conditional append at the
-image level, with the toggle applied inside it.
+packagegroup-edge-optee`. Hence the per-board install list rather than a
+distro-wide one, with the toggle applied inside it.
 
 ## Selection surface
 
@@ -129,7 +131,8 @@ command -v optee_example_hello_world
 |---|---|
 | `meta-edge-distro/conf/distro/include/edge-features.inc` | Toggle declarations and defaults |
 | `meta-edge-bsp/recipes-core/packagegroups/packagegroup-edge-optee.bb` | Member selection |
-| `meta-edge-distro/classes/edge-image.bbclass` | Installs the packagegroup, machine- and toggle-gated |
+| `meta-edge-bsp/conf/machine/include/edge-board-smarc-rzv2l.inc` | Names the packagegroup in `EDGE_MACHINE_EXTRA_INSTALL`, toggle-gated |
+| `meta-edge-distro/classes/edge-image.bbclass` | Installs `EDGE_MACHINE_EXTRA_INSTALL` |
 | `meta-edge-bsp/recipes-core/images/edge-image-dev.bb` | xtest slice, dev tier only |
 | `meta-edge-distro/conf/distro/include/edge-users.inc` | `tee` group membership for `devel` |
 | `kas/optee-examples.yml` | Capability fragment behind `OPTEE_EXAMPLES=1` |

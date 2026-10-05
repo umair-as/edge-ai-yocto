@@ -2,6 +2,9 @@
 
 - Status: Accepted
 - Date: 2026-06-11
+- Amended by: [ADR-0011](0011-per-board-kernel-base.md) — scope narrowed
+  from the platform to the RZ/V2L board; the Raspberry Pi 5 is on
+  mainline-stable 6.18
 
 ## Context
 
