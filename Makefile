@@ -1,4 +1,4 @@
-.PHONY: help base dev prod bundle parse layers shell info clean-lock netboot-sync lock verify-pins purge hooks ci
+.PHONY: help base dev prod bundle parse layers shell info clean-lock netboot-sync lock verify-pins purge hooks ci kernel-config-export kernel-hardening-check
 
 KAS ?= kas
 
@@ -223,7 +223,9 @@ help:
 	@echo "  make hooks                   Install the git hooks (run once per clone)"
 	@echo "  make parse                   bitbake -p (parse-only sanity check)"
 	@echo "  make ci                      Parse-check origin/main in a worktree, post commit statuses"
-	@echo "                               (CI_ARGS='--ref pr/N --matrix full --build rzv2l --no-status')"
+	@echo "                               (CI_ARGS='--ref pr/N --matrix full --build rzv2l --khc --no-status')"
+	@echo "  make kernel-config-export    Expanded prod kernel .config -> build/khc/<board>-prod.config"
+	@echo "  make kernel-hardening-check  kernel-hardening-checker gate on it (docs/security/kernel-config/)"
 	@echo "  make layers                  bitbake-layers show-layers"
 	@echo "  make shell                   Interactive KAS shell"
 	@echo "  make info                    Show build configuration"
@@ -286,6 +288,22 @@ parse: | $(KAS_DIRS)
 # owns its matrix.
 ci:
 	scripts/ci/local-check.sh $(CI_ARGS)
+
+# Kernel-hardening gate inputs (docs/security/kernel-config/). Configure only,
+# no compile. The prod tier is the one under claim: EDGE_KERNEL_DEV_FRAGMENTS
+# adds debug fragments to the dev kernel.
+KHC_PROFILE ?= prod
+KHC_OUT     ?= $(CURDIR)/build/khc/$(BOARD)-$(KHC_PROFILE).config
+KHC_BASELINE = docs/security/kernel-config/$(BOARD)-$(KHC_PROFILE).baseline.json
+
+# Absolute script path: kas shell runs its command in the build directory.
+kernel-config-export: | $(KAS_DIRS)
+	@echo "==> Exporting kernel .config (EDGE_PROFILE=$(KHC_PROFILE)) [$(STACK)]"
+	$(KAS) shell -c 'BB_ENV_PASSTHROUGH_ADDITIONS="$$BB_ENV_PASSTHROUGH_ADDITIONS EDGE_PROFILE EDGE_OTA_BACKEND EDGE_BOOT_TARGET EDGE_KERNEL_DEV_FRAGMENTS" EDGE_PROFILE=$(KHC_PROFILE) $(BOOT_TARGET_ENV)$(CURDIR)/scripts/ci/kernel-config-export.sh $(KHC_OUT)' $(STACK)
+
+kernel-hardening-check: kernel-config-export
+	scripts/ci/khc-gate.py --config $(KHC_OUT) --baseline $(KHC_BASELINE) \
+	    --report $(CURDIR)/build/khc/$(BOARD)-$(KHC_PROFILE)-report.md
 
 layers: | $(KAS_DIRS)
 	@echo "==> Showing layers [$(STACK)]"
