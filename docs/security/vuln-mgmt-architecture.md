@@ -4,7 +4,7 @@ Decision record for the CRA vulnerability-management workstream on this
 distro (Yocto wrynose 6.0). SBOM generation and the CVE check are wired at
 distro level and apply to every board; the measurements below were taken
 on `smarc-rzv2l` and are labelled as such, the Raspberry Pi 5
-(`raspberrypi5`, mainline 6.18 kernel) has no baseline measured yet. It
+(`raspberrypi5`, mainline 6.18 kernel) has no measured baseline. It
 states the decisions in force,
 the measured baseline they rest on, and the questions still open. Vulnerability
 handling here maps to CRA Annex I §2 (no known exploitable vulnerabilities) and
