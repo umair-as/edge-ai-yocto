@@ -1,0 +1,48 @@
+name: Kernel hardening
+
+# Hosted, seconds: runs kernel-hardening-checker on the kernel .config
+# committed under docs/security/kernel-config/ and fails on any FAIL the
+# matching baseline does not accept. Whether the committed .config still
+# matches the build is the `khc` stage of the Yocto check (docs/dev/ci.md),
+# which needs the build host.
+on:
+  pull_request:
+    paths:
+      - "docs/security/kernel-config/**"
+      - "scripts/ci/khc-gate.py"
+      - ".github/workflows/kernel-hardening.yml"
+  push:
+    branches: [main]
+    paths:
+      - "docs/security/kernel-config/**"
+      - "scripts/ci/khc-gate.py"
+      - ".github/workflows/kernel-hardening.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  committed-config:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        board: [rzv2l, raspberrypi5]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Pinned to a commit, as the actions are: the rule set changes between
+      # releases and a new rule is not a config regression.
+      - name: Install kernel-hardening-checker
+        run: pip install --quiet "git+https://github.com/a13xp0p0v/kernel-hardening-checker@afc376f2a935994793343cfeb05953583cc30191" # v0.6.17.1
+
+      - name: Gate committed .config against its baseline
+        run: |
+          python3 scripts/ci/khc-gate.py \
+            --config   "docs/security/kernel-config/${{ matrix.board }}-prod.config" \
+            --baseline "docs/security/kernel-config/${{ matrix.board }}-prod.baseline.json" \
+            --report   "$RUNNER_TEMP/khc-${{ matrix.board }}.md"
+
+      - name: Summary
+        if: always()
+        run: cat "$RUNNER_TEMP/khc-${{ matrix.board }}.md" >> "$GITHUB_STEP_SUMMARY" || true

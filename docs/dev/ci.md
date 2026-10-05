@@ -27,6 +27,7 @@ make ci                                  # origin/main, quick parse matrix
 make ci CI_ARGS='--ref pr/16'            # a pull request head
 make ci CI_ARGS='--matrix full'          # every optional capability fragment
 make ci CI_ARGS='--build rzv2l'          # + edge-image-dev and edge-bundle for one board
+make ci CI_ARGS='--khc'                  # + kernel-hardening gate, both boards (~5 min each)
 make ci CI_ARGS='--no-status'            # run without posting
 ```
 
@@ -74,6 +75,7 @@ to start while another build is running.
 | `yocto/parse` | `make parse` for each cell of the matrix |
 | `yocto/image-<board>` | `make dev BOARD=<board>` (`--build`) |
 | `yocto/bundle-<board>` | `make bundle BOARD=<board>` (`--build`) |
+| `yocto/khc-<board>` | `make kernel-config-export BOARD=<board>` (prod kernel, configure only), `khc-gate.py` against the committed baseline, and the exported `.config` must equal the committed one (`--khc`; `docs/security/kernel-config/`) |
 
 Matrix cells are one uncached parse each (about two minutes on an 8-core host):
 

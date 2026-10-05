@@ -28,6 +28,9 @@ Documents here:
   asserts publicly: keyword → VEX mapping, why `SPDX_INCLUDE_VEX = "all"`,
   fix vs not-affected vs mitigation vs risk acceptance, and the
   coarse-justification caveat.
+- [`kernel-config/`](kernel-config/README.md) — per-board prod kernel
+  `.config` and the accepted-failure baseline of kernel-hardening-checker;
+  gated in CI.
 - [`kernel-cve-triage.md`](kernel-cve-triage.md) — the config-reachability
   method for the kernel CVE line (OQ-5), its validation gate, and CIP-safety
   rules.

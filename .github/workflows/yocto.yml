@@ -16,6 +16,10 @@ on:
         description: "boards to image + bundle, comma-separated (empty = parse only)"
         type: string
         default: ""
+      khc:
+        description: "kernel-hardening gate on the prod kernel .config, both boards"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -38,6 +42,7 @@ jobs:
           REF: ${{ github.sha }}
           MATRIX: ${{ inputs.matrix }}
           BUILD: ${{ inputs.build }}
+          KHC: ${{ inputs.khc }}
         # An explicit `bash` runs with -o pipefail; the default shell does not,
         # and `make … | tee` would then report tee's status, not make's.
         shell: bash
@@ -50,6 +55,7 @@ jobs:
           [[ "$BUILD" =~ ^[a-z0-9,]*$ ]] || { echo "invalid build input: $BUILD"; exit 1; }
           args="--ref $REF --matrix $MATRIX --no-status"
           [ -n "$BUILD" ] && args="$args --build $BUILD"
+          [ "$KHC" = "true" ] && args="$args --khc"
           rc=0
           make --no-print-directory -C "$EDGE_REPO" ci CI_ARGS="$args" 2>&1 \
             | sed -u "s#$HOME#~#g" | tee "$RUNNER_TEMP/ci.out" || rc=$?

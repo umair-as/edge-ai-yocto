@@ -10,6 +10,9 @@
 #   yocto/parse           `make parse` matrix (quick | full)
 #   yocto/image-<board>   `make dev BOARD=<board>`          (--build only)
 #   yocto/bundle-<board>  `make bundle BOARD=<board>`       (--build only)
+#   yocto/khc-<board>     prod kernel .config exported, gated against the
+#                         committed baseline, identical to the committed copy
+#                         (--khc only; needs kernel-hardening-checker on PATH)
 #
 # Nothing runs unless the operator runs this. Hosted CI stays text-only
 # (.github/workflows/lint.yml); this is the Yocto half, on a host that has
@@ -19,6 +22,7 @@
 #   scripts/ci/local-check.sh --ref pr/16           # a PR head; status lands in the PR checks
 #   scripts/ci/local-check.sh --matrix full         # + every optional capability fragment
 #   scripts/ci/local-check.sh --build rzv2l         # + image and bundle for one board
+#   scripts/ci/local-check.sh --khc                 # + kernel-hardening gate, both boards
 #   scripts/ci/local-check.sh --no-status           # dry run, nothing posted
 #
 # Host overlay: kas/ci-local.yml from the main checkout when present, else
@@ -39,6 +43,7 @@ usage() {
 REF=origin/main
 MATRIX=quick
 BUILD_BOARDS=()
+KHC=0
 POST=1
 KEEP=0
 WORKDIR="${EDGE_CI_WORKDIR:-/var/tmp/edge-ci}"
@@ -52,6 +57,7 @@ while [ $# -gt 0 ]; do
         --ref)       REF=$2; shift ;;
         --matrix)    MATRIX=$2; shift ;;
         --build)     IFS=, read -r -a BUILD_BOARDS <<<"$2"; shift ;;
+        --khc)       KHC=1 ;;
         --no-status) POST=0 ;;
         --keep)      KEEP=1 ;;
         --workdir)   WORKDIR=$2; shift ;;
@@ -144,7 +150,7 @@ echo "commit   $SHA ($REF)"
 echo "worktree $WT"
 echo "overlay  $OVERLAY"
 echo "refdir   $refdir"
-echo "matrix   $MATRIX${BUILD_BOARDS[*]:+  build: ${BUILD_BOARDS[*]}}"
+echo "matrix   $MATRIX${BUILD_BOARDS[*]:+  build: ${BUILD_BOARDS[*]}}$([ "$KHC" -eq 1 ] && echo '  khc')"
 echo "logs     $LOGS"
 echo
 
@@ -274,6 +280,48 @@ for b in "${BUILD_BOARDS[@]}"; do
         >"$ART/$b/build-summary.txt" 2>/dev/null || true
     echo "artefacts $ART/$b"
 done
+
+# ---------------------------------------------------------------- khc
+
+# Prod kernel .config from this commit's stack, gated against the committed
+# baseline and compared with the committed copy under docs/security/.
+if [ "$KHC" -eq 1 ]; then
+    if ! command -v kernel-hardening-checker >/dev/null; then
+        echo "FAIL khc: kernel-hardening-checker not on PATH"
+        FAILED+=(khc)
+        for b in "${BOARDS[@]}"; do status "yocto/khc-$b" error "kernel-hardening-checker not installed"; done
+    fi
+fi
+if [ "$KHC" -eq 1 ] && command -v kernel-hardening-checker >/dev/null; then
+    for b in "${BOARDS[@]}"; do
+        status "yocto/khc-$b" pending "exporting prod kernel .config"
+        t0=$(date +%s)
+        if ! cell "khc-export-$b" kernel-config-export "BOARD=$b"; then
+            status "yocto/khc-$b" failure "kernel .config export failed"
+            continue
+        fi
+        exported="$WT/build/khc/$b-prod.config"
+        committed="$WT/docs/security/kernel-config/$b-prod.config"
+        baseline="$WT/docs/security/kernel-config/$b-prod.baseline.json"
+        gate_rc=0
+        "$WT/scripts/ci/khc-gate.py" --config "$exported" --baseline "$baseline" \
+            --report "$LOGS/khc-$b-report.md" >"$LOGS/khc-gate-$b.log" 2>&1 || gate_rc=$?
+        drift=0
+        diff -u "$committed" "$exported" >"$LOGS/khc-drift-$b.diff" 2>&1 || drift=1
+        summary=$(grep -m1 -E '^\[khc-gate\] \S+: [0-9]+ checks' "$LOGS/khc-gate-$b.log" | sed 's/^\[khc-gate\] //' || true)
+        if [ $gate_rc -eq 0 ] && [ $drift -eq 0 ]; then
+            printf 'ok   %-32s %4ds  %s\n' "khc-$b" $(( $(date +%s) - t0 )) "$summary"
+            status "yocto/khc-$b" success "${summary:-gate ok}; committed .config matches"
+        else
+            why=""
+            [ $gate_rc -ne 0 ] && why="gate rc=$gate_rc"
+            [ $drift -ne 0 ] && why="${why:+$why, }committed .config differs from build"
+            printf 'FAIL %-32s %4ds  %s\n' "khc-$b" $(( $(date +%s) - t0 )) "$why"
+            FAILED+=("khc-$b")
+            status "yocto/khc-$b" failure "$why"
+        fi
+    done
+fi
 
 # ---------------------------------------------------------------- result
 
