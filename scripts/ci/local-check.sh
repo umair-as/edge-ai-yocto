@@ -172,6 +172,8 @@ cell() {
     else
         # bitbake: "ERROR: …"; kas: "<timestamp> - ERROR - …"; make: "*** …".
         err=$(grep -m1 -E '^ERROR|ERROR +- |^\*\*\* ' "$log" | sed -E 's/^.* - ERROR +- //' || true)
+        # stdout may be public; the full line stays in the log file.
+        err=${err//$HOME/\~}
         printf 'FAIL %-32s %4ds  %s\n' "$name" $(( $(date +%s) - start )) "${err:0:80}"
         FAILED+=("$name")
     fi
