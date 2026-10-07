@@ -19,6 +19,11 @@ PV:smarc-rzv2l      = "4.8.0+git${SRCPV}"
 
 OPTEEMACHINE:smarc-rzv2l = "rz"
 
+# Same CVE backports as optee-os_%.bbappend: identical source, and this
+# recipe is the one the image SBOM reports.
+FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
+SRC_URI:append:smarc-rzv2l = " file://cve/CVE-2026-71968.patch"
+
 # Same EXTRA_OEMAKE as the optee-os bbappend. The tadevkit recipe runs
 # the same OP-TEE compile (separate work-dir from optee-os since PN
 # differs), then its do_install just extracts the export-ta_arm64/
