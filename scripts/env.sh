@@ -32,10 +32,13 @@ export KAS_REPO_REF_DIR="${KAS_REPO_REF_DIR:-/mnt/yocto-nvme/layers-wrynose}"
 # whether build/conf exists, matters once it does: on a host with an
 # established rzv2l build/, sourcing this with BOARD already set to
 # something else must not still land on the single-dir path.
+# Always derived from BOARD, like the Makefile's override: an inherited
+# KAS_BUILD_DIR (direnv, a shell used for another board) otherwise wins and
+# runs this board's kas config in the other board's tree.
 if [ -d "${_EDGE_REPO_ROOT}/build/conf" ] && [ "${BOARD:-rzv2l}" = "rzv2l" ]; then
-    export KAS_BUILD_DIR="${KAS_BUILD_DIR:-${_EDGE_REPO_ROOT}/build}"
+    export KAS_BUILD_DIR="${_EDGE_REPO_ROOT}/build"
 else
-    export KAS_BUILD_DIR="${KAS_BUILD_DIR:-${_EDGE_REPO_ROOT}/build/${BOARD:-rzv2l}}"
+    export KAS_BUILD_DIR="${_EDGE_REPO_ROOT}/build/${BOARD:-rzv2l}"
 fi
 
 # kas refuses to start if KAS_WORK_DIR doesn't exist (kas/context.py:
