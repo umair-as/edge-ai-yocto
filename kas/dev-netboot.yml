@@ -20,7 +20,8 @@
 #
 # NFS-root needs CONFIG_NFS_FS, CONFIG_NFS_V4, CONFIG_ROOT_NFS,
 # CONFIG_IP_PNP_DHCP and the board's Ethernet/PHY drivers built in.
-# rz_linux-cip builds all of them in; other providers are unverified.
+# rz_linux-cip builds all of them in; default builds remove them with
+# nfs-off.cfg, which EDGE_DEV_NETBOOT=1 skips. Other providers are unverified.
 #
 # Host-side setup (TFTP + NFS server, exports, sync workflow) is
 # documented in docs/dev/netboot-setup.md and automated by
