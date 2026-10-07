@@ -34,3 +34,4 @@ and the reasoning behind them.
 - [ADR-0011](0011-per-board-kernel-base.md) — kernel base is a per-board property
 - [ADR-0012](0012-container-runtime-baseline.md) — container userspace is OS baseline on every tier
 - [ADR-0013](0013-vulnerability-handling-cadence-and-release-gate.md) — vulnerability handling: two loops, milestone releases, evidence-based acceptance
+- [ADR-0014](0014-bootchain-update-mechanism.md) — bootchain update is a per-board capability (RZ/V2L BL2/FIP backend first; attended, RAUC-independent)

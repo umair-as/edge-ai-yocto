@@ -1,4 +1,4 @@
-.PHONY: help base dev prod bundle parse layers shell info clean-lock netboot-sync lock verify-pins purge hooks ci kernel-config-export kernel-hardening-check cve-archive cve-calibrate cve-refresh cve-monitor
+.PHONY: help base dev prod bundle bootloader-package parse layers shell info clean-lock netboot-sync lock verify-pins purge hooks ci kernel-config-export kernel-hardening-check cve-archive cve-calibrate cve-refresh cve-monitor
 
 KAS ?= kas
 
@@ -132,6 +132,14 @@ endif
 ifeq ($(OPTEE_EXAMPLES),1)
   CAPABILITY_YMLS += kas/optee-examples.yml
 endif
+ifeq ($(BOOTLOADER_UPDATE),1)
+  CAPABILITY_YMLS += kas/bootloader-update.yml
+  # Bootchain update is per-board (ADR-0014). Only RZ/V2L has a backend today;
+  # the image install is machine-gated, so the flag is a no-op elsewhere.
+  ifneq ($(BOARD),rzv2l)
+    $(warning note: BOOTLOADER_UPDATE=1 has no backend for BOARD=$(BOARD) (RZ/V2L only); it is a no-op here)
+  endif
+endif
 
 empty :=
 space := $(empty) $(empty)
@@ -199,6 +207,7 @@ help:
 	@echo "  make base                    Build edge-image-base (dev tier; v0 wired baseline)"
 	@echo "  make dev                     Build edge-image-dev  (dev tier; + debug/profile/stress tools)"
 	@echo "  make prod                    Build edge-image-prod (prod tier; hardened, no package-mgmt)"
+	@echo "  make bootloader-package      Host package: BL2/FIP + manifest + updater (RZ/V2L, out-of-band)"
 	@echo "  make bundle                  Build edge-bundle (.raucb) for OTA install (dev tier)"
 	@echo "  make bundle EDGE_PROFILE=prod  Bundle a prod image (set BUNDLE_IMAGE_NAME=edge-image-prod)"
 	@echo ""
@@ -212,6 +221,7 @@ help:
 	@echo "  NETBOOT=1                    + U-Boot 'netboot' env macro (TFTP/NFS dev workflow)"
 	@echo "  JTAG=1                       + KASLR off, kgdb, debug-safe boot (JTAG kernel labs)"
 	@echo "  BPF=1                        + kernel BTF + bpftool (libbpf CO-RE labs; size-heavy)"
+	@echo "  BOOTLOADER_UPDATE=1          + the board's bootchain updater (RZ/V2L BL2/FIP today; per-board, ADR-0014)"
 	@echo "  OPTEE_EXAMPLES=1             + OP-TEE demo TAs (bring-up/debug; off in shipped images)"
 	@echo "  EDGE_BOOT_TARGET=emmc        GPT user area + systemd-repart (eMMC boot; default esd)"
 	@echo ""
@@ -280,6 +290,15 @@ bundle: | $(KAS_DIRS)
 	$(KAS) shell -c 'BB_ENV_PASSTHROUGH_ADDITIONS="$$BB_ENV_PASSTHROUGH_ADDITIONS EDGE_PROFILE EDGE_OTA_BACKEND BUNDLE_IMAGE_NAME EDGE_BOOT_TARGET EDGE_KERNEL_DEV_FRAGMENTS" EDGE_PROFILE=$(EDGE_PROFILE) $(BOOT_TARGET_ENV)bitbake edge-bundle' $(STACK)
 	@echo "==> Bundle artefacts:"
 	@find $(KAS_BUILD_DIR)/tmp/deploy/images -name '*.raucb' -printf '    %p\n'
+
+# Host-side bootchain updater package (RZ/V2L): BL2/FIP variants + manifest +
+# the guarded updater, tarred for out-of-band provisioning. Separate from RAUC;
+# does not build an image. Deploys rzv2l-bootloader-<machine>.tar.gz.
+bootloader-package: | $(KAS_DIRS)
+	@echo "==> Building rzv2l-bootloader-update package [$(STACK)]"
+	$(KAS) shell -c 'bitbake rzv2l-bootloader-update -c deploy' $(STACK)
+	@echo "==> Bootloader package:"
+	@find $(KAS_BUILD_DIR)/tmp/deploy/images -name 'rzv2l-bootloader-*.tar.gz' -printf '    %p\n'
 
 # ----- Host CVE monitor ----------------------------------------------------
 # Python wrapper around a separately installed, pinned sbom-cve-check. No kas or

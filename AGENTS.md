@@ -396,6 +396,7 @@ deferred until the first release needs them.
 | Security docs — SBOM/CVE triage, SELinux, U-Boot hardening, kernel-config gate, vuln mgmt | `docs/security/README.md` (index) |
 | CI — hosted lint, operator-run Yocto check (`make ci`), kernel-hardening gate | `docs/dev/ci.md` |
 | OTA updates + rollback testing | `docs/dev/ota-updates.md`, `docs/dev/ota-rollback-test-plan.md` |
+| Bootchain (BL2/FIP) update — RZ/V2L | `docs/dev/bootchain-update.md`, ADR-0014 |
 | Netboot dev workflow | `docs/dev/netboot-setup.md` |
 | eMMC provisioning | `docs/dev/emmc-provisioning.md` |
 | JTAG kernel debugging | `docs/dev/jtag-kernel-debugging.md` |
