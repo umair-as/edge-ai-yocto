@@ -38,9 +38,9 @@ worktrees are an ephemeral concurrency tool, not a workflow tier.
 ## 1. Seed and verify — run the script
 
 `kas/local.yml` is gitignored (`.gitignore:17`), so a fresh worktree
-does **not** have it. Without it the Makefile falls back to
-`BASE_DEFAULT = kas/base.yml:kas/machines/rzv2l.yml` (`Makefile:46-51`),
-which builds correctly but **without the shared `DL_DIR`/`SSTATE_DIR`** —
+does **not** have it. The Makefile then composes only the tracked
+`kas/base.yml:kas/machines/$(BOARD).yml` (it appends `kas/local.yml` when
+present), which builds correctly but **without the shared `DL_DIR`/`SSTATE_DIR`** —
 a cold build of hours instead of the minutes an sstate-hit build takes.
 
 Layer *setup* stays fast either way: `KAS_REPO_REF_DIR` defaults to
@@ -68,9 +68,11 @@ worktree's own `build/`.
   cold-build attempts are the expensive failure mode this skill exists
   to prevent.
 
-`kas/local.yml` is the *entry point*, not an overlay — it composes base
-plus machine through its own `includes:`. Don't append it to
-`kas/base.yml:kas/machines/rzv2l.yml`; that double-composes.
+`kas/local.yml` is an additive host overlay with no `includes:`; it never
+selects the board. A raw kas call passes the full chain with it last:
+`export BOARD=<board>; . scripts/env.sh && kas shell -c '<cmd>'
+kas/base.yml:kas/machines/$BOARD.yml:kas/local.yml`. `kas shell
+kas/local.yml` alone loads no layers.
 
 Validate progressively before any image build: `make parse`, then the
 affected recipe's task, then the image. Capability flags compose on the

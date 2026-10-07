@@ -88,10 +88,10 @@ in-place against the same tree.
 ### Seed `kas/local.yml` first — a fresh worktree does not have it
 
 `kas/local.yml` is gitignored (`.gitignore:17`), so **it does not exist
-in a new worktree**. Without it the Makefile falls back to
-`BASE_DEFAULT = kas/base.yml:kas/machines/rzv2l.yml` (`Makefile:46-51`)
-and the build runs with no shared `DL_DIR`/`SSTATE_DIR` — cold, hours
-instead of minutes. Nothing warns you; it just builds slowly.
+in a new worktree**. The Makefile then composes only the tracked
+`kas/base.yml:kas/machines/$(BOARD).yml` (it appends `kas/local.yml` when
+present) and the build runs with no shared `DL_DIR`/`SSTATE_DIR` — cold,
+hours instead of minutes. Nothing warns you; it just builds slowly.
 
 Seed and verify before the first build, from the main checkout root:
 
