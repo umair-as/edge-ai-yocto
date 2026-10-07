@@ -50,10 +50,21 @@ reason: uncommitted work does not become a patch.
 make shell
 ```
 
-Or explicitly, when you need a specific composition:
+Or explicitly, when you need a specific composition (source the env and
+keep `kas/local.yml` last, or the shared DL_DIR/SSTATE_DIR are lost):
 
 ```bash
-kas shell kas/base.yml:kas/machines/rzv2l.yml
+export BOARD=rzv2l   # or raspberrypi5; env.sh picks the board's build dir
+. scripts/env.sh && kas shell kas/base.yml:kas/machines/$BOARD.yml:kas/local.yml
+```
+
+For a non-interactive devtool run, pass the same environment the Makefile
+uses (`make -n parse BOARD=<board>` prints it; not while another build runs —
+the parallel-build hook blocks it), for example on RZ/V2L:
+
+```bash
+. scripts/env.sh && kas shell -c 'export BB_ENV_PASSTHROUGH_ADDITIONS="$BB_ENV_PASSTHROUGH_ADDITIONS EDGE_PROFILE" EDGE_PROFILE=dev; devtool modify --no-overrides linux-renesas' \
+    kas/base.yml:kas/machines/rzv2l.yml:kas/local.yml
 ```
 
 Prefer `make` — it resolves the kas composition for you (AGENTS.md,
@@ -246,10 +257,51 @@ Then finish + 6a. Head the patch with its regeneration recipe:
 #   make savedefconfig → devtool finish
 ```
 
+## Kernel recipes and CVE backports
+
+Verified on `linux-renesas` (kernel-yocto):
+
+- **Workspace branch** is the kernel's machine branch (e.g. `rz-6.12-cip14`),
+  not `devtool`. `git log` shows the layer's patches as commits on top.
+- **`devtool modify` moves `build/tmp/work-shared/<machine>/kernel-source`
+  into the workspace**, and `devtool reset` does not put it back: the
+  work-shared directory stays empty until the next kernel build. A
+  `git -C <that dir>` then silently runs against the enclosing repo.
+- **`devtool reset` keeps a copy** in `build/workspace/attic/` (several GB).
+  Delete it once the patch is exported and verified.
+- **The workspace is not `O=`-buildable** (it holds a `.config`; do not
+  `mrproper` a devtool tree). Compile-check from a clean copy:
+  `git -C <ws> archive HEAD | tar -x -C <tmp>/src`, copy the workspace
+  `.config` to `<tmp>/obj`, then `make -C <tmp>/src O=<tmp>/obj ARCH=arm64
+  CROSS_COMPILE=<recipe-sysroot-native cross prefix> olddefconfig prepare
+  <file>.o` with `W=1`.
+
+Backporting an upstream fix that does not apply cleanly:
+
+1. `git fetch <stable clone> <sha>` in the workspace, then
+   `git cherry-pick <sha>` — a 3-way merge resolves what it can; fix only
+   the true conflicts.
+2. Commit with `git commit -C <upstream sha>`: original author and message,
+   no `-x` line, so the header stays verbatim.
+3. **Interdiff**: compare the `+`/`-` lines of the upstream commit with the
+   adapted commit. Only context may differ; an empty interdiff is the
+   strongest evidence.
+4. Export with `git format-patch -1 --stdout HEAD` into
+   `files/patches/cve/CVE-<id>.patch` and add one `Upstream-Status:
+   Backport [from <ver> commit <sha>; adapted for <base>: <why>]` line above
+   `---`. This deviates from `devtool finish` on purpose: finish would emit
+   `0001-*` names and rewrite `SRC_URI`, breaking the `patches/cve/`
+   convention. Take the sha from `git rev-parse`, never type it.
+5. Prove the exported files reproduce the tested tree: apply all CVE patches
+   in `SRC_URI` order to a throwaway index on the pre-patch base
+   (`GIT_INDEX_FILE=… git read-tree <base>; git apply --cached …`) and
+   compare `git write-tree` with the workspace `HEAD^{tree}`.
+
 ## Pitfalls
 
 - **Wrong branch** — `git branch` before every `git add`. Committing on
-  `master` puts upstream content in your diff.
+  `master` puts upstream content in your diff. (Kernel recipes: the machine
+  branch is correct — see "Kernel recipes and CVE backports".)
 - **Override branch** — finishing from one exports nothing at all. Use
   `--no-overrides`; this layer has `:append:smarc-rzv2l` operations.
 - **`virtual:devupstream:target:...:do_patch` failures** — the meta-arm

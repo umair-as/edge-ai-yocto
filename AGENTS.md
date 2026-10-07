@@ -89,8 +89,18 @@ is unavoidable (e.g. `bitbake -e` variable inspection), source the env
 in the same command:
 
 ```bash
-. scripts/env.sh && kas shell -c 'bitbake-getvar -r u-boot SRC_URI' kas/local.yml
+export BOARD=rzv2l        # or raspberrypi5
+. scripts/env.sh && kas shell -c 'bitbake-getvar -r u-boot SRC_URI' \
+    kas/base.yml:kas/machines/$BOARD.yml:kas/local.yml
 ```
+
+`scripts/env.sh` reads `BOARD` and sets `KAS_BUILD_DIR` to the board's build
+directory (`build/` for the first board, `build/<BOARD>/` for the others), as
+the Makefile does. Pass the full chain: `kas/local.yml` is an additive host
+overlay with no `includes:` (a host file never decides the board), so
+`kas shell kas/local.yml` alone loads no layers and fails with "Did not find
+any init-build-env script". Capability flags add their fragments to the chain;
+`make -n <target> BOARD=<board> <FLAGS>` prints the exact command.
 
 Interactive shells get this automatically via `.envrc` (direnv, after a
 one-time `direnv allow`). Non-interactive shells — including AI-agent
@@ -382,6 +392,7 @@ deferred until the first release needs them.
 | Prose in `docs/` and `README.md` (what may and may not be written) | `.claude/rules/docs-style.md` |
 | Cross-compiling apps outside bitbake | `.claude/rules/cross-compilation.md` |
 | Settled architecture decisions | `docs/adr/README.md` (index) |
+| Vulnerability handling — reachability ladder, fix choice, release gate | `docs/security/VULN-HANDLING.md`, ADR-0013 |
 | Security docs — SBOM/CVE triage, SELinux, U-Boot hardening, kernel-config gate, vuln mgmt | `docs/security/README.md` (index) |
 | CI — hosted lint, operator-run Yocto check (`make ci`), kernel-hardening gate | `docs/dev/ci.md` |
 | OTA updates + rollback testing | `docs/dev/ota-updates.md`, `docs/dev/ota-rollback-test-plan.md` |

@@ -32,7 +32,7 @@ bitbake <recipe> -c <task> -f
 | Error | Likely cause |
 |---|---|
 | `Nothing PROVIDES` | Missing `DEPENDS`, or the layer isn't in the kas composition |
-| `do_fetch failed` | Bad URI, no network, or wrong `SRCREV`. CVE-DB recipes need network on first fetch; their effective revision is pinned in `edge-floor.inc`, not in the recipe |
+| `do_fetch failed` | Bad URI, no network, or wrong `SRCREV`. CVE-DB recipes need network on first fetch; their effective revision is pinned in `edge-cve-db.inc`, not in the recipe |
 | `do_fetch failed` on a checksum | Upstream re-rolled the tarball. A checksum mismatch is a **hard stop** — unlike a fetch failure it does *not* fall back to `MIRRORS`. Verify against an independent mirror before touching any `SRC_URI[sha256sum]` |
 | `QA Issue: -dev contains` | Missing `RDEPENDS` or `FILES` entries |
 | `multiple providers` | Need `PREFERRED_PROVIDER` in distro/machine conf |
@@ -85,11 +85,15 @@ and `wayland`; we opt out of the others (see `conf/distro/edge.conf`).
 - The CVE-DB recipes (`sbom-cve-check-update-nvd-native`,
   `sbom-cve-check-update-cvelist-native`) are set to AUTOREV **by the
   fragment** (`conf/fragments/yocto/sbom-cve-check.conf`), not by their
-  `.bb` files, which carry their own older SRCREVs. **`edge-floor.inc`
-  pins both back to a dated revision** — that pin, not the fragment and not
-  the `.bb`, is what a build actually fetches. Change the CVE DB date
-  there. The build host needs network at first fetch, and the clone is
-  multi-GB on a cold `DL_DIR`.
+  `.bb` files, which carry their own older SRCREVs. **`edge-cve-db.inc`
+  (required by `edge-floor.inc`) pins both back to a dated revision** as
+  weak defaults (`?=`) — that pin, not the fragment and not the `.bb`, is
+  what a build actually fetches. Change the CVE DB date there, or override
+  it per host in the `cve_db_pin` block of `kas/sbom-cve.yml`. After a scan,
+  check that each database clone's `HEAD` equals the pinned SRCREV:
+  sbom-cve-check before 1.3.4 reset it to the newest revision. The build
+  host needs network at first fetch, and the clone is multi-GB on a cold
+  `DL_DIR`.
 - **The CVE-DB pin date is a security input, not a reproducibility
   detail.** A pinned database reports no CVE published after its date, so
   an un-bumped pin silently narrows the scan window as it ages. Bump it
@@ -252,7 +256,9 @@ what will rerun before committing to the build — not at launch time:
 ```bash
 # Which tasks would rerun, and why (no execution; diffs new signatures
 # against the latest stamps/sstate, names the changed variable/dep)
-. scripts/env.sh && kas shell kas/local.yml -c 'bitbake <target> -S printdiff'
+export BOARD=rzv2l   # or raspberrypi5; env.sh picks the board's build dir
+. scripts/env.sh && kas shell kas/base.yml:kas/machines/$BOARD.yml:kas/local.yml \
+    -c 'bitbake <target> -S printdiff'
 
 # Why one task's hash flipped (pairwise sigdata diff, latest two runs)
 bitbake-diffsigs -t <recipe> <task>
