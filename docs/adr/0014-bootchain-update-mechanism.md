@@ -65,8 +65,8 @@ content; then back up the current content (a QSPI partition whole) to persistent
 power-loss-mid-write is recovered from another boot medium or the Flash Writer — the
 accepted backstop, not a no-risk claim.
 
-The `qspi` and `emmc` modes are hardware-validated (write, boot from the medium,
-restore; QSPI also rollback and roll-forward; 2026-10-07). The eMMC addresses are those
+All three modes are hardware-validated (write, boot from the medium; `qspi` and `emmc`
+also restore, QSPI rollback and roll-forward; 2026-10-07). The eMMC addresses are those
 of [ADR-0006](0006-emmc-gpt-boot-target.md).
 
 ## Consequences
