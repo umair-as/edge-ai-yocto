@@ -152,12 +152,7 @@ PODMAN_FEATURES:pn-podman            ?= ""
 # ----- SBOM (SPDX 3.0) + CVE check ---------------------------------------
 
 # Non-negotiable: every edge-ai build emits an SBOM and runs the CVE check.
-# The sbom-cve-check fragment sets the two CVE-DB fetch recipes to AUTOREV
-# (conf/fragments/yocto/sbom-cve-check.conf); pin them so the CVE DB is part
-# of the release record rather than silent network-driven drift. These are
-# deliberately chosen revisions, not the .bb-shipped ones — the .bb values
-# trail the fragment. A pinned DB reports no CVE published after its date,
-# so the pin date below is a security input.
+# CVE-DB revision pins live in edge-cve-db.inc (required below).
 #
 # IMAGE_CLASSES:append wires sbom-cve-check.bbclass directly. The
 # fragment's same line via OE_FRAGMENTS is unreliable in this wrynose
@@ -168,30 +163,8 @@ PODMAN_FEATURES:pn-podman            ?= ""
 INHERIT       += "create-spdx"
 OE_FRAGMENTS  += "yocto/sbom-cve-check"
 IMAGE_CLASSES:append = " sbom-cve-check"
-# nvd-json-data-feeds @ 2026-08-31
-SRCREV:pn-sbom-cve-check-update-nvd-native     = "16379bcc8b21d112542cc1946037cbe670aa4ae1"
-# cvelistV5 @ 2026-08-31
-SRCREV:pn-sbom-cve-check-update-cvelist-native = "690942529c4953e38803aa62215bd0519350919b"
 
-# Shallow-clone the two CVE databases. They are append-only auto-generated
-# data repositories -- ~6.7 GB of packed history between them (nvd 4.1 GB /
-# ~12k commits, cvelist 2.6 GB / ~76k commits) -- and only the pinned
-# revision's JSON is ever read. Nothing in the build inspects their history.
-#
-# This does NOT speed up a fetch into an empty DL_DIR: bb/fetch2/git.py uses
-# a shallow tarball only when one is already present, and generates it after
-# the clone. The payoff is the generated gitshallow_*.tar.gz, which makes
-# every later cold fetch (a CI runner, a new host) small. Pair it with a
-# shared DL_DIR or SOURCE_MIRROR_URL or it buys nothing.
-#
-# Depth must be non-zero or the fetcher silently disables shallow
-# (bb/fetch2/git.py: shallow off when depth == 0 and no explicit revs).
-# Both pinned SHAs are non-tip; GitHub serves SHA-specific shallow fetches
-# for both repositories.
-BB_GIT_SHALLOW:pn-sbom-cve-check-update-nvd-native           = "1"
-BB_GIT_SHALLOW_DEPTH:pn-sbom-cve-check-update-nvd-native     = "1"
-BB_GIT_SHALLOW:pn-sbom-cve-check-update-cvelist-native       = "1"
-BB_GIT_SHALLOW_DEPTH:pn-sbom-cve-check-update-cvelist-native = "1"
+require conf/distro/include/edge-cve-db.inc
 
 # A checksum mismatch is a hard stop and does NOT fall back to MIRRORS the
 # way a fetch failure does, so an upstream that re-rolls a release tarball
