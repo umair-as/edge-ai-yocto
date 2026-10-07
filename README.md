@@ -31,12 +31,6 @@
 
 ---
 
-## Status
-
-Hardware-validated on RZ/V2L SMARC EVK: full boot chain, A/B OTA round-trip, rootless DRP-AI container inference. Raspberry Pi 5 (second board) with the DEEPX DX-M1 PCIe accelerator: signed A/B boot, RAUC install and slot switch, and rootless DX-M1 container inference — all validated on hardware, the last auto-starting from the shipped Quadlet at boot. In progress: DM-VERITY rootfs enforcement, IMA appraisal, HSM/YubiKey signing, and the production image tier.
-
----
-
 ## Quick start
 
 ```bash
