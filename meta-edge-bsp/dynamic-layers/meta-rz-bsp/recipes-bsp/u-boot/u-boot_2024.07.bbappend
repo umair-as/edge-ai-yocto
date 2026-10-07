@@ -20,6 +20,14 @@ SRC_URI:append = " \
     file://patches/0008-smarc-rzv2l-drop-legacy-CONFIG_BOOTCOMMAND-define.patch \
 "
 
+# CVE backports for compiled-in code newer than the 2024.07 Renesas fork.
+# CVE-2026-46728 changes which FIT nodes the signature covers; the signing
+# mkimage (oe-core u-boot-tools) carries the same fix.
+SRC_URI:append = " \
+    file://patches/cve/CVE-2024-57256.patch \
+    file://patches/cve/CVE-2026-46728.patch \
+"
+
 # U-Boot surface reduction. Three composable features:
 #   surface_reduce — usb/storage commands, USB host HCDs, kermit/s-record
 #                    load all off. Gadget side (ums eMMC flashing) remains.
