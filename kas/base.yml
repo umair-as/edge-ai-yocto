@@ -33,9 +33,9 @@ repos:
   # --- Yocto upstream layers (SHA-pinned to the wrynose 6.0 baseline) ---
   openembedded-core:
     url: https://git.openembedded.org/openembedded-core
-    # wrynose branch tip, 2026-07-30 (bumped from the yocto-6.0 tag to pull
-    # ~3 months of stable-branch CVE backports and recipe updates)
-    commit: f09a0f28aeb54ddd90415dd458338e1565bb5a49
+    # wrynose branch tip, 2026-09-30 (stable-branch CVE backports and recipe
+    # updates; carries sbom-cve-check 1.3.5)
+    commit: 0f03c732a0a2d0506b41b1abe60b3f368b2300dc
     layers:
       meta:
 
