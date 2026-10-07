@@ -24,6 +24,9 @@ Documents here:
   `CVE_STATUS` triage workflow (`scripts/cve-report.py`), and the
   disposition policy (vocabulary, target verification, invalidation
   triggers).
+- [`VULN-HANDLING.md`](VULN-HANDLING.md) — how a finding is assessed (the
+  reachability ladder), fixed, verified and recorded, and the release gate. The
+  decisions behind it: [ADR-0013](../adr/0013-vulnerability-handling-cadence-and-release-gate.md).
 - [`vex-and-cve-status.md`](vex-and-cve-status.md) — what each disposition
   asserts publicly: keyword → VEX mapping, why `SPDX_INCLUDE_VEX = "all"`,
   fix vs not-affected vs mitigation vs risk acceptance, and the

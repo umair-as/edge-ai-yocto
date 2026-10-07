@@ -32,7 +32,7 @@ EU Cyber Resilience Act, Annex I (essential cybersecurity requirements). This ta
 | 2.a — SBOM | ✅ | SPDX 3.0.1 always-on via `OE_FRAGMENTS += "yocto/sbom-cve-check"`. |
 | 2.b — CVE scanning at build | ✅ | `sbom-cve-check-update-{nvd,cvelist}-native` pulled into every build. SRCREVs pinned (no AUTOREV drift). |
 | 2.c — Fail-on-critical-CVE policy | 🟡 | Sketched in `kas/sbom-cve.yml` as `IMAGE_POSTPROCESS_COMMAND` hook; wiring deferred until SBOM-walk script is written. |
-| 2.d — Vulnerability handling process | 📅 | Needs `docs/security/VULN-HANDLING.md` describing report intake, triage SLA, fix-vs-mitigate, OTA push. Phase 2. |
+| 2.d — Vulnerability handling process | 🟡 | [`VULN-HANDLING.md`](VULN-HANDLING.md) + [ADR-0013](../adr/0013-vulnerability-handling-cadence-and-release-gate.md): reachability triage, fix-vs-mitigate, verification, release gate, OTA delivery via RAUC. No response-time commitment by design; report intake not covered (see Part II). |
 
 ### 3. Confidential authentication / no default passwords
 
@@ -138,8 +138,8 @@ EU Cyber Resilience Act, Annex I (essential cybersecurity requirements). This ta
 | Requirement | Status | Notes |
 |---|---|---|
 | Coordinated disclosure process | 📅 | Need `docs/security/SECURITY.md` + intake email + GitHub Security Advisory enablement. |
-| Vulnerability response SLAs | 📅 | Need policy document. |
-| SBOM-driven patch path | 🟡 | We have SBOMs at every build; CI gate that diffs SBOMs across releases not yet wired. |
+| Vulnerability response SLAs | 📅 | None by design for this reference implementation ([ADR-0013](../adr/0013-vulnerability-handling-cadence-and-release-gate.md)); response times are measured, not committed. A product built on the platform sets its own. |
+| SBOM-driven patch path | 🟡 | SBOMs at every build; monitor and release loops with controlled report comparisons ([`VULN-HANDLING.md`](VULN-HANDLING.md) §6, §8). No CI gate diffs SBOMs across releases. |
 | Free security updates over supported lifetime | 📅 | Lifetime not yet declared. The kernel horizon is per board (ADR-0011): CIP SLTS on RZ/V2L implies ≥10y; the Raspberry Pi 5 follows the kernel.org longterm lifetime of its 6.18 line, years rather than a decade. Needs commitment. |
 
 ---
