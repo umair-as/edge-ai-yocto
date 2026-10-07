@@ -17,6 +17,7 @@ FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 SRC_URI:append:smarc-rzv2l = " \
     file://0001-plat-rz-hw_rng_tsip-cast-memcpy-dst-back-to-void.patch \
     file://0002-plat-rz-g2l-relax-int-conversion-errors-for-gcc-14-.patch \
+    file://cve/CVE-2026-71968.patch \
 "
 
 # CFG_RPMB_FS=n: no RPMB key provisioning wired. CFG_CRYPTO_WITH_CE=n:
