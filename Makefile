@@ -1,4 +1,4 @@
-.PHONY: help base dev prod bundle parse layers shell info clean-lock netboot-sync lock verify-pins purge hooks ci kernel-config-export kernel-hardening-check
+.PHONY: help base dev prod bundle parse layers shell info clean-lock netboot-sync lock verify-pins purge hooks ci kernel-config-export kernel-hardening-check cve-archive cve-calibrate cve-refresh cve-monitor
 
 KAS ?= kas
 
@@ -226,6 +226,9 @@ help:
 	@echo "                               (CI_ARGS='--ref pr/N --matrix full --build rzv2l --khc --no-status')"
 	@echo "  make kernel-config-export    Expanded prod kernel .config -> build/khc/<board>-prod.config"
 	@echo "  make kernel-hardening-check  kernel-hardening-checker gate on it (docs/security/kernel-config/)"
+	@echo "  make cve-refresh|cve-archive|cve-calibrate|cve-monitor"
+	@echo "                               Host CVE monitor, no kas/bitbake (see scripts/cve-monitor.py;"
+	@echo "                               needs CVE_EVIDENCE_DIR, SBOM_CVE_CHECK, NVD_CLONE, CVELIST_CLONE)"
 	@echo "  make layers                  bitbake-layers show-layers"
 	@echo "  make shell                   Interactive KAS shell"
 	@echo "  make info                    Show build configuration"
@@ -277,6 +280,28 @@ bundle: | $(KAS_DIRS)
 	$(KAS) shell -c 'BB_ENV_PASSTHROUGH_ADDITIONS="$$BB_ENV_PASSTHROUGH_ADDITIONS EDGE_PROFILE EDGE_OTA_BACKEND BUNDLE_IMAGE_NAME EDGE_BOOT_TARGET EDGE_KERNEL_DEV_FRAGMENTS" EDGE_PROFILE=$(EDGE_PROFILE) $(BOOT_TARGET_ENV)bitbake edge-bundle' $(STACK)
 	@echo "==> Bundle artefacts:"
 	@find $(KAS_BUILD_DIR)/tmp/deploy/images -name '*.raucb' -printf '    %p\n'
+
+# ----- Host CVE monitor ----------------------------------------------------
+# Python wrapper around a separately installed, pinned sbom-cve-check. No kas or
+# BitBake. Required: CVE_EVIDENCE_DIR (and SBOM_CVE_CHECK, NVD_CLONE,
+# CVELIST_CLONE where the script header names them), passed as make variables.
+CVE_MONITOR = python3 scripts/cve-monitor.py
+
+cve-refresh:
+	@test -n "$(FEEDS)" || { echo "usage: make cve-refresh FEEDS=<id> [NVD_REF=<sha> CVELIST_REF=<sha>] [NO_FETCH=1]"; exit 2; }
+	$(CVE_MONITOR) refresh --feeds $(FEEDS) $(if $(NVD_REF),--nvd-ref $(NVD_REF)) $(if $(CVELIST_REF),--cvelist-ref $(CVELIST_REF)) $(if $(NO_FETCH),--no-fetch)
+
+cve-archive:
+	@test -n "$(RELEASE)" -a -n "$(IMAGE_DIR)" -a -n "$(IMAGE)" -a -n "$(MACHINE)" -a -n "$(STAMP)" -a -n "$(FEEDS)" || { echo "usage: make cve-archive RELEASE=<id> IMAGE_DIR=<deploy dir> IMAGE=<name> MACHINE=<name> STAMP=<yyyymmddhhmmss> FEEDS=<sealed snapshot id> [META='k=v k=v'] [PROVENANCE_NOTE='...']"; exit 2; }
+	$(CVE_MONITOR) archive --release $(RELEASE) --image-dir $(IMAGE_DIR) --image $(IMAGE) --machine $(MACHINE) --stamp $(STAMP) --feeds $(FEEDS) $(foreach m,$(META),--meta $(m)) $(if $(PROVENANCE_NOTE),--provenance-note "$(PROVENANCE_NOTE)")
+
+cve-calibrate:
+	@test -n "$(RELEASE)" || { echo "usage: make cve-calibrate RELEASE=<id>"; exit 2; }
+	$(CVE_MONITOR) calibrate --release $(RELEASE)
+
+cve-monitor:
+	@test -n "$(RELEASE)" -a -n "$(FEEDS)" -a -n "$(RUN)" || { echo "usage: make cve-monitor RELEASE=<id> FEEDS=<snapshot id> RUN=<new run id>"; exit 2; }
+	$(CVE_MONITOR) monitor --release $(RELEASE) --feeds $(FEEDS) --run $(RUN)
 
 parse: | $(KAS_DIRS)
 	@echo "==> Parsing BitBake recipes (EDGE_PROFILE=$(EDGE_PROFILE)) [$(STACK)]"
