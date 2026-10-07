@@ -30,6 +30,8 @@ SRC_URI:append = " \
     file://cfg/pstore-persist.cfg \
 "
 
+SRC_URI:append = "${@' file://cfg/nfs-off.cfg' if d.getVar('EDGE_DEV_NETBOOT') != '1' else ''}"
+
 # Publish linux.bin + linux_comp into DEPLOY_DIR_IMAGE. Wrynose split FIT
 # generation into two stages: the kernel recipe publishes raw artifacts,
 # edge-kernel-fit consumes them to assemble and sign the FIT.
