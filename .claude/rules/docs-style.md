@@ -45,6 +45,32 @@ The DX-M1 Quadlet will follow once a payload exists.
 (omit — describe what the Quadlet does and what it expects)
 ```
 
+### Volatile counts
+
+Finding counts change whenever the CVE feeds, the scanner or the image change:
+CVE totals, Unpatched/Patched/Ignored rows, "N CVEs cleared", findings per
+bucket, package or module totals. In a doc they go stale within weeks and then
+contradict the next scan.
+
+```
+# Wrong
+The cip14 bump clears 153 kernel CVEs (net −148); 239 remain Unpatched.
+Grype reports 38 Go vulnerabilities in podman.
+
+# Correct
+A kernel version bump is the main lever for kernel CVEs; measure its effect
+with the controlled comparison in VULN-HANDLING.md §8.2.
+Grype over the rootfs reports vendored Go-module findings that sbom-cve-check
+does not evaluate.
+```
+
+Docs describe the method, the decision and how to reproduce the number. The
+numbers themselves live in dated evidence: the CVE evidence store, release
+records, commit bodies (AGENTS.md "Put the result in the commit body"). An ADR
+may cite a count as decision context when it is labelled "at decision time"
+with its date and source, because the decision does not change when the count
+does.
+
 ### References that do not belong in a public repo
 
 No `scratch/` paths, no sibling or private project names, no build-host
@@ -67,6 +93,9 @@ No `we`, `our`, `I`, `you` narration of what happened; no "stated honestly",
   with an image ID where one exists.
 - **Measurements labelled with their board and conditions** — model, input
   size, mode, duration. A number without its conditions is not a benchmark.
+  This covers performance and behaviour measurements, which change only when
+  the system changes. It does not cover vulnerability or finding counts (see
+  "Volatile counts").
 - **ADR history as decision content** — alternatives considered and why they
   were rejected — written as the decision, not as drafting history.
 
