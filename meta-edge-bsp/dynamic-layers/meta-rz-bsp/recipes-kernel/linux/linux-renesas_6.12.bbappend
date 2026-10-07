@@ -48,6 +48,28 @@ SRC_URI:append:smarc-rzv2l = " \
     file://patches/0007-arm64-export-dcache-poc-ops-for-drpai-module.patch \
     file://patches/0008-arm64-dts-rzv2l-smarc-add-isu-node.patch \
 "
+# Kernel CVE backports newer than the pinned rz-6.12-cip14 (6.12.59): fixes
+# for compiled-in code from later 6.12 stable releases, or from mainline where
+# the vulnerable change reached this tree only through a vendor backport
+# (CVE-2025-39774).
+SRC_URI:append:smarc-rzv2l = " \
+    file://patches/cve/CVE-2025-39774.patch \
+    file://patches/cve/CVE-2026-74398.patch \
+    file://patches/cve/CVE-2026-74480.patch \
+    file://patches/cve/CVE-2026-74612.patch \
+    file://patches/cve/CVE-2026-74705.patch \
+    file://patches/cve/CVE-2026-80725.patch \
+    file://patches/cve/CVE-2026-53362.patch \
+    file://patches/cve/CVE-2026-63924.patch \
+    file://patches/cve/CVE-2026-53006.patch \
+    file://patches/cve/CVE-2026-43198.patch \
+    file://patches/cve/CVE-2026-90110.patch \
+    file://patches/cve/CVE-2026-72323.patch \
+    file://patches/cve/CVE-2026-53275.patch \
+    file://patches/cve/CVE-2026-80646.patch \
+    file://patches/cve/CVE-2026-72322.patch \
+"
+
 # QSPI FIP alignment — platform boots via eSD; uncomment if QSPI is wired.
 # SRC_URI:append:smarc-rzv2l = " file://patches/0004-arm64-dts-rzg2l-smarc-som-align-qspi-fip-partition-to-0x20000.patch"
 
