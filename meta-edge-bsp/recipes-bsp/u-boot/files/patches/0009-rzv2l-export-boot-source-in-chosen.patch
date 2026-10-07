@@ -1,0 +1,62 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+Date: Wed, 7 Oct 2026 18:30:00 +0200
+Subject: [PATCH] rzv2l: export the boot ROM device in /chosen
+
+The boot ROM loads BL2 from the device selected by the board's mode
+switches and latches the choice in SYS_LSI_MODE. Nothing after BL2
+reports it, and Linux cannot infer it: a QSPI bootchain can boot a
+kernel and rootfs from SD or eMMC.
+
+Read the latched mode when bootm finalises the kernel device tree and
+store it as /chosen/edge,boot-source ("qspi", "esd", "emmc", "scif" or
+"unknown"), with an [EDGE] console marker for serial logs.
+
+Upstream-Status: Inappropriate [board-specific boot-source reporting]
+Assisted-by: claude-code:claude-opus-5-5
+---
+ board/renesas/rzv2l-dev/rzv2l-dev.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+
+--- a/board/renesas/rzv2l-dev/rzv2l-dev.c
++++ b/board/renesas/rzv2l-dev/rzv2l-dev.c
+@@ -271,11 +271,39 @@
+ 	"/soc/mmc@11c00000", "vqmmc-supply", "<&/regulator-vccq-sdhi0>",
+ };
+ 
++static const char *edge_boot_source(u32 md_boot)
++{
++	switch (md_boot) {
++	case 0:
++		return "esd";
++	case 1:
++	case 2:
++		return "emmc";
++	case 3:
++	case 4:
++		return "qspi";
++	case 5:
++		return "scif";
++	default:
++		return "unknown";
++	}
++}
++
+ int ft_verify_fdt(void *fdt)
+ {
+ 	const char **fdt_dt = NULL;
+ 	int size = 0;
+ 	u32 boot_mode = readl(SYS_LSI_MODE);
++	const char *src = edge_boot_source(boot_mode &
++					   SYS_LSI_MODE_STAT_MD_BOOT_MASK);
++	int chosen = fdt_path_offset(fdt, "/chosen");
++
++	/* Boot ROM device for userspace: /proc/device-tree/chosen/edge,boot-source */
++	if (chosen < 0 ||
++	    fdt_setprop_string(fdt, chosen, "edge,boot-source", src))
++		printf("[EDGE] UBOOT boot-source=%s FAILED fdt\n", src);
++	else
++		printf("[EDGE] UBOOT boot-source=%s\n", src);
+ 
+ 	switch (boot_mode & SYS_LSI_MODE_STAT_MD_BOOT_MASK) {
+ 	case ESD_MODE:

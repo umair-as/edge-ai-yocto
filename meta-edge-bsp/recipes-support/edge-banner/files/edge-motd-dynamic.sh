@@ -18,6 +18,11 @@
 #                   egress IP for default route — address to reach this board on a multi-NIC setup.
 #   Hardware      : /sys/firmware/devicetree/base/model. The DT model
 #                   string. Live read, no caching.
+#   Boot source   : /proc/device-tree/chosen/edge,boot-source, written by
+#                   U-Boot on boards that export the boot ROM device; the
+#                   line is omitted where the property is absent.
+#   Root device   : first /dev/ path of dm-mod.create (verity) or root=,
+#                   medium from /sys/block/<disk>/device/type.
 #   Boot time     : /proc/uptime, formatted via `uptime -p`. Honest at
 #                   the moment of login (vs the previous static-snapshot
 #                   "Booted: T+0" idiom that was always 0 minutes).
@@ -72,9 +77,13 @@ _edge_motd_render() {
 
     # Use sed (POSIX BRE/ERE) not gawk's match($0,/.../,arr) — busybox awk
     # in the base image doesn't carry the 3-arg match() form.
-    _ip="not assigned" _if=""
-    if command -v ip >/dev/null 2>&1; then
-        _rt=$(ip -4 route get 1.1.1.1 2>/dev/null | head -1)
+    # ip(8) is in /sbin, which is not on PATH for non-root console logins.
+    _ip="not assigned" _if="" _ipcmd=$(command -v ip 2>/dev/null)
+    for _c in /sbin/ip /usr/sbin/ip; do
+        [ -z "$_ipcmd" ] && [ -x "$_c" ] && _ipcmd=$_c
+    done
+    if [ -n "$_ipcmd" ]; then
+        _rt=$("$_ipcmd" -4 route get 1.1.1.1 2>/dev/null | head -1)
         if [ -n "$_rt" ]; then
             _ip=$(printf '%s\n' "$_rt" | sed -nE 's/.*src ([0-9.]+).*/\1/p')
             _if=$(printf '%s\n' "$_rt" | sed -nE 's/.*dev ([^ ]+).*/\1/p')
@@ -91,6 +100,41 @@ _edge_motd_render() {
         [ -n "$_v" ] && _slot=$_v
     fi
 
+    _bootsrc=""
+    _bs=/proc/device-tree/chosen/edge,boot-source
+    if [ -r "$_bs" ]; then
+        case "$(tr -d '\0' < "$_bs" 2>/dev/null)" in
+            qspi) _bootsrc="QSPI flash" ;;
+            esd)  _bootsrc="SD card" ;;
+            emmc) _bootsrc="eMMC" ;;
+            scif) _bootsrc="SCIF download" ;;
+            *)    _bootsrc=unknown ;;
+        esac
+    fi
+
+    # Root partition: verity backing device from dm-mod.create, else root=.
+    _rootdev=""
+    if [ -r /proc/cmdline ]; then
+        _rootdev=$(sed -nE 's/.*dm-mod\.create="[^"]*(\/dev\/[a-z0-9]+).*/\1/p' /proc/cmdline)
+        [ -n "$_rootdev" ] || _rootdev=$(tr ' ' '\n' < /proc/cmdline \
+            | sed -nE 's/^root=(\/dev\/[a-z0-9]+)$/\1/p' | head -1)
+    fi
+    _root=""
+    if [ -n "$_rootdev" ]; then
+        _part=${_rootdev#/dev/}
+        _disk=$(printf '%s\n' "$_part" | sed -E 's/p?[0-9]+$//')
+        case "$_part" in mmcblk*|nvme*) _disk=$(printf '%s\n' "$_part" | sed -E 's/p[0-9]+$//') ;; esac
+        _medium=$_disk
+        if [ -r "/sys/block/$_disk/device/type" ]; then
+            case "$(cat "/sys/block/$_disk/device/type")" in
+                MMC) _medium=eMMC ;;
+                SD)  _medium="SD card" ;;
+            esac
+        fi
+        case "$_disk" in nvme*) _medium=NVMe ;; esac
+        _root="$_medium ($_part)"
+    fi
+
     printf '\033[0;36m  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m\n'
     printf '    \033[0;33mHost:        \033[0m%s\n' "$_hostname"
     printf '    \033[0;33mHardware:    \033[0m%s\n' "$_hw"
@@ -103,11 +147,14 @@ _edge_motd_render() {
     else
         printf '    \033[0;33mPrimary IP:  \033[0m%s\n' "$_ip"
     fi
+    [ -n "$_bootsrc" ] && printf '    \033[0;33mBoot source: \033[0m%s\n' "$_bootsrc"
+    [ -n "$_root" ] && printf '    \033[0;33mRoot device: \033[0m%s\n' "$_root"
     printf '    \033[0;33mRAUC slot:   \033[0m\033[1;32m%s\033[0m\n' "$_slot"
     printf '\033[0;36m  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m\n'
     printf '\n'
 
-    unset _hostname _kernel _hw _booted _load _mem_total _mem_avail _ip _if _rt _slot _v _s _d _h _m
+    unset _hostname _kernel _hw _booted _load _mem_total _mem_avail _ip _if _rt _slot _v _s _d _h _m \
+          _bootsrc _bs _rootdev _root _part _disk _medium _ipcmd _c
 }
 
 _edge_motd_render
