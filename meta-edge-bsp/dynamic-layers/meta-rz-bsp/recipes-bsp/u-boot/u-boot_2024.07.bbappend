@@ -18,6 +18,7 @@ SRC_URI:append = " \
     file://patches/0006-rzg2l-report-kaslr-seed-outcome.patch \
     file://patches/0007-arm-lib-bootm-fix-unsafe-wdt_overflow-append-to-bootargs.patch \
     file://patches/0008-smarc-rzv2l-drop-legacy-CONFIG_BOOTCOMMAND-define.patch \
+    file://patches/0009-rzv2l-export-boot-source-in-chosen.patch \
 "
 
 # CVE backports for compiled-in code newer than the 2024.07 Renesas fork.

@@ -49,6 +49,9 @@ console rather than assuming it:
 
 - `NOTICE:  BL2: SYS_LSI_MODE:` reads `0x10203` for QSPI, `0x10200` for eSD and `0x10201` for eMMC.
 - An edge-built bootchain prints `NOTICE:  [EDGE] BL2 …` and `[EDGE] UBOOT version=… profile=…`.
+- U-Boot reads the same register and prints `[EDGE] UBOOT boot-source=qspi|esd|emmc`. It
+  also passes the value to Linux as `/proc/device-tree/chosen/edge,boot-source`, which the
+  login banner shows as `Boot source:`.
 - The `U-Boot 2024.07 (…)` banner date is `SOURCE_DATE_EPOCH`, identical across builds of
   the same fork commit; it does not identify a build.
 
@@ -60,7 +63,7 @@ Addresses are those TF-A reads (`plat/renesas/rz/common/plat_storage.c`,
 | mode | BL2 | FIP | status |
 |---|---|---|---|
 | `qspi` | `mtd0` (QSPI 0x0) | QSPI 0x20000 = `mtd1` + (0x20000 − `mtd1` start), derived from sysfs | write, boot and rollback hardware-validated 2026-10-07; FIP-only restore 2026-10-09 |
-| `esd` | boot SD @ 0x200 | boot SD @ 0x20000 (WIC sector 256) | layout boots (it is the WIC layout); the tool's write path has run in dry-run only |
+| `esd` | boot SD @ 0x200 | boot SD @ 0x20000 (WIC sector 256) | write and boot hardware-validated 2026-10-07 |
 | `emmc` | `mmcblk0boot0` @ 0x200 (sector 1) | `mmcblk0boot0` @ 0x20000 (sector 256, [ADR-0006](../adr/0006-emmc-gpt-boot-target.md)) | write, restore and boot hardware-validated 2026-10-07 |
 
 ## On-target usage
