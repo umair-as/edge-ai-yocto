@@ -80,8 +80,8 @@ EDGE_ENABLE_JTAG_DEBUG ?= "0"
 EDGE_ENABLE_BTF_CORE_DEV ?= "0"
 IMAGE_INSTALL:append = "${@' packagegroup-edge-bpf' if d.getVar('EDGE_ENABLE_BTF_CORE_DEV') == '1' else ''}"
 
-# On-target BL2/FIP bootchain updater (RZ/V2L). Off by default: it rewrites
-# single-copy QSPI/eSD/eMMC storage with no runtime rollback, recoverable only
-# via the SCIF Flash Writer. Enable per build with `make dev BOOTLOADER_UPDATE=1`.
+# Bootchain updaters, per machine (RZ/V2L BL2/FIP; Pi 5 EEPROM + FAT boot
+# files). Off by default: single-copy bootchain storage. BOOTLOADER_UPDATE=1.
 EDGE_ENABLE_BOOTLOADER_UPDATE ?= "0"
 IMAGE_INSTALL:append:smarc-rzv2l = "${@bb.utils.contains('EDGE_ENABLE_BOOTLOADER_UPDATE', '1', ' rzv2l-bootloader-update', '', d)}"
+IMAGE_INSTALL:append:raspberrypi5 = "${@bb.utils.contains('EDGE_ENABLE_BOOTLOADER_UPDATE', '1', ' rpi-eeprom edge-rpi-eeprom edge-rpi-bootfiles-update', '', d)}"

@@ -134,10 +134,11 @@ ifeq ($(OPTEE_EXAMPLES),1)
 endif
 ifeq ($(BOOTLOADER_UPDATE),1)
   CAPABILITY_YMLS += kas/bootloader-update.yml
-  # Bootchain update is per-board (ADR-0014). Only RZ/V2L has a backend today;
-  # the image install is machine-gated, so the flag is a no-op elsewhere.
-  ifneq ($(BOARD),rzv2l)
-    $(warning note: BOOTLOADER_UPDATE=1 has no backend for BOARD=$(BOARD) (RZ/V2L only); it is a no-op here)
+  # Bootchain update is per-board (ADR-0014). RZ/V2L (BL2/FIP) and Pi 5 (EEPROM)
+  # have backends; the image install is machine-gated, so the flag is a no-op on
+  # any other board.
+  ifeq ($(filter $(BOARD),rzv2l raspberrypi5),)
+    $(warning note: BOOTLOADER_UPDATE=1 has no backend for BOARD=$(BOARD); it is a no-op here)
   endif
 endif
 
@@ -221,7 +222,7 @@ help:
 	@echo "  NETBOOT=1                    + U-Boot 'netboot' env macro (TFTP/NFS dev workflow)"
 	@echo "  JTAG=1                       + KASLR off, kgdb, debug-safe boot (JTAG kernel labs)"
 	@echo "  BPF=1                        + kernel BTF + bpftool (libbpf CO-RE labs; size-heavy)"
-	@echo "  BOOTLOADER_UPDATE=1          + the board's bootchain updater (RZ/V2L BL2/FIP today; per-board, ADR-0014)"
+	@echo "  BOOTLOADER_UPDATE=1          + the board's bootchain updater (RZ/V2L BL2/FIP, Pi 5 EEPROM; per-board, ADR-0014)"
 	@echo "  OPTEE_EXAMPLES=1             + OP-TEE demo TAs (bring-up/debug; off in shipped images)"
 	@echo "  EDGE_BOOT_TARGET=emmc        GPT user area + systemd-repart (eMMC boot; default esd)"
 	@echo ""
