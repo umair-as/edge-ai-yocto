@@ -1,0 +1,45 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Umair Ahmed Shah <umair.uashah@gmail.com>
+Date: Thu, 08 Oct 2026 15:06:02 +0200
+Subject: [PATCH] rpi: forward /system board revision/serial to the kernel fdt
+
+The Raspberry Pi firmware records the board revision and serial number in a
+/system node of the DTB it hands to the next stage. When U-Boot is chainloaded
+and the kernel boots from a signed FIT, the kernel receives the FIT's own fdt,
+which has no /system node, so the board revision is lost. Tools that read it --
+rpi-eeprom-update's board detection among them -- then cannot identify the
+board and refuse to run.
+
+Recreate /system in the kernel fdt and forward linux,revision and linux,serial
+from the firmware DTB, alongside the existing /chosen and memory fix-ups in
+update_fdt_from_fw().
+
+Upstream-Status: Pending
+Assisted-by: claude-code:claude-opus-4-8
+---
+   board/raspberrypi/rpi/rpi.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/board/raspberrypi/rpi/rpi.c b/board/raspberrypi/rpi/rpi.c
+index f9b643555dd..8a155b55fb0 100644
+--- a/board/raspberrypi/rpi/rpi.c
++++ b/board/raspberrypi/rpi/rpi.c
+@@ -616,6 +616,16 @@ void  update_fdt_from_fw(void *fdt, void *fw_fdt)
+ 
+ 	/* copy uart clk as provided by the firmware */
+ 	copy_property(fdt, fw_fdt, "/clocks/clk-uart", "clock-frequency");
++
++	/* The firmware records the board revision and serial in /system of its
++	 * DTB; a kernel booted from a signed FIT gets that FIT's own fdt, which
++	 * has no /system node, so recreate it and forward both. Userspace tools
++	 * (e.g. rpi-eeprom-update) read the board revision from linux,revision.
++	 */
++	if (fdt_path_offset(fdt, "/system") < 0)
++		fdt_add_subnode(fdt, 0, "system");
++	copy_property(fdt, fw_fdt, "/system", "linux,revision");
++	copy_property(fdt, fw_fdt, "/system", "linux,serial");
+ }
+ 
+ int ft_board_setup(void *blob, struct bd_info *bd)
+-- 
+2.43.0

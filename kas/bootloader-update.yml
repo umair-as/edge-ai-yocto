@@ -1,16 +1,7 @@
-# Capability fragment: on-target RZ/V2L bootchain updater (BL2/FIP).
-#
-# Self-contained: pure additive overlay, no `includes:` and no `repos:` (adds
-# no layers, only a local.conf toggle). Compose with the base+machine stack:
-#   kas build kas/base.yml:kas/machines/rzv2l.yml:kas/bootloader-update.yml
-#   make dev BOOTLOADER_UPDATE=1                   # via Makefile flag
-#
-# Flips EDGE_ENABLE_BOOTLOADER_UPDATE = 1, the board-neutral intent "install this
-# board's bootchain updater". Bootchain update is per-board (ADR-0014): the install
-# is machine-gated, so today this reaches only smarc-rzv2l (rzv2l-bootloader-update:
-# a hash-verified QSPI/eSD/eMMC BL2+FIP updater) and is a no-op on boards with no
-# backend yet (RPi5, future). Off by default: it rewrites single-copy bootchain
-# storage, so it is opt-in per build. See docs/dev/bootchain-update.md.
+# Capability fragment: install the board's bootchain updater (ADR-0014).
+# Additive overlay, no layers. Machine-gated in the image recipes: RZ/V2L
+# BL2/FIP updater, Pi 5 EEPROM + boot-file updaters; no-op on other boards.
+# Off by default — it rewrites single-copy bootchain storage.
 header:
   version: 19
 
