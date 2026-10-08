@@ -24,6 +24,12 @@ do_install() {
     install -m 0644 ${UNPACKDIR}/70-edge-io.rules ${D}${sysconfdir}/udev/rules.d/
 }
 
+# /dev/vcio passes any firmware property tag through, OTP writes included;
+# prod leaves it at the kernel default, root-only 0600.
+do_install:append:prod() {
+    sed -i '/KERNEL=="vcio"/d' ${D}${sysconfdir}/udev/rules.d/70-edge-io.rules
+}
+
 FILES:${PN} = "${sysconfdir}/udev/rules.d/70-edge-io.rules"
 
 RDEPENDS:${PN} = "udev"
