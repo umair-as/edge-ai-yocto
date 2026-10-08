@@ -9,11 +9,11 @@ inherit edge-ab-image
 
 WKS_SEARCH_PATH = "${THISDIR}/files/wic"
 
-# On-target BL2/FIP bootchain updater (RZ/V2L) — the field path for shipping
-# U-Boot/TF-A/OP-TEE CVE fixes. Off by default: single-copy bootchain storage,
-# no runtime rollback, Flash Writer recovery only. `make prod BOOTLOADER_UPDATE=1`.
+# Bootchain updaters, per machine (RZ/V2L BL2/FIP; Pi 5 EEPROM + FAT boot
+# files). Off by default: single-copy bootchain storage. BOOTLOADER_UPDATE=1.
 EDGE_ENABLE_BOOTLOADER_UPDATE ?= "0"
 IMAGE_INSTALL:append:smarc-rzv2l = "${@bb.utils.contains('EDGE_ENABLE_BOOTLOADER_UPDATE', '1', ' rzv2l-bootloader-update', '', d)}"
+IMAGE_INSTALL:append:raspberrypi5 = "${@bb.utils.contains('EDGE_ENABLE_BOOTLOADER_UPDATE', '1', ' rpi-eeprom edge-rpi-eeprom edge-rpi-bootfiles-update', '', d)}"
 
 # Prod tier. EDGE_PROFILE is resolved at distro-parse from the environment
 # (make prod exports it); setting it here would be too late to steer the

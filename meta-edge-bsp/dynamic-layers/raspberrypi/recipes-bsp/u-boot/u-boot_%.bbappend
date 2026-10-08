@@ -1,10 +1,13 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
-# oe-core u-boot 2026.01 with meta-raspberrypi's rpi_arm64_config. Everything
-# this board needs on top is Kconfig, merged from the fragments below: no
-# source patch. The RAUC boot chain itself is the managed environment
-# (rauc-uboot-env, seeded on first boot); CONFIG_BOOTCOMMAND covers fresh media.
+# oe-core u-boot 2026.01 with meta-raspberrypi's rpi_arm64_config. On top:
+# the Kconfig fragments below, plus one source patch that forwards the
+# firmware's /system board revision/serial onto the signed-FIT kernel fdt
+# (lost otherwise, since the kernel boots the FIT's own fdt). The RAUC boot
+# chain is the managed environment (rauc-uboot-env, seeded on first boot);
+# CONFIG_BOOTCOMMAND covers fresh media.
 SRC_URI:append:raspberrypi5 = " file://edge-rpi5-boot.cfg"
+SRC_URI:append:raspberrypi5 = " file://0001-rpi-forward-system-revision-to-kernel-fdt.patch"
 
 # U-Boot surface reduction, same three tokens as the RZ/V2L bbappend:
 #   surface_reduce — USB host, serial download, DFU off. Boot is SD only.

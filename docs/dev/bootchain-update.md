@@ -3,10 +3,9 @@
 **Scope: RZ/V2L only.** Bootchain update is a per-board capability
 ([ADR-0014](../adr/0014-bootchain-update-mechanism.md)): each board stores and
 rewrites its pre-kernel firmware differently, so each needs its own backend. This
-page is the RZ/V2L backend (BL2 + FIP). Raspberry Pi 5 (EEPROM + firmware/U-Boot
-files on the FAT boot partition) and future boards (i.MX93, TI AM64x, …) have
-fundamentally different mechanisms and are not covered here. `BOOTLOADER_UPDATE=1`
-is a no-op on a board with no backend.
+page is the RZ/V2L backend (BL2 + FIP); the Raspberry Pi 5 EEPROM backend is in
+[`bootchain-update-rpi5.md`](bootchain-update-rpi5.md). `BOOTLOADER_UPDATE=1` is a
+no-op on a board with no backend.
 
 The RAUC A/B flow updates the rootfs and the kernel FIT, not the bootchain. BL2 and
 the FIP (TF-A BL31, OP-TEE BL32, U-Boot BL33) live in single-copy storage outside the
@@ -165,5 +164,5 @@ from the serial console and can stop U-Boot autoboot to run console commands.
 ## Scope
 
 This path is attended and operator-run, and is deliberately independent of RAUC.
-Unattended or RAUC-integrated delivery on a redundant target, and a boot-enforced
-anti-rollback floor on the bootchain, are future work (ADR-0014, Open questions).
+Delivery is not unattended or RAUC-integrated, and the bootchain has no
+boot-enforced anti-rollback floor (ADR-0014, Open questions).

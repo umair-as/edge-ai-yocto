@@ -1,0 +1,68 @@
+#!/bin/sh
+# Operator-driven Raspberry Pi EEPROM bootloader updater.
+#
+# A guarded wrapper over rpi-eeprom-update. "stage" writes the recovery files
+# to the FAT boot partition; the firmware self-flashes the EEPROM on the next
+# reboot. Nothing is applied automatically: there is no service, and an
+# ordinary reboot never initiates an update. The current and candidate
+# versions are read via /dev/vcio + vcgencmd (the VCIO backport), so the board
+# does not rely on the bootloader's device-tree node, which the U-Boot handoff
+# does not pass through.
+set -eu
+
+BOOT_MNT=/boot
+
+log() { echo "[edge-rpi-eeprom] $*" >&2; }
+
+need_root() {
+    if [ "$(id -u)" -ne 0 ]; then
+        log "must run as root"
+        exit 1
+    fi
+}
+
+# The recovery files land on the FAT boot partition. Refuse unless it is the
+# mounted, writable FAT volume, so a stage never arms a partial update on the
+# wrong target or a read-only mount.
+check_boot() {
+    line=$(findmnt -no FSTYPE,OPTIONS "${BOOT_MNT}" 2>/dev/null) || {
+        log "${BOOT_MNT} is not a mount point"
+        exit 1
+    }
+    case "${line}" in
+        vfat*) ;;
+        *) log "${BOOT_MNT} is not a FAT filesystem: ${line}"; exit 1 ;;
+    esac
+    case ",${line#* }," in
+        *,rw,*) ;;
+        *) log "${BOOT_MNT} is not mounted read-write: ${line}"; exit 1 ;;
+    esac
+}
+
+case "${1:-}" in
+    status)
+        # rpi-eeprom-update exit code: 0 up to date, 1 update available.
+        rpi-eeprom-update
+        ;;
+    stage)
+        need_root
+        check_boot
+        rpi-eeprom-update -a
+        log "staged to ${BOOT_MNT}; the EEPROM self-flashes on next reboot."
+        log "run 'reboot' to apply, or 'edge-rpi-eeprom cancel' to abort."
+        ;;
+    cancel)
+        need_root
+        rpi-eeprom-update -r
+        log "pending EEPROM update files removed."
+        ;;
+    *)
+        cat <<EOF
+Usage: edge-rpi-eeprom {status|stage|cancel}
+  status  Show the current and available EEPROM versions.
+  stage   Stage the available update to ${BOOT_MNT} (applies on next reboot).
+  cancel  Remove a staged update.
+EOF
+        exit 1
+        ;;
+esac

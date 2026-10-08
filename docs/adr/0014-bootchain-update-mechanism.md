@@ -54,6 +54,16 @@ FIP for `qspi`/`esd`/`emmc`. It is **deliberately separate from RAUC**: the capa
 to build and apply a new bootchain is the requirement; unattended delivery is not, and
 is deferred (see Open questions).
 
+The second backend is **Raspberry Pi 5**: `edge-rpi-eeprom`, an operator-run wrapper
+over `rpi-eeprom-update` that stages an EEPROM bootloader image to `/boot` for the
+firmware to self-flash on reboot. Detecting the board on this board's signed-FIT
+mainline boot needs the board revision in the kernel device tree, which a U-Boot patch
+forwards from the firmware's `/system` node; see
+[`bootchain-update-rpi5.md`](../dev/bootchain-update-rpi5.md). Updating the
+FAT-partition boot files (U-Boot, DTB, `config.txt`) are the operator-run
+`edge-rpi-bootfiles-update` (manifest + backup/`--restore`, a FAT-file sibling of
+`rzv2l-bootloader-update`); RAUC-integrated or unattended delivery remains open.
+
 RZ/V2L brick-risk is reduced by a guard chain that runs for every artifact before the
 first byte is written: root + explicit mode/variant; variant matches the PMIC detected
 from the device tree; artifact SHA-256 == manifest; QSPI `mtd` label check (refuse the
