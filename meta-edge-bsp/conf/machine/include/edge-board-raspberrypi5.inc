@@ -90,7 +90,11 @@ EDGE_FIT_PUBKEY_DTB ?= "bcm2712-rpi-5-b.dtb"
 # here. edge-io-udev: gpio group + gpiochip rule, in place of the vendor
 # udev-rules-rpi (removed there too; its rules target the vendor kernel and
 # name groups this distro does not create, which stalls udevd at start).
-EDGE_MACHINE_EXTRA_INSTALL ?= "linux-firmware-rpidistro-bcm43455 bluez-firmware-rpidistro-bcm4345c0-hcd wireless-regdb-static edge-io-udev"
+# raspi-utils (vcgencmd, pinctrl, vcmailbox, raspinfo) and raspi-gpio: the RPi
+# userland tools. raspi-utils RCONFLICTS the legacy "userland" GL stack and
+# reaches the firmware over /dev/vcio from the VCIO backport in
+# linux-edge-mainline; vcgencmd also reads bootloader state for rpi-eeprom-update.
+EDGE_MACHINE_EXTRA_INSTALL ?= "linux-firmware-rpidistro-bcm43455 bluez-firmware-rpidistro-bcm4345c0-hcd wireless-regdb-static edge-io-udev raspi-utils raspi-gpio"
 
 # devel joins the I/O groups the board's recipes create. i2c and spi are not
 # offered: mainline 6.18 exposes no RP1 header I2C/SPI controller for this
