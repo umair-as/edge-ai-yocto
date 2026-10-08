@@ -3,3 +3,8 @@
 # mainline kernel; the sysfs-gpio chgrp hooks, gpiomem, spidev, vcsm,
 # rpivid and serial-alias rules there target the vendor kernel.
 SUBSYSTEM=="gpio", KERNEL=="gpiochip*", GROUP="gpio", MODE="0660"
+
+# VideoCore mailbox userspace device (/dev/vcio) for vcgencmd and vcmailbox.
+# The video group matches the vcgencmd convention and the devel user's groups.
+# Present only where the VCIO driver is built (the Pi); dropped on prod images.
+SUBSYSTEM=="misc", KERNEL=="vcio", GROUP="video", MODE="0660"

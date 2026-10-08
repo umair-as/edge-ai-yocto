@@ -70,6 +70,14 @@ SRC_URI:append = " \
     file://cfg/wireless-rpi5.cfg \
 "
 
+# VCIO mailbox userspace char device (/dev/vcio): backport of the Raspberry Pi
+# downstream driver. Mainline has the kernel-internal firmware mailbox
+# (BCM2835_MBOX, via rtc-rpi.cfg) but not this userspace ABI, which vcgencmd and
+# the full rpi-eeprom-update status path need. Default on; EDGE_ENABLE_VCIO = "0"
+# drops it (and the RPi userland tools that depend on it) for a lean image.
+EDGE_ENABLE_VCIO ?= "1"
+SRC_URI:append = "${@' file://patches/0006-drivers-char-broadcom-add-vcio-mailbox-userspace-driver.patch file://cfg/vcio-rpi.cfg' if d.getVar('EDGE_ENABLE_VCIO') == '1' else ''}"
+
 # Asserted with the platform symbols: a modular SD host, PCIe bridge, MSI
 # parent or RNG is a green build whose root device, network, accelerator or
 # entropy appears too late.
