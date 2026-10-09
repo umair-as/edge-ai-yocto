@@ -21,6 +21,16 @@ and [`adr/0006-emmc-gpt-boot-target.md`](../adr/0006-emmc-gpt-boot-target.md).
 `/boot` is shared, but each slot has its own FIT. The FIT signature covers the
 slot's kernel, DTB, root hash, and `dm-mod.create` policy.
 
+The mechanism is the same on every board; what differs per board:
+
+| Board (`BOARD=`) | `/boot` | U-Boot env template | Slot FIT load |
+|---|---|---|---|
+| `rzv2l` | ext4 | `files/rauc-uboot-env.defaults.in` | `ext4load mmc 0:1` |
+| `raspberrypi5` | FAT (shared with the firmware files) | `files/raspberrypi5/rauc-uboot-env.defaults.in` | `fatload mmc 0:1` |
+
+Board facts (env offset, slot devices, FIT addresses) live in
+`meta-edge-bsp/conf/machine/include/edge-board-<machine>.inc`.
+
 ## Mechanism
 
 RAUC drives the install; U-Boot's environment state machine drives slot
@@ -30,9 +40,8 @@ selection and rollback.
   `boot-attempts=3`, slots `rootfs.0`/`A` and `rootfs.1`/`B`. Install marks the
   target slot bad *before* writing and active *only* after a fully successful
   install (write + hooks).
-- **U-Boot** (`meta-edge-bsp/recipes-bsp/u-boot/files/rauc-uboot-env.defaults.in`;
-  the Raspberry Pi 5 variant under `files/raspberrypi5/` differs only in load
-  address and FIT load path): `rauc_select_slot` walks `BOOT_ORDER`, picks the first slot with
+- **U-Boot** (the board's `rauc-uboot-env.defaults.in` under
+  `meta-edge-bsp/recipes-bsp/u-boot/files/`): `rauc_select_slot` walks `BOOT_ORDER`, picks the first slot with
   `BOOT_<slot>_LEFT > 0`, decrements that counter, and `saveenv`s the decrement
   **before** `bootm` — so a slot that hangs or crashes mid-boot still consumes an
   attempt. When a slot's counter hits 0, the next slot in `BOOT_ORDER` is tried.
@@ -69,31 +78,28 @@ fails to *boot*, not on a workload that fails *after* boot.
 
 ## Hardware validation
 
-Validated on the RZ/V2L SMARC EVK (2026-07; full detail and evidence in the
-[test plan](ota-rollback-test-plan.md)):
+| Board | Install + slot switch | Failure → rollback matrix ([test plan](ota-rollback-test-plan.md)) |
+|---|---|---|
+| `rzv2l` | validated 2026-07 | T1, T2, T3, T6, T7, T8 PASS (2026-07) |
+| `raspberrypi5` | validated 2026-09-15 | not run on this board |
 
-| Path | Result |
-|------|--------|
-| Corrupt slot → bootcount revert to last-good | PASS (T1) |
-| Same, as-shipped cmdline (no `panic=`) | PASS (T2) — `CONFIG_PANIC_TIMEOUT` self-reboots |
-| Interrupted install (daemon killed mid-write) leaves active slot intact | PASS (T3) |
-| Failed post-install hook aborts install, target never activated | PASS (T6) |
-| Both-slots-exhausted backstop self-heals | PASS (T7) |
-| Workload failure after boot does **not** revert (documents the gap) | PASS (T8) |
+The matrix covers:
 
-The failure→revert round-trip is therefore hardware-validated for boot-time
-failures. Power-loss atomicity (mid-write, mid-env-write) is designed-safe on
-RAUC's atomic marking + redundant U-Boot env but not yet bench-tested.
+| Path | Test |
+|------|------|
+| Corrupt slot → bootcount revert to last-good | T1 |
+| Same, as-shipped cmdline (no `panic=`) — `CONFIG_PANIC_TIMEOUT` self-reboots | T2 |
+| Interrupted install (daemon killed mid-write) leaves the active slot intact | T3 |
+| Failed post-install hook aborts the install; target never activated | T6 |
+| Both-slots-exhausted backstop self-heals | T7 |
+| Workload failure after boot does **not** revert (documents the gap) | T8 |
 
-The same install path is validated on the Raspberry Pi 5 (2026-09-15): a
-`.raucb` built with `make bundle BOARD=raspberrypi5` installed over `rauc
-install` from slot A, the post-install hook wrote the target slot's signed
-FIT to the FAT `/boot` partition, U-Boot selected `conf-B` on reboot, the
-slot booted with `rauc.slot=B` and was marked good, and the late-fallback
-policy then marked A bad exactly as on RZ/V2L. The T1-T8 rollback matrix
-above has been run on RZ/V2L only; the Pi runs the same slot-selection
-macros and RAUC configuration from its board-specific env file, and its
-rollback paths are untested on hardware.
+On the Pi 5 the post-install hook writes the target slot's signed FIT to the FAT
+`/boot`, U-Boot boots `conf-B`, the slot is marked good and the late-fallback policy
+marks A bad, as on RZ/V2L; it runs the same slot-selection macros and RAUC
+configuration from its own env file. Power-loss atomicity (mid-write, mid-env-write)
+rests on RAUC's atomic marking and the redundant U-Boot env and has not been run on
+hardware on either board.
 
 ## Kernel and root-hash coupling
 
@@ -132,10 +138,12 @@ RAUC A/B updates remain supported.
 ## Building and installing a bundle
 
 ```bash
-make bundle                       # -> build/tmp/deploy/images/smarc-rzv2l/edge-image-dev-bundle.raucb
-make bundle BOARD=raspberrypi5    # -> build/raspberrypi5/tmp/deploy/images/raspberrypi5/edge-image-dev-bundle.raucb
-make bundle SBOM_CVE=1            # + SPDX SBOM and sbom-cve-check report of the bundled rootfs
+make bundle BOARD=<board>             # -> <build-dir>/tmp/deploy/images/<machine>/edge-image-dev-bundle.raucb
+make bundle BOARD=<board> SBOM_CVE=1  # + SPDX SBOM and sbom-cve-check report of the bundled rootfs
 ```
+
+The build directory is `build/` for the first board (`rzv2l`) and `build/<BOARD>/`
+for every other board.
 
 The image SBOM and CVE report are separate tasks of the image recipe, after
 `do_image_complete`, which is all a bundle needs. A dev bundle therefore skips

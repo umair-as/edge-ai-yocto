@@ -245,7 +245,7 @@ the out-of-tree modules (`vspm`/`mmngr`/`drpai`/`mmngrbuf`/`u_dma_buf`). The
 modules' version string matched (vermagic passed) but they were built against a
 different kernel than the shared `/boot` FIT → symbol-resolution corruption. This
 is the rootfs-only-bundle + shared-`/boot` coupling documented in
-[`ota-updates.md`](ota-updates.md#kernel-coupling-the-main-gotcha); the rollback
+[`ota-updates.md`](ota-updates.md#kernel-and-root-hash-coupling); the rollback
 correctly protected the device. `pstore: writing error (-28)` (ENOSPC) is why the
 crash never persisted to journal/pstore.
 

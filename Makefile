@@ -237,7 +237,7 @@ help:
 	@echo ""
 	@echo "  Example: make dev NETBOOT=1"
 	@echo "           sudo ./scripts/dev/sync-nfs-rootfs.sh   # after each rebuild"
-	@echo "  See docs/dev/netboot-setup.md for host setup + per-board env."
+	@echo "  See docs/dev/netboot/README.md for host setup + per-board env."
 	@echo ""
 	@echo "Utility targets:"
 	@echo "  make hooks                   Install the git hooks (run once per clone)"
@@ -461,7 +461,7 @@ purge:
 # root for tar to preserve uid/gid/xattrs into the NFS root. Does NOT
 # rebuild — chain it with `make dev NETBOOT=1` if you want a fresh build:
 #   make dev NETBOOT=1 && sudo ./scripts/dev/sync-nfs-rootfs.sh
-# See docs/dev/netboot-setup.md for one-time host + board setup.
+# See docs/dev/netboot/README.md for one-time host + board setup.
 netboot-sync:
 	@echo "==> Syncing latest rootfs + fitImage to NFS/TFTP"
 	sudo ./scripts/dev/sync-nfs-rootfs.sh

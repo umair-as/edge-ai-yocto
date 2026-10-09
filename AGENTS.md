@@ -396,9 +396,9 @@ deferred until the first release needs them.
 | Security docs — SBOM/CVE triage, SELinux, U-Boot hardening, kernel-config gate, vuln mgmt | `docs/security/README.md` (index) |
 | CI — hosted lint, operator-run Yocto check (`make ci`), kernel-hardening gate | `docs/dev/ci.md` |
 | OTA updates + rollback testing | `docs/dev/ota-updates.md`, `docs/dev/ota-rollback-test-plan.md` |
-| Bootchain update — RZ/V2L BL2/FIP, Pi 5 EEPROM + boot files | `docs/dev/bootchain-update.md`, `docs/dev/bootchain-update-rpi5.md`, ADR-0014 |
-| Netboot dev workflow | `docs/dev/netboot-setup.md` |
-| eMMC provisioning | `docs/dev/emmc-provisioning.md` |
+| Bootchain update (per board) | `docs/dev/bootchain/README.md`, ADR-0014 |
+| Netboot dev workflow (per board) | `docs/dev/netboot/README.md` |
+| eMMC boot target + provisioning (per board) | `docs/dev/emmc/README.md` |
 | Flashing a wic to SD/USB (bmaptool vs dd, reused-card env trap) | `docs/dev/flashing-media.md` |
 | JTAG kernel debugging | `docs/dev/jtag-kernel-debugging.md` |
 | Containers on-target (podman, Quadlet) | `docs/dev/podman.md`, `docs/dev/quadlet.md` |

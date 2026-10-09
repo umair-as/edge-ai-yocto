@@ -35,14 +35,16 @@ board keeps that board's saved env there, and U-Boot prefers a CRC-valid saved
 env over its compiled-in default — so the freshly flashed board runs the other
 board's boot script.
 
-Symptom: the board loops in U-Boot before Linux. A Pi 5 (FAT boot partition)
-running an RZ/V2L env's `ext4load mmc 0:1` prints `Can't set block device` and
-`[RAUC] verified slot FIT load/boot failed`, then resets.
+Symptom: the board loops in U-Boot before Linux, running a boot script written for
+another board. For example, a Pi 5 card that last held an RZ/V2L image runs that
+env's `ext4load mmc 0:1` against its FAT boot partition, prints
+`Can't set block device` and `[RAUC] verified slot FIT load/boot failed`, and
+resets.
 
 A full `dd` write covers the whole image, including the zeroed pre-partition
 gap, so it overwrites any stale env. U-Boot then finds no valid saved env and
-uses its correct per-board compiled-in default (Pi 5: `fatload`), which seeds
-the right env on first boot. Equivalently, zero the env region before a
+uses the board's own compiled-in default, which seeds the right env on first
+boot. Equivalently, zero the env region before a
 `bmaptool` copy:
 
 ```bash

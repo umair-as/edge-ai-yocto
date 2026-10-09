@@ -9,7 +9,7 @@
 #   IMAGE=edge-image-base ./scripts/dev/sync-nfs-rootfs.sh
 #   NFS_ROOT=/srv/nfs/edge-image-dev TFTP_DIR=/srv/tftp ./scripts/dev/sync-nfs-rootfs.sh
 #
-# Defaults match the runbook at docs/dev/netboot-setup.md. Override via
+# Defaults match the runbook at docs/dev/netboot/README.md. Override via
 # env vars to point at a different host layout.
 #
 # Requires:
