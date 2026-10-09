@@ -17,7 +17,7 @@
 # After running:
 #   - Build a netboot-enabled image:   make dev NETBOOT=1
 #   - Set serverip + nfs_export on the board (at the U-Boot prompt — see
-#     docs/dev/netboot-setup.md)
+#     docs/dev/netboot/README.md)
 #   - Push rootfs + fitImage:          make netboot-sync
 #   - On the board:                    run netboot
 
@@ -160,5 +160,5 @@ note "       saveenv"
 note "  4. make netboot-sync                  # push rootfs+fitImage to host"
 note "  5. on board:  reset; (stop autoboot with 'edge'); run netboot"
 note ""
-note "See docs/dev/netboot-setup.md for the full runbook."
+note "See docs/dev/netboot/README.md for the full runbook."
 note "==================================================================="
