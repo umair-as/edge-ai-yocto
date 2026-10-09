@@ -134,7 +134,13 @@ RAUC A/B updates remain supported.
 ```bash
 make bundle                       # -> build/tmp/deploy/images/smarc-rzv2l/edge-image-dev-bundle.raucb
 make bundle BOARD=raspberrypi5    # -> build/raspberrypi5/tmp/deploy/images/raspberrypi5/edge-image-dev-bundle.raucb
+make bundle SBOM_CVE=1            # + SPDX SBOM and sbom-cve-check report of the bundled rootfs
 ```
+
+The image SBOM and CVE report are separate tasks of the image recipe, after
+`do_image_complete`, which is all a bundle needs. A dev bundle therefore skips
+them unless `SBOM_CVE=1` is set; a prod-profile bundle always produces them,
+next to the bundle in the same deploy directory.
 
 On the target (device `/data` is not user-writable — stage in the operator's
 home, which is `/data`-backed):

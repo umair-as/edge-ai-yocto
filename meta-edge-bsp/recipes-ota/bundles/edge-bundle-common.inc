@@ -18,6 +18,13 @@ RAUC_SLOT_rootfs[fstype]   = "ext4.verity"
 RAUC_SLOT_rootfs[imagetype] = "raw"
 RAUC_SLOT_rootfs[hooks]    = "pre-install;post-install"
 
+# The slot dependency stops at the image's do_image_complete; its SBOM and
+# sbom-cve-check report hang off the image's do_build and are otherwise not
+# produced for the bundled rootfs. Off for dev iteration, on for prod.
+EDGE_BUNDLE_SBOM_CVE ??= "0"
+EDGE_BUNDLE_SBOM_CVE:prod = "1"
+do_build[depends] += "${@'${BUNDLE_IMAGE}:do_sbom_cve_check' if d.getVar('EDGE_BUNDLE_SBOM_CVE') == '1' else ''}"
+
 # Disable adaptive updates (block-hash-index) by default. Re-enable per-build
 # via EDGE_RAUC_ADAPTIVE=1 for smaller bundle transfer at the cost of
 # the longer hash-index compute phase.

@@ -157,6 +157,14 @@ STACK = $(BASE)$(CAP_CHAIN)
 # WKS_FILE and growth mechanism.
 BOOT_TARGET_ENV := $(if $(EDGE_BOOT_TARGET),EDGE_BOOT_TARGET=$(EDGE_BOOT_TARGET) ,)
 
+# === Bundle SBOM + CVE report ===
+#
+#   make bundle SBOM_CVE=1   # + image SBOM and sbom-cve-check report for the bundled rootfs
+#
+# Prod-tier bundles always produce it (recipe override); dev bundles only on
+# request — the two tasks add minutes per rootfs change.
+BUNDLE_SBOM_ENV := $(if $(filter 1,$(SBOM_CVE)),EDGE_BUNDLE_SBOM_CVE=1 ,)
+
 # === Build tier (EDGE_PROFILE) ===
 #
 # Tier is resolved at INVOCATION, not pinned in an image recipe (an image
@@ -211,6 +219,7 @@ help:
 	@echo "  make bootloader-package      Host package: BL2/FIP + manifest + updater (RZ/V2L, out-of-band)"
 	@echo "  make bundle                  Build edge-bundle (.raucb) for OTA install (dev tier)"
 	@echo "  make bundle EDGE_PROFILE=prod  Bundle a prod image (set BUNDLE_IMAGE_NAME=edge-image-prod)"
+	@echo "  make bundle SBOM_CVE=1       + image SBOM + CVE report for the bundled rootfs (always on for prod)"
 	@echo ""
 	@echo "Capability flags (composable; combine freely):"
 	@echo "  TPM=1                        + meta-secure-core (TPM2 + IMA/EVM userspace)"
@@ -288,7 +297,7 @@ bundle: | $(KAS_DIRS)
 	fi
 	$(call check_rauc_keys)
 	@echo "==> Building edge-bundle (EDGE_PROFILE=$(EDGE_PROFILE)) [$(STACK)]"
-	$(KAS) shell -c 'BB_ENV_PASSTHROUGH_ADDITIONS="$$BB_ENV_PASSTHROUGH_ADDITIONS EDGE_PROFILE EDGE_OTA_BACKEND BUNDLE_IMAGE_NAME EDGE_BOOT_TARGET EDGE_KERNEL_DEV_FRAGMENTS" EDGE_PROFILE=$(EDGE_PROFILE) $(BOOT_TARGET_ENV)bitbake edge-bundle' $(STACK)
+	$(KAS) shell -c 'BB_ENV_PASSTHROUGH_ADDITIONS="$$BB_ENV_PASSTHROUGH_ADDITIONS EDGE_PROFILE EDGE_OTA_BACKEND BUNDLE_IMAGE_NAME EDGE_BOOT_TARGET EDGE_KERNEL_DEV_FRAGMENTS EDGE_BUNDLE_SBOM_CVE" EDGE_PROFILE=$(EDGE_PROFILE) $(BOOT_TARGET_ENV)$(BUNDLE_SBOM_ENV)bitbake edge-bundle' $(STACK)
 	@echo "==> Bundle artefacts:"
 	@find $(KAS_BUILD_DIR)/tmp/deploy/images -name '*.raucb' -printf '    %p\n'
 
