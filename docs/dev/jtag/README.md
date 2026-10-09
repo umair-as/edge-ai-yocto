@@ -3,7 +3,7 @@
 Host-side config to attach a debugger to the RZ/V2L SMARC board over JTAG.
 Pairs with the debug-profile kernel (`make dev JTAG=1`, KASLR off + kgdb +
 gdb scripts) — see `../jtag-kernel-debugging.md` for the kernel side and the
-sustained-halt caveat (use NFS-root for breakpoints; see `../netboot-setup.md`).
+sustained-halt caveat (use NFS-root for breakpoints; see `../netboot/rzv2l.md`).
 
 ## Files
 
@@ -82,7 +82,7 @@ sustained halts, two validated options:
   Validated: a 25 s halt under active eMMC writes then produced zero timeouts.
 - **NFS-root** (`make dev JTAG=1 NETBOOT=1`, then `run netboot`) — rootfs off
   eMMC entirely. Most robust for long sessions or when the IRQ can't be repinned.
-  See `../netboot-setup.md`.
+  See `../netboot/rzv2l.md`.
 
 Note: a multi-second whole-system halt makes services with their own
 `WatchdogSec=` miss their ping; systemd restarts them on resume. Harmless, but

@@ -5,7 +5,7 @@
 # The eMMC bootloader (BL2 + FIP) lives in the hardware boot partition
 # (mmcblkXboot0), NOT the user area. For a BLANK eMMC the boot0 bootloader is
 # written with the serial Flash Writer (RZ/V2L Start-up Guide, "Writing
-# Bootloader for eMMC Boot") — see docs/dev/emmc-provisioning.md. This script
+# Bootloader for eMMC Boot") — see docs/dev/emmc/rzv2l.md. This script
 # writes the GPT user-area image; if boot0 is writable from Linux it can also
 # program boot0 (--bl2/--fip), at the Start-up-Guide sectors:
 #   BL2 -> mmcblkXboot0 sector 1
@@ -137,7 +137,7 @@ cat <<EOF
 [emmc-provision] User-area image written.
   Next:
     1. Ensure boot0 holds BL2+FIP (this run if --bl2/--fip were given, else via
-       the serial Flash Writer per docs/dev/emmc-provisioning.md).
+       the serial Flash Writer per docs/dev/emmc/rzv2l.md).
     2. Power off; set switches to eMMC (SW1-2=OFF, SW11=ON,OFF,OFF,ON).
     3. Power on. First boot rewrites the U-Boot env (CRC invalid is expected);
        reboot once to settle. systemd-repart grows /data.

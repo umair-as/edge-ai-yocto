@@ -24,7 +24,7 @@
 # nfs-off.cfg, which EDGE_DEV_NETBOOT=1 skips. Other providers are unverified.
 #
 # Host-side setup (TFTP + NFS server, exports, sync workflow) is
-# documented in docs/dev/netboot-setup.md and automated by
+# documented in docs/dev/netboot/README.md and automated by
 # scripts/dev/sync-nfs-rootfs.sh — not part of the image.
 #
 # The default bootcmd (signed FIT from mmc) is unchanged. `run netboot`
