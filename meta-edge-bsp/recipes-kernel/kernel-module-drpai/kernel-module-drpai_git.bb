@@ -1,7 +1,8 @@
 SUMMARY     = "RZ/V2L DRP-AI accelerator kernel driver (out-of-tree module)"
 DESCRIPTION = "Loadable kernel module for the DRP-AI inference accelerator on \
 RZ/V2L. Creates /dev/drpai0, binds the renesas,rzv2l-drpai device-tree node, \
-and serves userspace runtimes via ioctl over dma-buf/CMA buffers."
+and serves userspace runtimes via read/write/ioctl over the physical \
+buffers in the drp_reserved memblock carveout (not a CMA pool)."
 HOMEPAGE    = "https://github.com/umair-as/rzv2l-drpai-driver"
 SECTION     = "kernel"
 LICENSE     = "GPL-2.0-only"
