@@ -13,12 +13,12 @@
 
 # nofail on /boot and /data: a broken persistent partition does not block
 # boot — the system still comes up so an operator can recover via SSH.
-# Pass 0 0 (no fsck) — journaled ext4 with commit=60 plus an unmounted
-# /data on failed boot makes the boot-time fsck cost not worth its delay
-# on an SD card.
+# /boot pass 0: journaled ext4, rarely written. /data pass 2: e2fsck -p
+# before mount catches media corruption the journal cannot repair; it
+# returns at once on a clean volume.
 /dev/root            /                    auto       ro                    0  0
 LABEL=boot           /boot                ext4       noatime,nodiratime,nofail    0  0
-LABEL=data           /data                ext4       defaults,noatime,nodiratime,commit=60,nofail    0  0
+LABEL=data           /data                ext4       defaults,noatime,nodiratime,commit=60,nofail    0  2
 proc                 /proc                proc       defaults              0  0
 devpts               /dev/pts             devpts     mode=0620,ptmxmode=0666,gid=5    0  0
 tmpfs                /run                 tmpfs      mode=0755,nodev,nosuid,strictatime    0  0

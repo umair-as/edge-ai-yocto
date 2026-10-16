@@ -15,9 +15,13 @@
 
 # nofail on /boot and /data: a broken persistent partition does not block
 # boot — the system still comes up so an operator can recover via SSH.
+# fsck pass 2 on /boot: a FAT dirty bit left by a power cut or hard reset is
+# sticky (a clean umount does not clear it) until fsck.vfat -a runs.
+# fsck pass 2 on /data: e2fsck -p catches media corruption the journal
+# cannot repair; it returns at once on a clean volume.
 /dev/root            /                    auto       ro                    0  0
-PARTLABEL=boot       /boot                vfat       noatime,nofail        0  0
-PARTLABEL=data       /data                ext4       defaults,noatime,nodiratime,commit=60,nofail    0  0
+PARTLABEL=boot       /boot                vfat       noatime,nofail        0  2
+PARTLABEL=data       /data                ext4       defaults,noatime,nodiratime,commit=60,nofail    0  2
 proc                 /proc                proc       defaults              0  0
 devpts               /dev/pts             devpts     mode=0620,ptmxmode=0666,gid=5    0  0
 tmpfs                /run                 tmpfs      mode=0755,nodev,nosuid,strictatime    0  0
