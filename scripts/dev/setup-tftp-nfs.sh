@@ -23,7 +23,7 @@
 
 set -Eeuo pipefail
 
-# Defaults — override via env if your bench layout differs.
+# Defaults; each is overridable from the environment.
 TFTP_DIR="${TFTP_DIR:-/srv/tftp}"
 TFTP_SUBDIR="${TFTP_SUBDIR:-edge-fit-dev}"
 NFS_ROOT="${NFS_ROOT:-/srv/nfs/edge-image-dev}"

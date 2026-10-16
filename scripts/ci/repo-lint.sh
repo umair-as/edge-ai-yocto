@@ -122,6 +122,35 @@ for f in $(git ls-files "$(echo $RECIPE_DIRS | tr ' ' '\n' | head -1)/*.bb" 2>/d
              END { print m + 0 }' "$f")
     [ "$n" -gt 3 ] && warn "DESCRIPTION $n lines (cap 3)  $f"
 done
+hdr "ADVISORY: comment style (comment-style.md)"
+# Comment lines only. Templates (*.example) address their reader and are
+# skipped; `your-` placeholders, I2C/I²C and I/O are not first person. Dates
+# are flagged only next to an observation word: pin and release dates are
+# facts. docs/ paths are flagged in recipe and BitBake config files only.
+csf=$( { git ls-files -- meta-edge-bsp meta-edge-distro kas scripts; echo Makefile; } \
+      | grep -vE '\.(patch|example|png|svg|jpg|gz|bin|der|pem|crt)$|^scripts/ci/repo-lint\.sh$')
+for f in $csf; do
+    c=$(grep -nE '^[[:space:]]*#([^!]|$)' "$f" 2>/dev/null) || continue
+    echo "$c" | sed 's/your-[a-z]*//g' \
+        | grep -E '(^|[^A-Za-z])([Ww]e|[Oo]ur|[Yy]ou|[Yy]our)([^A-Za-z]|$)|(^|[^A-Za-z/])I([^A-Za-z0-9/²]|$)' \
+        | sed "s|^|  warn first-person  $f:|"
+    echo "$c" | grep -E '20[0-9]{2}-[01][0-9]-[0-3][0-9]' \
+        | grep -iE 'observ|validat|measur|tested|bench|seen on' | sed "s|^|  warn dated        $f:|"
+    echo "$c" | grep -E '[Ii]f you|[Ff]lip to|[Ww]hen you want' | sed "s|^|  warn directive    $f:|"
+    case "$f" in
+    *.bb|*.bbappend|*.bbclass|*.inc|*.cfg|*.conf|*.wks|*.wks.in)
+        echo "$c" | grep -E 'docs/' | sed "s|^|  warn docs-path    $f:|"
+        echo "$c" | grep -E '([^A-Za-z]|^)[Ss]hould([^A-Za-z]|$)' | sed "s|^|  warn directive    $f:|" ;;
+    esac
+done
+
+hdr "ADVISORY: Makefile shape"
+# Rationale over ~4 comment lines belongs in docs/; build settings reach
+# bitbake through kas env:, not a hand-written passthrough list.
+awk '/^[[:space:]]*#/ { if (!n) s = NR; n++; next }
+     { if (n > 4) printf "  warn comment block %d lines  Makefile:%d\n", n, s; n = 0 }' Makefile
+grep -n 'BB_ENV_PASSTHROUGH_ADDITIONS' Makefile | sed 's/^/  warn passthrough outside kas  Makefile:/'
+
 printf '\n  Advisory findings never fail the run.\n'
 
 hdr "RESULT"

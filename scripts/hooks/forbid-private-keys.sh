@@ -11,7 +11,7 @@
 # reading from disk here is reading staged content. Run standalone with no
 # arguments and it derives the list itself.
 #
-# Override (only if you are certain) with: git commit --no-verify
+# Bypass: git commit --no-verify (skips every hook, not just this one).
 set -euo pipefail
 
 files=("$@")

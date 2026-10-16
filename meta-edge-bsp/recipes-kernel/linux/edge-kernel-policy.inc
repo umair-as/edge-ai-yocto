@@ -192,8 +192,7 @@ do_edge_kernel_policy_assert[dirs] = "${B}"
 #
 # Gate script and baseline enter the task signature by checksum, so editing
 # either re-runs the gate and everything after it. EDGE_KHC_BOARD is the
-# kas/machines/<name>.yml name, set by the board include; the snapshot of
-# the same .config lives in docs/security/kernel-config/.
+# kas/machines/<name>.yml name, set by the board include.
 EDGE_KHC_BOARD ?= ""
 EDGE_KHC_GATE = "${@'1' if d.getVar('EDGE_KERNEL_DEV_FRAGMENTS') != '1' else '0'}"
 EDGE_KHC_DIR = "${EDGE_BSP_LAYERDIR}/recipes-kernel/linux/files/khc"

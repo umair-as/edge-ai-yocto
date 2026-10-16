@@ -47,7 +47,7 @@ EDGE_RAUC_STREAMING_TLS_KEY   = "${@bb.utils.contains('EDGE_RAUC_STREAMING_KEY_M
 # EDGE_RAUC_ALLOWED_SIGNER_CNS: semicolon-separated CN allowlist. Empty =
 #   no restriction (dev). Set on prod images to fence off legacy / dev leaves.
 # EDGE_RAUC_CHECK_PURPOSE: OpenSSL X.509 purpose enforced on the signer
-#   chain (e.g. "codesign"). Our own rauc-init-certs.sh emits a
+#   chain (e.g. "codesign"). scripts/rauc-init-certs.sh emits a
 #   codeSigning + emailProtection EKU (the second is only for `rauc
 #   encrypt`'s own config-less internal self-verify; this check-purpose
 #   gate maps "codesign" to RAUC's custom purpose, which requires just

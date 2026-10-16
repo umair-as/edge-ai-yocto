@@ -10,7 +10,7 @@
 #     when /dev/teepriv0 appears)
 #   - tee / teepriv / teesuppl system users+groups
 #
-# ABI: meta-arm pins this to v4.9.0; our optee-os is on the Renesas
+# ABI: meta-arm pins this to v4.9.0; optee-os here is on the Renesas
 # 4.8.0/rz fork. OP-TEE's client-side SMC ABI is stable across minor
 # versions — the vendor AI SDK pairs an upstream-master optee-client
 # with the same 4.8.0 OP-TEE OS fork, so 4.9 client + 4.8 OS is a

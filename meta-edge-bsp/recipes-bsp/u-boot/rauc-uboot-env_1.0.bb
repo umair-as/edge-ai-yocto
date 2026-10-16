@@ -84,7 +84,7 @@ do_install() {
     # -EACCES, even though the device is writable — the tool refuses to
     # construct an env from scratch with no defenv to seed from. Ship the
     # same KEY=VALUE content as rauc-uboot-env.defaults so the seed env and
-    # the values our init script writes agree.
+    # the values the init script writes agree.
     install -m 0644 ${UNPACKDIR}/rauc-uboot-env.defaults ${D}${sysconfdir}/u-boot-initial-env
 
     # Conditionally append the dev netboot env macro to BOTH the
