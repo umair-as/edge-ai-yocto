@@ -54,8 +54,8 @@ local_conf_header:
 
   spdx_timestamps: |
     # SPDX_INCLUDE_TIMESTAMPS — include real wall-clock timestamps in SPDX
-    # docs. Default 0 (reproducible builds). Flip to 1 for an audit-grade
-    # dated artifact when reproducibility is not required.
+    # docs. Default 0 (reproducible builds); 1 gives an audit-grade dated
+    # artifact that is not reproducible.
     #
     # SPDX_INCLUDE_TIMESTAMPS = "1"
 

@@ -76,9 +76,9 @@ local_conf_header:
 
   rm_work: |
     # Reclaim build/tmp/work/ after each recipe finishes do_build, EXCEPT
-    # for the boot chain and the kernel — those we keep iterable so we can
-    # `devtool modify`, inspect patched source, study failures, etc. without
-    # paying a `cleansstate` + re-fetch tax.
+    # for the boot chain and the kernel — their work dirs stay for
+    # `devtool modify`, patched-source inspection and failure triage without
+    # a `cleansstate` + re-fetch.
     #
     # Anything not on the exclude list gets its work tree removed after
     # build. Add more excludes here if a recipe needs frequent inspection.
@@ -115,7 +115,7 @@ local_conf_header:
   rauc_hardening: |
     # ---- Bundle signing PKI hygiene ----------------------------------------
     # check-purpose: enforce OpenSSL X.509 purpose on the signer chain.
-    # Our rauc-init-certs.sh emits codeSigning + emailProtection EKU on the
+    # scripts/rauc-init-certs.sh emits codeSigning + emailProtection EKU on the
     # leaf; "codesign" is the default. emailProtection is there only so
     # `rauc encrypt`'s config-less internal self-verify (which falls back to
     # OpenSSL's default S/MIME-sign purpose check, not this check-purpose

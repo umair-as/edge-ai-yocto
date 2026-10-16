@@ -26,7 +26,7 @@ RDEPENDS:${PN}-camera = "v4l-utils"
 # RZ/V2L camera + display stack. Curated rather than pulling
 # meta-renesas's packagegroup-gstreamer1.0-plugins umbrella: that
 # scarthgap-era group RDEPENDS on AAC (-bad-faac/-faad), ASF
-# (-ugly-asf), and an RTSP server we don't ship, and assumes meta-
+# (-ugly-asf), and an RTSP server this image does not ship, and assumes meta-
 # multimedia is in the layer set for faac/faad2. The list below covers
 # the v4l2src → vspmfilter → waylandsink camera-preview pipeline
 # (the OV5645 → CRU → HDMI demo path) and nothing else.

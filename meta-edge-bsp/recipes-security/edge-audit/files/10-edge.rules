@@ -3,7 +3,7 @@
 ## Loaded by auditd at boot from /etc/audit/rules.d/. CIS Distribution
 ## Independent Linux Benchmark Level-1 minimum + a small set of edge-
 ## specific rules. Deliberately tight — full syscall auditing is GBs/day
-## and we don't have a SIEM pipeline yet (Phase 2).
+## and no SIEM pipeline consumes it.
 ##
 ## A `-D` first clears any previously-loaded rule, so this file is the
 ## source of truth.

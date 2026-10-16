@@ -7,7 +7,7 @@
 #
 # Why this exists:
 #   The Makefile exports KAS_WORK_DIR + KAS_REPO_REF_DIR only to its own
-#   sub-processes. Standalone `kas shell` invocations in your interactive
+#   sub-processes. Standalone `kas shell` invocations in an interactive
 #   shell don't inherit make's environment, so kas falls back to its
 #   defaults (KAS_WORK_DIR = CWD = repo root) and re-clones every
 #   upstream layer in-tree. Sourcing this file once per shell session

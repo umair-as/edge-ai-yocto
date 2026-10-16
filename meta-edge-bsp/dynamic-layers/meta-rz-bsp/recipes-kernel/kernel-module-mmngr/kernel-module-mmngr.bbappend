@@ -6,7 +6,7 @@ S = "${UNPACKDIR}/${BP}"
 
 # Vendor patches lack the Upstream-Status header that wrynose's do_patch
 # postfunc requires. patch-status demoted from ERROR_QA here rather than
-# carrying header-only forks of meta-renesas's patches under our files/.
+# carrying header-only forks of meta-renesas's patches in this layer.
 ERROR_QA:remove = "patch-status"
 
 # Hand-installed .ko: signed here so it loads under CONFIG_MODULE_SIG_FORCE.

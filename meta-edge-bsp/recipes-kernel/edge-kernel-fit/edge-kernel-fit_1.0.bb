@@ -21,7 +21,7 @@ UBOOT_ENTRYPOINT  = "${EDGE_FIT_ENTRYPOINT}"
 
 # Single-DTB v0; the kernel deploys r9a07g054l2-smarc.dtb (set via
 # KERNEL_DEVICETREE in meta-rz-bsp's smarc-rzv2l.conf). The class
-# auto-builds a /configurations/conf-<dtb-name> node and we make it
+# auto-builds a /configurations/conf-<dtb-name> node, made here
 # the default so U-Boot's `bootm` without an explicit config name
 # selects this one.
 FIT_CONF_DEFAULT_DTB = "r9a07g054l2-smarc.dtb"

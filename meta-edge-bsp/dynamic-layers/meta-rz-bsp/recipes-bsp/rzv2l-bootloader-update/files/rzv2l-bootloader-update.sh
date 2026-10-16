@@ -152,7 +152,7 @@ pick_artifact() {
     return 1
 }
 
-# Byte size of a target region we are allowed to write into.
+# Byte size of the writable part of a target region.
 target_capacity() {
     local target="$1"
     case "$target" in

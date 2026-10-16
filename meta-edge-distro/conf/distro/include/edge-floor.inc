@@ -1,7 +1,7 @@
 # Non-negotiable distro floor.
 #
-# These define "edge-ai" — they are not operator-configurable. Anything
-# an operator should be able to flip lives in edge-features.inc.
+# These define "edge-ai" — they are not operator-configurable.
+# Operator-configurable features live in edge-features.inc.
 # Tier-specific decisions live in edge-profile-${EDGE_PROFILE}.inc.
 # OTA backend wiring lives in edge-ota-${EDGE_OTA_BACKEND}.inc.
 
@@ -106,8 +106,8 @@ PREFERRED_PROVIDER_virtual/refpolicy = "refpolicy-mcs"
 
 # Refpolicy ships /etc/selinux/config with SELINUX=${DEFAULT_ENFORCING}.
 # Permissive is the floor: AVC denials log to audit, no domain transition
-# is blocked. Flip to "enforcing" only after policy coverage has been
-# validated against the full image surface. Recovery escape remains the
+# is blocked. Enforcing requires policy coverage validated against the
+# full image surface. Recovery escape remains the
 # selinux=0 kernel param via fw_setenv EXTRA_KERNEL_ARGS.
 DEFAULT_ENFORCING = "permissive"
 
@@ -287,7 +287,7 @@ EDGE_BUILD_DATE[vardepsexclude] = "DATETIME EDGE_BUILD_ID"
 # command so https:// fetches present a real UA. The wget fetcher reads
 # the literal name `FETCHCMD_wget` (bb/fetch2/wget.py:86) — "wget" is not
 # in OVERRIDES, so `FETCHCMD:wget` doesn't reach it via override mapping.
-# We set the underscore form for the fetcher and mirror it as colon-form
+# The underscore form is set for the fetcher and mirrored as colon-form
 # for visibility in `bitbake -e`. Affects every wget pull but only
 # crates.io currently filters on UA.
 FETCHCMD_wget = "/usr/bin/env wget --tries=2 --timeout=100 --user-agent=Mozilla/5.0"
