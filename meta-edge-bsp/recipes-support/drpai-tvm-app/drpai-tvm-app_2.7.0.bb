@@ -1,8 +1,7 @@
 SUMMARY     = "DRP-AI TVM tutorial inference app (ImageNet classifier) for RZ/V2L"
-DESCRIPTION = "Minimal DRP-AI TVM (RUHMI) classification application for RZ/V2L: \
-loads a DRP-AI-compiled model, runs the DRP-AI pre-processing + inference path \
-over /dev/drpai0 and udmabuf, and prints the top results. Built from the v2ml \
-(CPU-mode) tutorial source against the prebuilt runtime."
+DESCRIPTION = "DRP-AI TVM (RUHMI) classification app for RZ/V2L: loads a DRP-AI-compiled \
+model, runs pre-processing and inference via /dev/drpai0 and udmabuf, prints \
+the top results. Built from the v2ml tutorial source."
 HOMEPAGE    = "https://github.com/renesas-rz/rzv_drp-ai_tvm"
 SECTION     = "console/utils"
 LICENSE     = "Apache-2.0"

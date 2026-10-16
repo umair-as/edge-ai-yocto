@@ -1,9 +1,7 @@
 SUMMARY     = "Dedicated rootless-container service account (edge-ctr)"
-DESCRIPTION = "System account that runs the DRP-AI inference container under \
-rootless Podman. No interactive login; static uid/gid 608; subordinate id \
-ranges and linger enabled by design; home + container storage on /data so state \
-survives RAUC slot swaps. Separates the container runtime principal from the \
-interactive devel login."
+DESCRIPTION = "System account (static uid/gid 608, no login) that runs the inference \
+container under rootless Podman, with subordinate ids, linger, and home and \
+container storage on /data so state survives RAUC slot swaps."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "base"
 LICENSE     = "MIT"

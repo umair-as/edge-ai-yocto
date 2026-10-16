@@ -1,8 +1,7 @@
 SUMMARY     = "DRP-AI TVM (RUHMI) on-device inference runtime for RZ/V2L"
-DESCRIPTION = "Prebuilt EdgeCortix MERA / DRP-AI TVM runtime shared libraries \
-that execute DRP-AI-compiled models on RZ/V2L through /dev/drpai0 and the mmngr \
-buffer path, plus the matching TVM runtime headers (-dev) to build applications \
-against the runtime. The V2L target uses the v2m runtime build."
+DESCRIPTION = "Prebuilt EdgeCortix MERA / DRP-AI TVM runtime libraries that run \
+DRP-AI-compiled models on RZ/V2L via /dev/drpai0 and mmngr, with the TVM \
+runtime headers in -dev. RZ/V2L uses the v2m runtime build."
 HOMEPAGE    = "https://github.com/renesas-rz/rzv_drp-ai_tvm"
 SECTION     = "libs"
 LICENSE     = "Apache-2.0"

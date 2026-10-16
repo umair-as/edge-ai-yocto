@@ -1,8 +1,7 @@
 SUMMARY     = "Rootless Podman quadlet: DRP-AI inference as edge-ctr"
-DESCRIPTION = "Systemd Quadlet (.container) that runs the DRP-AI ResNet18 \
-inference workload as the rootless edge-ctr principal, passing /dev/drpai0 and \
-/dev/udmabuf0 into the container. The inference payload (app + runtime libs + \
-compiled model) is bind-mounted from /data/drpai."
+DESCRIPTION = "Systemd Quadlet that runs the DRP-AI ResNet18 workload as the rootless \
+edge-ctr principal with /dev/drpai0 and /dev/udmabuf0 passed in; the payload \
+(app, runtime, model) is bind-mounted from /data/drpai."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "console/utils"
 LICENSE     = "MIT"

@@ -277,6 +277,24 @@ near-world rebuild. Manual: `bitbake/doc/bitbake-user-manual/`
 (`-intro.rst` for `-S`, `-execution.rst` §checksums) in the kas-cloned
 `bitbake/` checkout.
 
+## Before patching third-party code — check upstream first
+
+Before writing a patch for, or reporting a bug in, an upstream project (RAUC,
+U-Boot, TF-A, the kernel, any meta-* layer), search the project itself: its
+issues, PRs, default branch and release tags. A local clone's HEAD is not
+upstream; local clones go stale. An upstream fix is backported
+verbatim (`Upstream-Status: Backport`) in preference to a local patch.
+
+```bash
+gh search issues --repo <org>/<repo> "<error text>"      # then read the fixing PR
+gh api repos/<org>/<repo>/compare/<our-pin>...<branch>   # what the pin is missing
+git ls-remote origin '<branch>'                          # is the local clone current?
+git tag --contains <fix-sha>                             # is the fix in a release?
+```
+
+The same applies to layer and payload pins: compare the pin against the
+upstream branch before assuming a feature or fix is absent.
+
 ## Patch iteration — when to reach for devtool
 
 For known-good patches harvested from another tree (proven to apply
