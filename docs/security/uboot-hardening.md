@@ -398,7 +398,7 @@ Two questions need separate answers. Wave 3 answered them as one:
 | `CONFIG_MODULE_SIG` | `=y` (pre-existing) | Module-signature checking compiled in |
 | `CONFIG_MODULE_SIG_ALL` | `=y` (pre-existing) | In-tree modules signed at kernel build |
 | `CONFIG_MODULE_SIG_FORCE` | `=y` | Unsigned modules are rejected independently of lockdown |
-| `CONFIG_MODULE_SIG_KEY` | `"certs/signing_key.pem"` (kernel default) | Auto-generated per build |
+| `CONFIG_MODULE_SIG_KEY` | `"certs/edge-module-signing.pem"` | Persistent key from `scripts/kernel-module-key-init.sh`; every kernel and module build signs with it |
 | `EXTRA_KERNEL_ARGS` | no `lockdown=` token | LSM stays dormant; modules load |
 
 The four hand-installed Renesas modules are now signed by their bbappends. The

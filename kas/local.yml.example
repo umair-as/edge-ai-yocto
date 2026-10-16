@@ -194,13 +194,9 @@ local_conf_header:
     # startup, and kas forwards only its env: keys. See AGENTS.md §Build commands.
 
     # --- Tier profile -----------------------------------------------------
-    # "prod" — locked-down image (package-management removed, observability
-    #          off by default). edge-image-base.bb pins this.
-    # "dev"  — bring-up / debug image (observability on by default).
-    #          edge-image-dev.bb pins this.
-    # The pin in the .bb is itself an EDGE_PROFILE = "..." line, so setting
-    # this only matters if you bitbake a downstream image that doesn't pin.
-    # EDGE_PROFILE = "prod"
+    # EDGE_PROFILE (dev|prod) is set per make target (`make prod`,
+    # `make bundle IMAGE=prod`). Do not set it here: a local.conf value
+    # overrides every target's tier.
 
     # --- OTA backend ------------------------------------------------------
     # The distro requires conf/distro/include/edge-ota-${EDGE_OTA_BACKEND}.inc;

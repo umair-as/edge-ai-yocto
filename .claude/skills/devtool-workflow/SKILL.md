@@ -63,7 +63,7 @@ uses (`make -n parse BOARD=<board>` prints it; not while another build runs —
 the parallel-build hook blocks it), for example on RZ/V2L:
 
 ```bash
-. scripts/env.sh && kas shell -c 'export BB_ENV_PASSTHROUGH_ADDITIONS="$BB_ENV_PASSTHROUGH_ADDITIONS EDGE_PROFILE" EDGE_PROFILE=dev; devtool modify --no-overrides linux-renesas' \
+. scripts/env.sh && EDGE_PROFILE=dev kas shell -c 'devtool modify --no-overrides linux-renesas' \
     kas/base.yml:kas/machines/rzv2l.yml:kas/local.yml
 ```
 

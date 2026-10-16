@@ -1,17 +1,16 @@
 # Operator-facing toggles for the edge-ai distro.
 #
 # All declared with ?= so kas/local.yml wins. A shell environment override
-# does NOT win unless the variable is on the Makefile's shell-level
-# BB_ENV_PASSTHROUGH_ADDITIONS list -- bitbake discards the rest of the
-# environment before this file is parsed.
+# does NOT win: bitbake keeps only the variables kas forwards (the env: keys
+# of kas/base.yml) and discards the rest before this file is parsed.
 
 # ----- Choice variables (string-valued) ------------------------------------
 
 # Image tier. Drives OVERRIDES (:prod / :dev) and the profile include.
-# Resolved at distro-parse — set it in the environment (Makefile targets
-# export it via BB_ENV_PASSTHROUGH_ADDITIONS) or kas/local.yml, not in an
-# image recipe (an image-recipe assignment is too late for the require below
-# in edge-ai.conf). Default is dev; prod is an explicit opt-in for release.
+# Resolved at distro-parse — each make target sets it, forwarded by the
+# kas/base.yml env: key; not in an image recipe (an image-recipe assignment
+# is too late for the require below in edge-ai.conf). Default is dev; prod
+# is an explicit opt-in for release.
 EDGE_PROFILE ?= "dev"
 
 # OTA backend. Drives the ota-${EDGE_OTA_BACKEND}.inc include and the
@@ -154,4 +153,4 @@ EDGE_RAUC_BUNDLE_FORMAT ?= "${@bb.utils.contains('EDGE_ENABLE_RAUC_BUNDLE_ENCRYP
 
 # No BB_ENV_PASSTHROUGH_ADDITIONS here: bitbake reads it from the environment
 # at startup, before any conf file is parsed, so an append in conf has no
-# effect. The Makefile sets it in the shell that runs bitbake.
+# effect. kas adds the env: keys of kas/base.yml to it.

@@ -7,9 +7,9 @@ inherit bundle
 RAUC_BUNDLE_COMPATIBLE ?= "edge-ai-${MACHINE}"
 
 RAUC_BUNDLE_SLOTS  = "rootfs"
-# Default to the dev image — the current iteration target. Operators
-# shipping prod bundles set BUNDLE_IMAGE_NAME = "edge-image-prod" (or
-# "-base") in kas/local.yml.
+# Default to the dev image. `make bundle IMAGE=prod` sets BUNDLE_IMAGE_NAME
+# and EDGE_PROFILE together; a local.conf assignment overrides the make
+# value and splits image from tier.
 BUNDLE_IMAGE_NAME ?= "edge-image-dev"
 BUNDLE_IMAGE       = "${BUNDLE_IMAGE_NAME}"
 

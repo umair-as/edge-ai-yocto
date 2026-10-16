@@ -44,7 +44,7 @@ present), which builds correctly but **without the shared `DL_DIR`/`SSTATE_DIR`*
 a cold build of hours instead of the minutes an sstate-hit build takes.
 
 Layer *setup* stays fast either way: `KAS_REPO_REF_DIR` defaults to
-`/mnt/yocto-nvme/layers-wrynose` in both `Makefile:27` and
+`/mnt/yocto-nvme/layers-wrynose` in both the `Makefile` and
 `scripts/env.sh`, so git alternates work without `local.yml`. It is only
 sstate and downloads that go missing — which is the expensive half.
 

@@ -15,12 +15,12 @@ Upstream Yocto layers (`bitbake`, `openembedded-core`, `meta-arm`,
 repo root. They are managed exclusively by kas and live under
 `$KAS_WORK_DIR` (= `.kas/`), which is gitignored as a category.
 
-The bitbake build dir is **not** in scope for this policy. It stays at
-the traditional `build/` at repo root (set via `KAS_BUILD_DIR`) — the
-universal Yocto convention every operator, tutorial, and `oe-init-...`
-script references. Keeping it at the conventional location costs
-nothing in this design (`build/` is one gitignored dir, not a per-layer
-denylist), and aligns with operator muscle memory.
+The bitbake build dir is **not** in scope for this policy. It stays
+under the traditional `build/` at repo root (set via `KAS_BUILD_DIR`),
+one tree per board as `build/<BOARD>/` (see
+[build-system.md](../dev/build-system.md#build-directories)). Keeping it at
+the conventional location costs nothing in this design (`build/` is one
+gitignored dir, not a per-layer denylist).
 
 Acceleration uses `KAS_REPO_REF_DIR` (git alternates pointing at a
 shared object cache). SHA pins declared in `kas/base.yml`'s `repos:`
