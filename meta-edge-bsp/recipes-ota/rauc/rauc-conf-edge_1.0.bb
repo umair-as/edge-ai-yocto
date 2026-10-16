@@ -76,6 +76,14 @@ EDGE_RAUC_BUNDLE_FORMATS ?= "${@bb.utils.contains('EDGE_ENABLE_RAUC_BUNDLE_ENCRY
 EDGE_RAUC_ENCRYPTION_KEY  ?= "${@'/etc/ota/bundle-decrypt.key' if d.getVar('EDGE_RAUC_DECRYPT_KEY_SRC') else ''}"
 EDGE_RAUC_ENCRYPTION_CERT ?= "${@'/etc/ota/bundle-decrypt.cert.pem' if d.getVar('EDGE_RAUC_DECRYPT_CERT_SRC') else ''}"
 
+# ----- Bootloader slot ----------------------------------------------------
+# A board overlay with a RAUC bootloader slot sets both: a boot-emmc slot on
+# the base eMMC device, and the pre-install handler that gates bootloader
+# bundles (operator authorization, no mixed bundles, read-back hook). Empty =
+# no bootloader slot.
+EDGE_RAUC_BOOTLOADER_SLOT_DEVICE ?= ""
+EDGE_RAUC_PREINSTALL_HANDLER     ?= ""
+
 do_install() {
     install -d ${D}${sysconfdir}/rauc
 
@@ -128,6 +136,24 @@ do_install() {
     else
         sed -i "/@RAUC_ALLOWED_SIGNER_CNS_STANZA@/d" \
             ${D}${sysconfdir}/rauc/system.conf
+    fi
+
+    # A bootloader slot is never rendered without the handler that gates it.
+    if [ -n "${EDGE_RAUC_BOOTLOADER_SLOT_DEVICE}" ]; then
+        if [ -z "${EDGE_RAUC_PREINSTALL_HANDLER}" ]; then
+            bbfatal "EDGE_RAUC_BOOTLOADER_SLOT_DEVICE is set without EDGE_RAUC_PREINSTALL_HANDLER; the bootloader slot would accept any signed bundle."
+        fi
+        {
+            echo ""
+            echo "[handlers]"
+            echo "pre-install=${EDGE_RAUC_PREINSTALL_HANDLER}"
+            echo ""
+            echo "[slot.bootloader.0]"
+            echo "device=${EDGE_RAUC_BOOTLOADER_SLOT_DEVICE}"
+            echo "type=boot-emmc"
+        } >> ${D}${sysconfdir}/rauc/system.conf
+    elif [ -n "${EDGE_RAUC_PREINSTALL_HANDLER}" ]; then
+        printf '\n[handlers]\npre-install=%s\n' "${EDGE_RAUC_PREINSTALL_HANDLER}" >> ${D}${sysconfdir}/rauc/system.conf
     fi
 
     # Encryption: append [encryption] block when opt-in flag is on.

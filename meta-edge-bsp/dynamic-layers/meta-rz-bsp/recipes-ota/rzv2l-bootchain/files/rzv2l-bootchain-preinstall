@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+#
+# RAUC system pre-install handler. RAUC runs it for every install after the
+# bundle is mounted and before the compatible check and any slot write. A
+# bundle without the bootloader class passes through. A bundle targeting the
+# bootloader slot is accepted only when:
+#   - it carries no other image (no mixed bootloader + rootfs bundles);
+#   - an operator authorization from rzv2l-bootchain-authorize exists for this
+#     boot, has not expired, and names this bundle's image digest and build id;
+#     it is consumed by this attempt whatever the outcome;
+#   - its manifest declares the slot pre- and post-install hooks, no install
+#     hook, bundle hook or custom handler, and ships the reference hook stub (the post-install hook is the read-back check, which
+#     RAUC runs before it flips EXT_CSD);
+#   - the layout, TF-A pin, PMIC variant, board state and FIT anchor guards pass.
+# On success it leaves an approval that the slot pre-install hook consumes.
+set -euo pipefail
+IFS=$'\n\t'
+# shellcheck disable=SC2034  # read by common.sh
+RZB_TAG="rzv2l-bootchain-preinstall"
+# shellcheck source=rzv2l-bootchain-common.sh
+. "${RZB_LIB:-/usr/lib/rzv2l-bootchain/common.sh}"
+
+# RAUC_TARGET_SLOTS lists one inactive slot per root class in system.conf,
+# whatever the bundle carries (install.c determine_target_install_group);
+# RAUC_IMAGE_CLASS_<n> is set only for target slots the manifest has an image
+# for. Classify by the images.
+IFS=' ' read -r -a slots <<< "${RAUC_TARGET_SLOTS:-}"
+bl=""; others=()
+for n in "${slots[@]}"; do
+    v="RAUC_IMAGE_CLASS_${n}"; class="${!v:-}"
+    [ -n "$class" ] || continue
+    if [ "$class" = "$RZB_CLASS" ]; then bl="$n"; else others+=("$class"); fi
+done
+
+mf="${RAUC_BUNDLE_MOUNT_POINT:-}/manifest.raucm"
+mf_images="$(sed -n 's/^\[image\.\([^]]*\)\]$/\1/p' "$mf" 2>/dev/null | tr '\n' ' ')"
+case " ${mf_images} " in
+    *" ${RZB_CLASS} "*) [ -n "$bl" ] || rzb_die "bundle carries a ${RZB_CLASS} image but RAUC targets no ${RZB_CLASS} slot; refusing" ;;
+esac
+[ -n "$bl" ] || exit 0
+
+[ "${#others[@]}" -eq 0 ] || rzb_die "bundle carries ${RZB_CLASS} together with: ${others[*]} — bootchain bundles must carry the bootchain only; refusing"
+[ "$(printf '%s' "$mf_images" | wc -w)" -eq 1 ] || rzb_die "bundle manifest lists images '${mf_images% }', expected only ${RZB_CLASS}; refusing"
+
+install -d -m 0700 "$RZB_RUN_DIR" "${RZB_RUN_DIR}/consumed"
+
+# --- operator authorization: one bundle, one attempt, this boot ------------
+auth="${RZB_RUN_DIR}/authorization"
+used="${RZB_RUN_DIR}/consumed/${RAUC_TRANSACTION_ID:-$$}"
+mv "$auth" "$used" 2>/dev/null \
+    || rzb_die "no operator authorization for a bootloader install — run 'rzv2l-bootchain-authorize <bundle>' first; refusing"
+rzb_log "authorization consumed by transaction ${RAUC_TRANSACTION_ID:-?}"
+
+v="RAUC_IMAGE_DIGEST_${bl}"; digest="${!v:-}"
+v="RAUC_IMAGE_NAME_${bl}";   name="${!v:-}"
+build="${RAUC_META_EDGE_BUILD_ID:-}"
+[ "$(rzb_kv "$used" format)" = "$RZB_FORMAT" ] || rzb_die "authorization file has an unknown format; refusing"
+[ "$(rzb_kv "$used" boot_id)" = "$(rzb_boot_id)" ] || rzb_die "authorization was issued in another boot; refusing"
+exp="$(rzb_kv "$used" expires)"
+case "$exp" in ''|*[!0-9]*) rzb_die "authorization has no valid expiry; refusing" ;; esac
+[ "$(date +%s)" -lt "$exp" ] || rzb_die "authorization expired at $(date -d "@${exp}" '+%F %T' 2>/dev/null || echo "$exp"); refusing"
+[ -n "$digest" ] && [ "$(rzb_kv "$used" image_digest)" = "$digest" ] \
+    || rzb_die "authorization is for image $(rzb_kv "$used" image_digest | cut -c1-16)…, this bundle carries ${digest:0:16}…; refusing"
+[ -n "$build" ] && [ "$(rzb_kv "$used" build_id)" = "$build" ] \
+    || rzb_die "authorization is for build '$(rzb_kv "$used" build_id)', this bundle is build '${build}'; refusing"
+
+# --- the read-back hook must be present ------------------------------------
+hooks="$(awk -v s="[image.${RZB_CLASS}]" '
+    /^\[/ { in_s = ($0 == s); next }
+    in_s && /^hooks=/ { sub(/^hooks=/, ""); print; exit }' "$mf")"
+case ";${hooks};" in *";pre-install;"*) ;; *) rzb_die "manifest declares no slot pre-install hook for ${RZB_CLASS}; refusing" ;; esac
+case ";${hooks};" in *";post-install;"*) ;; *) rzb_die "manifest declares no slot post-install hook (read-back check) for ${RZB_CLASS}; refusing" ;; esac
+case ";${hooks};" in *";install;"*) rzb_die "manifest declares a slot install hook for ${RZB_CLASS}; it would replace RAUC's boot-emmc handler; refusing" ;; esac
+grep -qx '\[handler\]' "$mf" && rzb_die "manifest names a custom install handler; refusing"
+bhooks="$(awk '/^\[/ { in_s = ($0 == "[hooks]"); next } in_s && /^hooks=/ { sub(/^hooks=/, ""); print; exit }' "$mf")"
+[ -z "$bhooks" ] || rzb_die "manifest declares bundle hooks '${bhooks}' (install-check overrides the compatible check); refusing"
+hookfile="$(awk '/^\[/ { in_s = ($0 == "[hooks]"); next } in_s && /^filename=/ { sub(/^filename=/, ""); print; exit }' "$mf")"
+[ -n "$hookfile" ] || rzb_die "manifest names no hook file; refusing"
+case "$hookfile" in */*|.*) rzb_die "manifest hook file '${hookfile}' is not a plain file name; refusing" ;; esac
+cmp -s "${RAUC_BUNDLE_MOUNT_POINT}/${hookfile}" "${RZB_SHARE_DIR}/bundle-hook.sh" \
+    || rzb_die "bundle hook '${hookfile}' differs from ${RZB_SHARE_DIR}/bundle-hook.sh; refusing"
+
+# --- bundle contents ------------------------------------------------------
+[ "${RAUC_META_EDGE_BOOTCHAIN_FORMAT:-}" = "$RZB_FORMAT" ] || rzb_die "bundle meta bootchain-format '${RAUC_META_EDGE_BOOTCHAIN_FORMAT:-}' != ${RZB_FORMAT}; refusing"
+case "$name" in ''|*/*) rzb_die "image name '${name}' is not a plain file name; refusing" ;; esac
+img="${RAUC_BUNDLE_MOUNT_POINT}/${name}"
+[ "$(sha256sum "$img" | awk '{print $1}')" = "$digest" ] || rzb_die "image ${name} does not match its manifest digest; refusing"
+[ "$(rzb_int "${RAUC_META_EDGE_BL2_OFFSET:-}" bl2-offset)" -eq "$RZB_BL2_OFFSET" ] || rzb_die "bundle bl2-offset '${RAUC_META_EDGE_BL2_OFFSET:-}' != $(printf '%#x' "$RZB_BL2_OFFSET"); refusing"
+rzb_check_layout_pin "${RAUC_META_EDGE_TFA_PIN:-}" "$(rzb_int "${RAUC_META_EDGE_FIP_OFFSET:-}" fip-offset)"
+bl2_size="$(rzb_int "${RAUC_META_EDGE_BL2_SIZE:-}" bl2-size)"
+fip_size="$(rzb_int "${RAUC_META_EDGE_FIP_SIZE:-}" fip-size)"
+rzb_check_image "$img" "$bl2_size" "${RAUC_META_EDGE_BL2_SHA256:-}" "$fip_size" "${RAUC_META_EDGE_FIP_SHA256:-}"
+det="$(rzb_detected_variant)"
+[ "${RAUC_META_EDGE_VARIANT:-}" = "$det" ] || rzb_die "bundle is for variant '${RAUC_META_EDGE_VARIANT:-}', this board is ${det}; refusing"
+
+# --- board state ------------------------------------------------------------
+active="$(rzb_check_board)" || exit 1
+target=$(( 1 - active ))
+[ "$(stat -Lc%s "$img")" -le "$(rzb_bootpart_size "$target")" ] || rzb_die "image ($(stat -Lc%s "$img") B) larger than ${RZB_MMC_DEV}boot${target}; refusing"
+[ -e "${RZB_SYSFS}/block/$(basename "$RZB_MMC_DEV")boot${target}/force_ro" ] || rzb_die "no force_ro control for ${RZB_MMC_DEV}boot${target}; refusing"
+rzb_log "board: booted from emmc, boot${active} active, writing boot${target}, variant ${det}"
+
+# --- FIT anchor --------------------------------------------------------------
+fipreg="$(mktemp "${RZB_RUN_DIR}/fip.XXXXXX")"; cand="$(mktemp "${RZB_RUN_DIR}/cand.XXXXXX")"; cur="$(mktemp "${RZB_RUN_DIR}/cur.XXXXXX")"
+trap 'rm -f "$fipreg" "$cand" "$cur"' EXIT
+dd if="$img" of="$fipreg" iflag=skip_bytes,count_bytes skip="$RZB_FIP_OFFSET" count="$fip_size" status=none
+rzb_fip_anchor "$fipreg" "$cand" || rzb_die "anchor guard: no U-Boot DTB with FIT keys in the bundle FIP; refusing"
+rzb_current_anchor "$active" "$cur" || rzb_die "anchor guard: no U-Boot DTB with FIT keys in the active boot${active} FIP; refusing"
+rzb_log "anchor guard: current anchor read from boot${active}"
+rzb_check_anchor "$cand" "$cur"
+
+{
+    echo "format=${RZB_FORMAT}"
+    echo "image_digest=${digest}"
+    echo "target=${target}"
+    echo "boot_id=$(rzb_boot_id)"
+    echo "transaction=${RAUC_TRANSACTION_ID:-}"
+} > "${RZB_RUN_DIR}/approved.tmp"
+mv "${RZB_RUN_DIR}/approved.tmp" "${RZB_RUN_DIR}/approved"
+rzb_log "accepted ${RAUC_META_EDGE_TFA_PIN} build ${build} (${digest:0:16}…) for boot${target}"

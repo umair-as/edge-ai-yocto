@@ -1,0 +1,115 @@
+From a75bbb2b2764eb78954318a809d257de9be79b5e Mon Sep 17 00:00:00 2001
+From: Florian Bezannier <florian.bezannier@agregio-solutions.com>
+Date: Fri, 27 Mar 2026 09:38:17 +0100
+Subject: [PATCH] src/update_handler: fix 'assertion 'slot->name' failed' error
+ for boot-emmc slots
+
+To properly support env variable generation for hook scripts, more parts
+of the slot struct need to be filled out. Add that for the temporary
+slot.
+
+Also add a corresponding regression test case.
+
+Upstream-Status: Backport [https://github.com/rauc/rauc/commit/a75bbb2b2764eb78954318a809d257de9be79b5e, PR #1901; after v1.15.2]
+
+Signed-off-by: Florian Bezannier <florian.bezannier@agregio-solutions.com>
+[Jan Luebbe: add commit message]
+Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+---
+ src/update_handler.c    |  4 +++
+ test/test_write_slot.py | 61 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 65 insertions(+)
+
+diff --git a/src/update_handler.c b/src/update_handler.c
+index 56ea8d55..0b95f335 100644
+--- a/src/update_handler.c
++++ b/src/update_handler.c
+@@ -2369,6 +2369,10 @@ static gboolean img_to_boot_emmc_handler(RaucImage *image, RaucSlot *dest_slot,
+ 	 * partition as device.
+ 	 */
+ 	part_slot = g_new0(RaucSlot, 1);
++	part_slot->name = dest_slot->name;
++	part_slot->sclass = dest_slot->sclass;
++	part_slot->type = g_strdup(dest_slot->type);
++	part_slot->state = dest_slot->state;
+ 	part_slot->device = g_strdup_printf(
+ 			"%sboot%d",
+ 			realdev,
+diff --git a/test/test_write_slot.py b/test/test_write_slot.py
+index 6bba8aa2..cffe1b30 100644
+--- a/test/test_write_slot.py
++++ b/test/test_write_slot.py
+@@ -1,5 +1,6 @@
+ import os
+ from subprocess import check_call
++from textwrap import dedent
+ 
+ from helper import run
+ from conftest import needs_emmc
+@@ -165,3 +166,63 @@ def test_write_boot_emmc_size_limit_too_large(system):
+     assert f"Boot partition {device}boot0 is now active" in err
+ 
+     assert "The size-limit (10485760 bytes) exceeds actual device size" in err
++
++
++@needs_emmc
++def test_write_boot_emmc_hook(tmp_path, create_system_files, system, bundle):
++    """
++    Tests that pre/post-install slot hooks work correctly with boot-emmc slots.
++    Regression test for https://github.com/rauc/rauc/issues/1893
++    """
++    device = os.environ["RAUC_TEST_EMMC"]
++
++    # disable boot partition for a fixed setup
++    check_call(["mmc", "bootpart", "enable", "0", "0", device])
++
++    system.prepare_minimal_config()
++    system.config["slot.bootloader.0"] = {
++        "device": device,
++        "type": "boot-emmc",
++    }
++    system.write_config()
++
++    bundle.add_hook_script(
++        dedent("""\
++        #!/bin/bash
++        set -e
++        case "$1" in
++            slot-pre-install)
++                env | sort > "$RAUC_PYTEST_TMP/pre-install-hook-env"
++                ;;
++            slot-post-install)
++                env | sort > "$RAUC_PYTEST_TMP/post-install-hook-env"
++                ;;
++            *)
++                exit 1
++                ;;
++        esac
++        """)
++    )
++    bundle.manifest["image.bootloader"] = {
++        "filename": "bootloader.img",
++        "hooks": "pre-install;post-install",
++    }
++    bundle.make_random_image("bootloader", 4096, "random bootloader")
++    bundle.build()
++
++    with system.running_service("A"):
++        out, err, exitcode = run(f"rauc install {bundle.output}")
++
++    assert exitcode == 0
++
++    with open(tmp_path / "pre-install-hook-env") as f:
++        pre_lines = f.readlines()
++        assert "RAUC_SLOT_NAME=bootloader.0\n" in pre_lines
++        assert "RAUC_SLOT_CLASS=bootloader\n" in pre_lines
++        assert "RAUC_SLOT_TYPE=boot-emmc\n" in pre_lines
++
++    with open(tmp_path / "post-install-hook-env") as f:
++        post_lines = f.readlines()
++        assert "RAUC_SLOT_NAME=bootloader.0\n" in post_lines
++        assert "RAUC_SLOT_CLASS=bootloader\n" in post_lines
++        assert "RAUC_SLOT_TYPE=boot-emmc\n" in post_lines
+-- 
+2.43.0
+

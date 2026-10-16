@@ -18,8 +18,11 @@ Per the RZ/V2L Linux Start-up Guide ("How to boot from eMMC"):
 The mask ROM loads BL2 from `boot0`; BL2 loads the FIP from `boot0`. Neither is in
 the user area, so the user-area image is a clean GPT and WIC never touches `boot0`.
 The same loader binaries serve SD and eMMC (TF-A reads a boot register to pick the
-source). Later bootchain updates use `rzv2l-bootloader-update --mode emmc`
-([bootchain](../bootchain/rzv2l.md)).
+source). Later bootchain updates go through the RAUC bootloader slot, which writes
+`boot1` or `boot0`, whichever is not selected, and switches EXT_CSD to it
+([bootchain](../bootchain/rzv2l.md#emmc-rauc-bootloader-slot)). A `boot0` that holds a
+bootchain without `/chosen/edge,boot-source` is first rewritten with
+`rzv2l-bootloader-update --mode emmc`.
 
 ## Prerequisites
 
@@ -96,7 +99,17 @@ sudo ./edge-emmc-provision.sh \
     --target /dev/mmcblkX
 ```
 
+### Option C — U-Boot `ums` from QSPI
+
+When the eMMC's own bootchain is not usable, a QSPI-booted U-Boot exports the eMMC
+user area the same way: SW11 `OFF, OFF, OFF, ON`, SW1-2 OFF, stop autoboot, then
+`ums 0 mmc 0` and the host steps of Option A. Before `ums`, keep the host desktop from
+auto-mounting the exported partitions (a udev rule setting `UDISKS_IGNORE=1` for the
+gadget's vendor ID `0000`); `ums` has no read-only mode. `mmc partconf 0` on the same
+console shows which boot partition is selected.
+
 ## Recovery
 
 A bad eMMC provision does not touch any SD. Select SD/eSD boot (SW1-2 ON, SW11
-`ON, ON, OFF, ON`) and boot the SD unchanged.
+`ON, ON, OFF, ON`) and boot the SD unchanged. A bootchain problem in a boot partition
+is recovered from QSPI U-Boot ([bootchain recovery](../bootchain/rzv2l.md#recovery)).

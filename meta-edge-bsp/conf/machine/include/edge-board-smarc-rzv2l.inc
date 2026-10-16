@@ -127,3 +127,20 @@ WKS_FILE = "${@oe.utils.conditional('EDGE_BOOT_TARGET', 'emmc', 'edge-rzv2l-emmc
 # Partition table of the selected layout; edge-slot-udev keys its rules on it.
 # Plain `=`: the distro pre-declares it.
 EDGE_PTABLE = "${@oe.utils.conditional('EDGE_BOOT_TARGET', 'emmc', 'gpt', 'msdos', d)}"
+
+# --- eMMC bootchain (RAUC boot-emmc slot) ----------------------------------
+# BL2 + FIP as one image per eMMC boot partition: BL2 (bl2_bp_mmc) at sector 1,
+# FIP at the offset BL2 of the TF-A pin reads ("<pin>:<offset>" pairs; the
+# device refuses a bundle whose pin is absent here). The size bound is the
+# build-time check; the device checks the partition's real size.
+EDGE_RZV2L_BOOTCHAIN_MMC_DEV    = "/dev/mmcblk0"
+EDGE_RZV2L_BOOTCHAIN_BL2_OFFSET = "0x200"
+EDGE_RZV2L_BOOTCHAIN_FIP_OFFSET = "0x20000"
+EDGE_RZV2L_TFA_FIP_LAYOUT       = "2.10:0x20000"
+EDGE_RZV2L_BOOTCHAIN_MAX_SIZE   = "0x400000"
+
+# eMMC boot target only: the bootloader slot, its pre-install handler and the
+# guard package. Unset EDGE_BOOT_TARGET means esd.
+EDGE_RAUC_BOOTLOADER_SLOT_DEVICE = "${@oe.utils.conditional('EDGE_BOOT_TARGET', 'emmc', d.getVar('EDGE_RZV2L_BOOTCHAIN_MMC_DEV'), '', d)}"
+EDGE_RAUC_PREINSTALL_HANDLER     = "${@oe.utils.conditional('EDGE_BOOT_TARGET', 'emmc', '/usr/lib/rzv2l-bootchain/preinstall', '', d)}"
+EDGE_RAUC_BOOTLOADER_PACKAGES    = "${@oe.utils.conditional('EDGE_BOOT_TARGET', 'emmc', 'rzv2l-bootchain-guard', '', d)}"

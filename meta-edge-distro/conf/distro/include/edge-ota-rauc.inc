@@ -36,3 +36,8 @@ IMAGE_INSTALL:append = " rauc rauc-conf-edge virtual-ota-uboot-env u-boot-fw-uti
 # dispatches on the partition table at runtime (systemd-repart for GPT/eMMC,
 # parted for MBR/eSD), so the same package ships regardless of EDGE_BOOT_TARGET.
 IMAGE_INSTALL:append = " edge-grow-data"
+
+# Bootloader slot guards, set by the board overlay for boot targets that have
+# a RAUC bootloader slot (rauc-conf-edge renders the slot from the same facts).
+EDGE_RAUC_BOOTLOADER_PACKAGES ??= ""
+IMAGE_INSTALL:append = " ${EDGE_RAUC_BOOTLOADER_PACKAGES}"

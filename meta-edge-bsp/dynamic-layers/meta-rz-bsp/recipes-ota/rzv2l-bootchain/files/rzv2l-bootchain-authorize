@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+#
+# Operator authorization for one RZ/V2L bootchain bundle install.
+#
+#   rzv2l-bootchain-authorize [--ttl SECONDS] <bundle.raucb>
+#   rzv2l-bootchain-authorize --status | --revoke
+#
+# Verifies the bundle with the system keyring (rauc info), checks that it is a
+# bootchain-only bundle with the read-back hooks, and writes one authorization
+# to /run (cleared on reboot) naming its image digest and build id. The RAUC
+# pre-install handler consumes it on the next bootloader install attempt,
+# successful or not; a new authorization replaces an unused one. The printed
+# install command also pins the manifest hash.
+set -euo pipefail
+IFS=$'\n\t'
+# shellcheck disable=SC2034  # read by common.sh
+RZB_TAG="rzv2l-bootchain-authorize"
+# shellcheck source=rzv2l-bootchain-common.sh
+. "${RZB_LIB:-/usr/lib/rzv2l-bootchain/common.sh}"
+
+TTL_MAX=3600
+ttl=600
+auth="${RZB_RUN_DIR}/authorization"
+
+usage() { sed -n '4,14p' "$0" | sed 's/^# \{0,1\}//'; }
+
+case "${1:-}" in
+    --status)
+        [ -f "$auth" ] || { echo "no pending authorization"; exit 0; }
+        exp="$(rzb_kv "$auth" expires)"
+        echo "pending: build $(rzb_kv "$auth" build_id), image $(rzb_kv "$auth" image_digest | cut -c1-16)…, expires $(date -d "@${exp}" '+%F %T')"
+        exit 0 ;;
+    --revoke) rm -f "$auth"; echo "authorization revoked"; exit 0 ;;
+    --ttl) ttl="${2:-}"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+esac
+bundle="${1:-}"
+[ -n "$bundle" ] && [ $# -eq 1 ] || { usage >&2; exit 2; }
+case "$ttl" in ''|*[!0-9]*) rzb_die "--ttl must be a number of seconds" ;; esac
+[ "$ttl" -ge 1 ] && [ "$ttl" -le "$TTL_MAX" ] || rzb_die "--ttl must be 1..${TTL_MAX} seconds"
+[ "$(id -u)" -eq 0 ] || rzb_die "must run as root"
+[ -f "$bundle" ] || rzb_die "no such bundle: $bundle"
+
+install -d -m 0700 "$RZB_RUN_DIR"
+info="$(mktemp "${RZB_RUN_DIR}/info.XXXXXX")"
+trap 'rm -f "$info"' EXIT
+rauc info --output-format=shell "$bundle" > "$info" 2>/dev/null \
+    || rzb_die "rauc info failed: bundle signature or format not accepted by this system"
+# rauc info --output-format=shell single-quotes each value; values with an
+# embedded quote are refused rather than unescaped. Images count from 0.
+get() {
+    local v; v="$(rzb_kv "$info" "$1")"
+    case "$v" in "'"*"'") v="${v#\'}"; v="${v%\'}" ;; esac
+    case "$v" in *"'"*) rzb_die "unexpected quoting in rauc info field $1" ;; esac
+    printf '%s' "$v"
+}
+
+[ "$(get RAUC_MF_IMAGES)" = 1 ] || rzb_die "bundle carries $(get RAUC_MF_IMAGES) images; a bootchain bundle carries exactly one"
+[ "$(get RAUC_IMAGE_CLASS_0)" = "$RZB_CLASS" ] || rzb_die "bundle image class is '$(get RAUC_IMAGE_CLASS_0)', not ${RZB_CLASS}"
+hooks="$(get RAUC_IMAGE_HOOKS_0)"
+case " ${hooks} " in *" pre-install "*) ;; *) rzb_die "bundle image declares no slot pre-install hook" ;; esac
+case " ${hooks} " in *" post-install "*) ;; *) rzb_die "bundle image declares no slot post-install hook (read-back check)" ;; esac
+case " ${hooks} " in *" install "*) rzb_die "bundle image declares a slot install hook, which would replace RAUC's boot-emmc handler" ;; esac
+[ -z "$(get RAUC_MF_HOOKS)" ] || rzb_die "bundle declares bundle hooks '$(get RAUC_MF_HOOKS)'"
+[ "$(get RAUC_META_EDGE_BOOTCHAIN_FORMAT)" = "$RZB_FORMAT" ] || rzb_die "bundle bootchain-format '$(get RAUC_META_EDGE_BOOTCHAIN_FORMAT)' != ${RZB_FORMAT}"
+digest="$(get RAUC_IMAGE_DIGEST_0)"; build="$(get RAUC_META_EDGE_BUILD_ID)"; hash="$(get RAUC_MF_HASH)"
+[ -n "$digest" ] && [ -n "$build" ] && [ -n "$hash" ] || rzb_die "bundle lacks image digest, build id or manifest hash"
+
+exp=$(( $(date +%s) + ttl ))
+{
+    echo "format=${RZB_FORMAT}"
+    echo "image_digest=${digest}"
+    echo "build_id=${build}"
+    echo "manifest_hash=${hash}"
+    echo "boot_id=$(rzb_boot_id)"
+    echo "expires=${exp}"
+} > "${auth}.tmp"
+mv "${auth}.tmp" "$auth"
+
+echo "authorized: $(get RAUC_MF_VERSION) build ${build}, TF-A $(get RAUC_META_EDGE_TFA_PIN), $(get RAUC_META_EDGE_VARIANT)"
+echo "  image ${digest}"
+echo "  one install attempt until $(date -d "@${exp}" '+%F %T'), this boot only"
+echo "install with:"
+echo "  rauc install --require-manifest-hash=${hash} ${bundle}"

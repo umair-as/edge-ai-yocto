@@ -1,4 +1,4 @@
-.PHONY: help base dev prod bundle bootloader-package parse layers shell info clean-lock netboot-sync lock verify-pins purge hooks ci kernel-config-export kernel-hardening-check cve-archive cve-calibrate cve-refresh cve-monitor
+.PHONY: help base dev prod bundle bootchain-bundle bootloader-package parse layers shell info clean-lock netboot-sync lock verify-pins purge hooks ci kernel-config-export kernel-hardening-check cve-archive cve-calibrate cve-refresh cve-monitor
 
 KAS ?= kas
 
@@ -220,6 +220,7 @@ help:
 	@echo "  make bundle                  Build edge-bundle (.raucb) for OTA install (dev tier)"
 	@echo "  make bundle EDGE_PROFILE=prod  Bundle a prod image (set BUNDLE_IMAGE_NAME=edge-image-prod)"
 	@echo "  make bundle SBOM_CVE=1       + image SBOM + CVE report for the bundled rootfs (always on for prod)"
+	@echo "  make bootchain-bundle        Build the RZ/V2L bootloader-only bundle (eMMC boot-emmc slot, operator-installed)"
 	@echo ""
 	@echo "Capability flags (composable; combine freely):"
 	@echo "  TPM=1                        + meta-secure-core (TPM2 + IMA/EVM userspace)"
@@ -300,6 +301,22 @@ bundle: | $(KAS_DIRS)
 	$(KAS) shell -c 'BB_ENV_PASSTHROUGH_ADDITIONS="$$BB_ENV_PASSTHROUGH_ADDITIONS EDGE_PROFILE EDGE_OTA_BACKEND BUNDLE_IMAGE_NAME EDGE_BOOT_TARGET EDGE_KERNEL_DEV_FRAGMENTS EDGE_BUNDLE_SBOM_CVE" EDGE_PROFILE=$(EDGE_PROFILE) $(BOOT_TARGET_ENV)$(BUNDLE_SBOM_ENV)bitbake edge-bundle' $(STACK)
 	@echo "==> Bundle artefacts:"
 	@find $(KAS_BUILD_DIR)/tmp/deploy/images -name '*.raucb' -printf '    %p\n'
+
+# Bootloader-only RAUC bundle for the RZ/V2L eMMC boot partitions (boot-emmc
+# slot). Installed by an operator after rzv2l-bootchain-authorize on the board;
+# never part of edge-bundle. The board's image must be built with
+# EDGE_BOOT_TARGET=emmc so it carries the slot and its guards.
+bootchain-bundle: | $(KAS_DIRS)
+	@if [ "$(BOARD)" != "rzv2l" ]; then echo "bootchain-bundle: RZ/V2L only (BOARD=rzv2l)"; exit 1; fi
+	@if [ ! -f keys/dev/rauc/rauc-signer.key ]; then \
+		echo "RAUC signing keys missing at keys/dev/rauc/."; \
+		echo "Run: ./scripts/rauc-init-certs.sh"; \
+		exit 1; \
+	fi
+	$(call check_rauc_keys)
+	@echo "==> Building rzv2l-bootchain-bundle [$(STACK)]"
+	$(KAS) shell -c 'BB_ENV_PASSTHROUGH_ADDITIONS="$$BB_ENV_PASSTHROUGH_ADDITIONS EDGE_PROFILE EDGE_OTA_BACKEND EDGE_BOOT_TARGET" EDGE_PROFILE=$(EDGE_PROFILE) $(BOOT_TARGET_ENV)bitbake rzv2l-bootchain-bundle' $(STACK)
+	@find $(KAS_BUILD_DIR)/tmp/deploy/images -name 'rzv2l-bootchain-bundle*.raucb' -printf '    %p\n'
 
 # Host-side bootchain updater package (RZ/V2L): BL2/FIP variants + manifest +
 # the guarded updater, tarred for out-of-band provisioning. Separate from RAUC;
