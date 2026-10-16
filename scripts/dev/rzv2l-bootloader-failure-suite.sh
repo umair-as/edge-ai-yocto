@@ -29,7 +29,7 @@
 
 set -u
 
-TOOL=/usr/sbin/rzv2l-bootloader-update
+TOOL=${TOOL:-/usr/sbin/rzv2l-bootloader-update}
 PKG=/usr/share/rzv2l-boot
 VARIANT=pmic
 RUN=""
@@ -143,6 +143,13 @@ if [ -b /dev/nbd0 ]; then
 else
     s S3 "no /dev/nbd0 to stand in for a non-SD device"
 fi
+# A raw bootchain area larger than the card's first partition offset stands in
+# for a foreign card whose partition starts inside the area.
+t S4 "SD partition starts inside the raw bootchain area" "layout guard" sudo env ROOT_DIR="$PKG" SD_BOOTCHAIN_END=0x80000000 bash "$TOOL" --mode esd --variant "$VARIANT" --yes
+t S5 "FIP would run into the U-Boot environment" "U-Boot environment" sudo env ROOT_DIR="$PKG" ESD_ENV_OFFSET=0x40000 bash "$TOOL" --mode esd --variant "$VARIANT" --yes
+
+section "Single run"
+t L1 "a second run while the lock is held" "lock:" sh -c "sudo flock /run/lock/rzv2l-bootloader-update.lock sleep 3 & sleep 1; sudo env ROOT_DIR='$PKG' bash '$TOOL' --mode qspi --variant $VARIANT --yes; rc=\$?; wait; exit \$rc"
 
 section "eMMC write path (boot0: BL2 @ 0x200, FIP @ 0x20000)"
 if [ "$HAVE_BOOT0" -eq 1 ]; then

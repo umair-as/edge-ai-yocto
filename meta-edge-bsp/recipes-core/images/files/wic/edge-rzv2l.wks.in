@@ -34,11 +34,12 @@
 #   │  edge-grow-data.service                     │
 #   └─────────────────────────────────────────────┘
 
-# RZ/V2L eSD boot expects the bootloader at SoC-ROM-fixed raw offsets,
-# outside any partition:
-#   - BL2 (3584-byte boot parameter block + BL2 image) at sector 0 (LBA 0).
-#   - FIP at FIP_WIC_OFFSET = "--offset 256s" (sector 256 = 0x20000 bytes
-#     = 128 KB). This is the offset the mask ROM reads for eSD boot.
+# RZ/V2L eSD boot expects the bootloader at raw offsets, outside any partition:
+#   - BL2 (3584-byte boot parameter block = 7 copies + BL2 image) from sector 1;
+#     sector 0 holds the MBR. The ROM reads the copies at sectors 1-7 and the
+#     BL2 code at sector 8.
+#   - FIP at FIP_WIC_OFFSET = "--offset 256s" (sector 256 = 0x20000), the
+#     address BL2 reads it from (TF-A RZG2L_SD_FIP_BASE in the pinned TF-A).
 # --no-table keeps WIC from emitting GPT/MBR entries for these regions;
 # they sit before any partition. FIP_WIC_OFFSET is enrolled in WICVARS
 # (kas/machines/rzv2l.yml) so WIC's WKS preprocessor expands it instead
