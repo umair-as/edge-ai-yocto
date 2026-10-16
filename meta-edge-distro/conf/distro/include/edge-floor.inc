@@ -204,6 +204,12 @@ SPDX_INCLUDE_VEX = "all"
 # FIT_GENERATE_KEYS would mint a second trust root for the second board.
 EDGE_KEYS_DIR ?= "${@os.path.normpath(d.getVar('EDGE_DISTRO_LAYERDIR') + '/../keys')}"
 
+# Kernel module signing key (key + cert PEM), from scripts/kernel-module-key-init.sh.
+# The kernel build tree carries it under EDGE_MODULE_SIG_KEY_REL, the
+# CONFIG_MODULE_SIG_KEY value in security-hardening.cfg.
+EDGE_MODULE_SIG_KEY     ?= "${EDGE_KEYS_DIR}/dev/kernel/module-signing.pem"
+EDGE_MODULE_SIG_KEY_REL  = "certs/edge-module-signing.pem"
+
 # Non-negotiable: signed FIT is the boot path. The profile (file-key vs
 # HSM) can change; the fact of signing cannot. mkimage auto-generates
 # the key pair into UBOOT_SIGN_KEYDIR on first build.

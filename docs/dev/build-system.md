@@ -59,13 +59,15 @@ from the shell, because kas reads its `env:` keys from the caller.
 by systemd-repart). Any layout other than `esd` is the fragment
 `kas/boot/<layout>.yml`, which sets `EDGE_BOOT_TARGET`.
 
-The layout a tree was last built for is stamped in
+The layout a build target last selected (written before bitbake runs) is
+stamped in
 `build/<BOARD>/edge-layout`. Build targets reuse it when `LAYOUT` is not
 given, so `make dev LAYOUT=emmc` followed by `make bundle` produces an eMMC
 bundle. A build target given a `LAYOUT` different from the stamp refuses to
 run; `LAYOUT_CHANGE=1` switches the tree. `make parse` ignores the stamp and
 uses `LAYOUT` or `esd`, so parse checks do not depend on the tree. `make
-info` prints the layout in effect.
+info` prints the layout in effect. `EDGE_PROFILE=` applies to `make parse`,
+`make shell` and `make layers`.
 
 ## Bundles
 

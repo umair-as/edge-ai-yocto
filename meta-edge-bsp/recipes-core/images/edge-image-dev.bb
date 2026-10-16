@@ -21,8 +21,7 @@ python () {
     p = d.getVar('EDGE_PROFILE')
     if p != 'dev':
         raise bb.parse.SkipRecipe(
-            "requires EDGE_PROFILE=dev (got '%s'); build with 'make dev' "
-            "or set EDGE_PROFILE=dev" % p)
+            "requires EDGE_PROFILE=dev (got '%s'); build with 'make dev'" % p)
 }
 
 # Pull in the standard oe-core debug + profile feature buckets. They drag

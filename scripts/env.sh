@@ -13,7 +13,7 @@
 #   upstream layer in-tree. Sourcing this file once per shell session
 #   lifts the same env into shell scope and avoids the in-tree pollution.
 #
-# Defaults match the Makefile (Makefile:27-28). Operators with a
+# Defaults match the Makefile's KAS_REPO_REF_DIR and KAS_WORK_DIR. Operators with a
 # different layout can pre-set either variable before sourcing — the
 # `${VAR:-default}` form leaves any existing value alone.
 

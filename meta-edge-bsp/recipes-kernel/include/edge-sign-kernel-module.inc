@@ -7,9 +7,9 @@
 # CONFIG_MODULE_SIG_FORCE=y an unsigned module is rejected at load with ENOKEY.
 #
 # Signs with the key and hash the kernel itself used, so the module verifies
-# against the built-in keyring. kernel.bbclass stages the pair into
-# ${STAGING_KERNEL_BUILDDIR}/certs; only sign-file.c is staged, not the built
-# tool, so it is compiled here against the native openssl.
+# against the built-in keyring. The kernel stages the key (EDGE_MODULE_SIG_KEY_REL)
+# and certs/signing_key.x509 into ${STAGING_KERNEL_BUILDDIR}; only sign-file.c is
+# staged, not the built tool, so it is compiled here against the native openssl.
 #
 # EDGE_SIGN_MODULES holds module basenames without the .ko suffix, as installed
 # under ${nonarch_base_libdir}/modules/${KERNEL_VERSION}/extra/.
@@ -21,7 +21,8 @@ DEPENDS += "openssl-native"
 
 edge_sign_kernel_modules() {
     certdir="${STAGING_KERNEL_BUILDDIR}/certs"
-    if [ ! -f "${certdir}/signing_key.pem" ] || [ ! -f "${certdir}/signing_key.x509" ]; then
+    key="${STAGING_KERNEL_BUILDDIR}/${EDGE_MODULE_SIG_KEY_REL}"
+    if [ ! -f "${key}" ] || [ ! -f "${certdir}/signing_key.x509" ]; then
         bbfatal "No module signing key in ${certdir} — kernel built without CONFIG_MODULE_SIG"
     fi
 
@@ -49,7 +50,7 @@ edge_sign_kernel_modules() {
         ${STRIP} --strip-debug --remove-section=.comment \
             --remove-section=.note --preserve-dates "${ko}"
         "${signtool}" ${EDGE_MODULE_SIG_HASH} \
-            "${certdir}/signing_key.pem" "${certdir}/signing_key.x509" "${ko}" \
+            "${key}" "${certdir}/signing_key.x509" "${ko}" \
             || bbfatal "sign-file failed on ${ko}"
         # A missing trailer here means the module fails to load under
         # MODULE_SIG_FORCE — fail the build rather than ship it.
