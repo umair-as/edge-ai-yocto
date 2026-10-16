@@ -17,6 +17,12 @@ SRC_URI += " \
     file://fstab \
 "
 
+# fstab checks /data (ext4) on every board and the FAT /boot on raspberrypi5
+# (pass 2); systemd-fsck needs the checkers, which images otherwise get only as
+# weak or dev-only dependencies.
+RDEPENDS:${PN}:append = " e2fsprogs-e2fsck"
+RDEPENDS:${PN}:append:raspberrypi5 = " dosfstools"
+
 do_install:append() {
     # The 127.0.1.1 entry must name the same host as /etc/hostname.
     echo "${EDGE_HOSTNAME}" > ${D}${sysconfdir}/hostname

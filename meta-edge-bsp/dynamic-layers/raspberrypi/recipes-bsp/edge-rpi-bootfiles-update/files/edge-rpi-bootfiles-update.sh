@@ -13,8 +13,11 @@
 #                        FITs, or U-Boot cannot verify either slot after the swap
 #   config.txt           read by the firmware before the kernel
 # RAUC rootfs A/B does not cover /boot, so a bad write is not rolled back by a
-# slot switch. Every check fails before the first write, the current files are
-# backed up first, and each write is an atomic rename verified by read-back.
+# slot switch. Every check fails before the first write and the current files
+# are backed up first. Each file is copied to a temporary name, synced, renamed
+# over the target and read back. FAT has no journal: a power cut during the
+# rename leaves the target old or new, possibly with lost or cross-linked
+# clusters that fsck.vfat repairs at the next boot (fstab pass 2).
 # --restore <run-id> writes a backup back through the same guards.
 set -euo pipefail
 IFS=$'\n\t'
@@ -27,7 +30,8 @@ BACKUP_DIR=${BACKUP_DIR:-/data/rpi-boot/backup}
 
 # config.txt and the board DTB are read by the firmware, then kernel_2712.img
 # (U-Boot) is executed. Written in that order so the execution entry changes
-# last: an interruption leaves the prior U-Boot runnable.
+# last. An interruption after the DTB leaves the prior U-Boot verifying the
+# slot FITs against the new DTB's key.
 ARTIFACTS=(config.txt bcm2712-rpi-5-b.dtb kernel_2712.img)
 
 RESTORE=""

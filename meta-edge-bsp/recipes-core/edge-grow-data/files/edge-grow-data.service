@@ -8,6 +8,8 @@ Description=Grow /data to fill the storage device on first boot
 DefaultDependencies=no
 After=systemd-udev-trigger.service boot.mount
 Before=data.mount local-fs.target
+# The fstab fsck of /data must not run concurrently with e2fsck/resize2fs here.
+Before=systemd-fsck@dev-disk-by\x2dlabel-data.service systemd-fsck@dev-disk-by\x2dpartlabel-data.service
 RequiresMountsFor=/boot
 ConditionPathExists=!/boot/.edge-data-grown
 
