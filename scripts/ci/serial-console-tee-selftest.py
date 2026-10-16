@@ -72,10 +72,24 @@ def fake_board():
             if line.startswith(b"mmc dev"):
                 out(b"mmc0(part 2) is current device\r\n")
             out(b"=> ")
+        elif ST["mode"] == "login" and d.endswith(b"\r"):
+            line = ST["rx"].split(b"\r")[-2]; ST["rx"] = b""
+            if ST.get("pw_wait"):
+                ST["pw_wait"] = False
+                if line == b"pw":
+                    ST["mode"] = "linux"; out(b"\r\nLast login: x\r\ndevel@edge:~$ ")
+                else:
+                    out(b"\r\nLogin incorrect\r\nedge-test login: ")
+            elif line == b"devel":
+                ST["pw_wait"] = True; out(b"devel\r\nPassword: ")
+            else:
+                out(b"\r\nedge-test login: ")
         elif ST["mode"] == "linux" and b"/sbin/ip -4 -br addr\r" in d:
             out(b"/sbin/ip -4 -br addr\r\nlo UNKNOWN 127.0.0.1/8\r\neth1 UP 198.51.100.5/24 \r\ndevel@edge:~$ ")
         elif ST["mode"] == "linux" and b"ip -4 -br addr\r" in d:   # non-root PATH lacks /sbin
             out(b"ip -4 -br addr\r\n-sh: ip: command not found\r\ndevel@edge:~$ ")
+        elif ST["mode"] == "linux" and d == b"\r":
+            out(b"\r\ndevel@edge:~$ ")
 threading.Thread(target=fake_board, daemon=True).start()
 def boot(stop="edge", countdown=True, tail=b"edge-test login: ", delay=0.6):
     def run():
@@ -127,6 +141,19 @@ ok(r.returncode == 3, "stop-autoboot --since judges the newest boot in the windo
 boot(countdown=False, delay=0.3)
 r = tool("stop-autoboot", "--log", L2, "--timeout", "10")
 ok(r.returncode == 3 and "not interruptible" in r.stderr, "stop-autoboot exits 3 when the board boots without a countdown")
+ST["mode"] = "login"; ST["rx"] = b""; out(b"\r\nedge-test login: ")
+time.sleep(0.3)
+env = dict(os.environ); env.pop("EDGE_CONSOLE_PASSWORD", None)
+r = subprocess.run([TOOL, "login", "--log", L2, "--timeout", "5"], capture_output=True, text=True, timeout=30, env=env)
+ok(r.returncode != 0 and "EDGE_CONSOLE_PASSWORD" in r.stderr, f"login without a password refuses at the password prompt ({r.returncode} {r.stderr.strip()!r})")
+env["EDGE_CONSOLE_PASSWORD"] = "wrong"
+r = subprocess.run([TOOL, "login", "--log", L2, "--timeout", "5"], capture_output=True, text=True, timeout=30, env=env)
+ok(r.returncode == 2, f"login exits 2 on a rejected password ({r.returncode} {r.stdout!r} {r.stderr!r})")
+env["EDGE_CONSOLE_PASSWORD"] = "pw"
+r = subprocess.run([TOOL, "login", "--log", L2, "--timeout", "5"], capture_output=True, text=True, timeout=30, env=env)
+ok(r.returncode == 0 and "logged in" in r.stdout and b"pw" not in open(L2, "rb").read().split(b"Password: ")[-1][:4], f"login logs in, password not echoed ({r.returncode} {r.stdout!r} {r.stderr!r})")
+r = subprocess.run([TOOL, "login", "--log", L2, "--timeout", "5"], capture_output=True, text=True, timeout=30, env=env)
+ok(r.returncode == 0 and "already logged in" in r.stdout, f"login is a no-op at a shell prompt ({r.stdout!r} {r.stderr!r})")
 ST["mode"] = "linux"; out(b"\r\nroot@edge:~# ")
 time.sleep(0.3)
 r = tool("ip", "--log", L2)

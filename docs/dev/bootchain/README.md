@@ -82,8 +82,7 @@ Each backend carries an on-target failure suite or test list on its page. A case
 passes only when the updater refuses with the expected message and the bootchain
 storage is byte-identical afterwards. `scripts/dev/fit-verifier-fixtures.sh` builds
 host-side negative FIT fixtures from a signed `fitImage` and runs `fit_check_sign`
-over them; `scripts/dev/serial-boot-capture.py` records a boot from the serial
-console.
+over them.
 
 Procedures for driving a board console (reboot and read, stop autoboot, U-Boot
 commands) are in [../serial-console.md](../serial-console.md).

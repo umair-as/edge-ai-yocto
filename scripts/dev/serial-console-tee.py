@@ -26,6 +26,9 @@ log (`offset` prints the current end), `now` (default) or `start`:
                  until the `=>` prompt appears; exit 3 if the board booted past it
   uboot CMD...   run U-Boot commands, print each reply; destructive commands need
                  --allow-destructive, `mmc dev 0 boot0|boot1|user` is translated
+  login          log in at the Linux console (no-op when a shell prompt shows);
+                 the password comes from $EDGE_CONSOLE_PASSWORD, never argv;
+                 exit 2 on a rejected login
   ip             print the console's IPv4 address (console must be logged in)
 
 `send` appends a carriage return to TEXT unless --raw. With --expect it waits
@@ -483,6 +486,40 @@ def cmd_uboot(args):
     return 0
 
 
+# End of the console output: a login, password or shell prompt.
+PROMPT_END_RX = re.compile(r'(?:^(?!Last )\S+ login: ?|Password: ?|[$#] ?)\Z', re.M)
+
+
+def cmd_login(args):
+    def step(data):
+        mark = log_size(args.log)
+        fifo_write(args, data)
+        text, which = wait_text(args, mark, PROMPT_END_RX, args.timeout)
+        if which != 'match':
+            sys.exit(f'[no login, password or shell prompt within {args.timeout:.0f}s]')
+        return text.rstrip('\n').rsplit('\n', 1)[-1]
+
+    last = step(b'\r')
+    if last.startswith('Password'):
+        # A stale password prompt: fail it, then start over at the login prompt.
+        last = step(b'\r')
+    if not LOGIN_RX.search(last):
+        print('already logged in')
+        return 0
+    last = step(args.user.encode() + b'\r')
+    if last.startswith('Password'):
+        pw = os.environ.get('EDGE_CONSOLE_PASSWORD')
+        if pw is None:
+            step(b'\r')
+            sys.exit('password prompt and EDGE_CONSOLE_PASSWORD is not set')
+        last = step(pw.encode() + b'\r')
+    if LOGIN_RX.search(last) or last.startswith('Password'):
+        print(f'login as {args.user} rejected', file=sys.stderr)
+        return 2
+    print(f'logged in as {args.user}')
+    return 0
+
+
 def cmd_ip(args):
     mark = log_size(args.log)
     # /sbin/ip: not on a non-root PATH on every image; present on both boards.
@@ -554,6 +591,10 @@ def main():
     u.add_argument('--allow-destructive', action='store_true')
     u.add_argument('--timeout', type=float, default=30)
     u.add_argument('commands', nargs='*', metavar='CMD')
+    lg = sub.add_parser('login', help='log in at the Linux console')
+    common(lg)
+    lg.add_argument('--user', default='devel')
+    lg.add_argument('--timeout', type=float, default=15, help='seconds per prompt')
     i = sub.add_parser('ip', help='print the console IPv4 address')
     common(i)
     i.add_argument('--iface')
@@ -562,7 +603,7 @@ def main():
     args = ap.parse_args()
     table = {'serve': serve, 'send': send, 'stop': stop, 'offset': cmd_offset, 'status': cmd_status,
              'profiles': cmd_profiles, 'wait-boot': cmd_wait_boot, 'stop-autoboot': cmd_stop_autoboot,
-             'uboot': cmd_uboot, 'ip': cmd_ip}
+             'uboot': cmd_uboot, 'login': cmd_login, 'ip': cmd_ip}
     return table[args.cmd](args)
 
 
