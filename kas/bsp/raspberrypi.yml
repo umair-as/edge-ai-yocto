@@ -17,12 +17,10 @@ header:
     - kas/bsp/raspberrypi-kernel.yml
 
 repos:
-  # No wrynose branch upstream (agherzan/meta-raspberrypi#1598); master
-  # declares LAYERSERIES_COMPAT = "wrynose". Pinned by commit.
   meta-raspberrypi:
     url: https://github.com/agherzan/meta-raspberrypi.git
-    branch: master
-    commit: b0f0a6c0bfbf5d0e464c13944dda73fa69f31f6b
+    branch: wrynose
+    commit: 919588393f41b48cb6c5d832aa35e58a19b6762d
     # The layer sits at the repo root, not in a subdirectory.
     layers:
       .:

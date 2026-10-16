@@ -22,5 +22,7 @@ FILES:${PN} = "${sbindir}/edge-rpi-eeprom"
 
 # rpi-eeprom: the updater + bootloader-2712 payload. raspi-utils: vcgencmd,
 # which rpi-eeprom-update reads the current version/config through (via
-# /dev/vcio). util-linux: findmnt for the boot-partition guard.
-RDEPENDS:${PN} = "rpi-eeprom raspi-utils util-linux coreutils"
+# /dev/vcio). raspi-utils-rpieepromab: rpi-eeprom-ab, which rpi-eeprom-update
+# probes for A/B EEPROM support (inert while AB_EEPROM=0). util-linux: findmnt
+# for the boot-partition guard.
+RDEPENDS:${PN} = "rpi-eeprom raspi-utils raspi-utils-rpieepromab util-linux coreutils"

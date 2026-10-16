@@ -27,7 +27,8 @@ public key — but *where* that key is embedded differs by board; see "FIT
 verification chain" below. The command-surface hardening tokens
 (`surface_reduce`, `net_off`, `fit_enforce`) apply to both boards through
 per-board `.cfg` fragments; the symbol tables in "What is hardened" enumerate
-the RZ/V2L fragment content specifically.
+the RZ/V2L fragment content specifically. RPi5 adds a fourth token,
+`watchdog`, that arms the SoC watchdog across the U-Boot boot path.
 
 The hardening addresses three orthogonal objectives:
 
@@ -55,11 +56,13 @@ controls which hardening layers are active:
 | `surface_reduce` | Disable unused commands (usb, storage, loadb/loads) | Yes |
 | `net_off` | Drop U-Boot network commands when netboot is off | Yes (skipped when `EDGE_DEV_NETBOOT=1`) |
 | `fit_enforce` | Reassert legacy image format off | Yes |
+| `watchdog` | RPi5 only: PM watchdog armed from `bootcmd` until `bootm` | Yes |
 
-Tokens are additive. Default for every image is the full set:
+Tokens are additive. Default for every image is the full set for the board:
 
 ```bitbake
-EDGE_UBOOT_FEATURES ?= "surface_reduce net_off fit_enforce"
+EDGE_UBOOT_FEATURES ?= "surface_reduce net_off fit_enforce"           # RZ/V2L
+EDGE_UBOOT_FEATURES ?= "surface_reduce net_off fit_enforce watchdog"  # RPi5
 ```
 
 ### Layering over the Renesas defconfig
@@ -228,6 +231,33 @@ No size change today (the Renesas defconfig already disables it). The
 value is provenance: a `make menuconfig` regeneration cannot silently
 relax this.
 
+### `watchdog` — U-Boot boot watchdog (RPi5)
+
+| Symbol | Effect |
+|---|---|
+| `CONFIG_WDT=y`, `CONFIG_WDT_BCM2835=y` | Driver-model watchdog for the BCM2712 PM block (`watchdog@7d200000`). |
+| `CONFIG_CMD_WDT=y` | `wdt` command, used by the managed environment. |
+| `CONFIG_WATCHDOG=y` | U-Boot services a started watchdog during long operations and at the prompt. |
+| `CONFIG_WATCHDOG_AUTOSTART` not set | Nothing arms it at U-Boot start, so the prompt reached through the keyed autoboot stop is never reset. |
+| `CONFIG_WATCHDOG_TIMEOUT_MSECS=15000` | Under the BCM2835 hardware maximum of about 16 s. |
+
+The managed environment (`rauc-uboot-env`) arms and disarms it:
+
+- `bootcmd` runs `edge_wdt_start` (`wdt start 15000`) before slot selection.
+- `boot_fit` runs `edge_wdt_stop` immediately before `bootm`.
+
+A hang in slot selection, FIT load or `saveenv` therefore resets the board, and
+the next boot goes through the normal RAUC boot-count path. `bootm` itself —
+FIT signature verification, decompression, kernel entry — runs disarmed, and
+so does the kernel until systemd arms `/dev/watchdog0` (`edge-watchdog`,
+`RuntimeWatchdogSec=30`). The firmware-to-U-Boot hand-off is not covered.
+`wdt` is guarded with `if wdt dev …`, so the same environment on a U-Boot
+built without the token boots normally and prints "watchdog unavailable".
+
+Hardware-validated 2026-10-12 on RPi5: `[EDGE] watchdog armed` at boot, and a
+U-Boot hang induced after arming (`go` to a branch-to-self instruction) reset
+the board after about 15 s, followed by a normal boot into the same slot.
+
 ### What Renesas already disables
 
 The smarc-rzv2l defconfig is more locked down than a generic
@@ -267,7 +297,7 @@ deferral below for the module-signing dependency that gates activation.
 Changing `EXTRA_KERNEL_ARGS` does not alter a verity-ready slot. Recovery that
 changes signed boot policy requires a newly signed FIT or an explicit alternate
 boot from the U-Boot shell. The environment migration stamp is
-`/boot/.rauc-uboot-env-initialized-v9-fit-conf-selector`.
+`/boot/.rauc-uboot-env-initialized-v10-uboot-wdt`.
 
 ---
 
@@ -470,6 +500,18 @@ fdt addr ${fdtcontroladdr}; fdt print /signature
 Same commands on RPi5; `${fdtcontroladdr}` resolves to `bcm2712-rpi-5-b.dtb`
 there instead of `u-boot-smarc-rzv2l.dtb` — see "FIT verification chain"
 above for why the anchor DTB differs by board.
+
+RPi5 boot watchdog:
+
+```bash
+# Boot console, before the FIT load:
+#   WDT:   Started watchdog@7d200000 with servicing every 1000ms (15s timeout)
+#   [EDGE] watchdog armed
+# At U-Boot prompt:
+wdt list                          # expected: watchdog@7d200000 (bcm2835_wdt)
+# Induced hang (resets after ~15 s, then boots normally):
+run edge_wdt_start; mw.l 0x01000000 0x14000000; go 0x01000000
+```
 
 Kernel-side check (the cmdline appendix actually landed):
 
