@@ -28,6 +28,10 @@
 # signature, a zeroed signature + size word, and an erased header. eMMC is
 # neither documented nor observed.
 #
+# eMMC: writes boot0 only and refuses while EXT_CSD enables boot1. The RAUC
+# bootloader slot (rzv2l-bootchain-bundle) alternates boot0/boot1 and is the
+# eMMC update path; this tool is the lab/recovery path for a boot0-enabled eMMC.
+#
 # The FIP address is a TF-A pin property (QSPI_FIP_ADDR and 0x20000 below match
 # TF-A 2.10.5; earlier Renesas TF-A placed it at 0x10000 on SD).
 #
@@ -464,7 +468,7 @@ check_emmc_boot_config() {
     bb="$(printf '%s\n' "$out" | sed -n 's/.*\[BOOT_BUS_CONDITIONS: \(0x[0-9a-fA-F]*\)\].*/\1/p' | head -1)"
     [ -n "$pc" ] && [ -n "$bb" ] || die "emmc guard: PARTITION_CONFIG/BOOT_BUS_CONDITIONS not found in EXT_CSD of ${MMC_DEV}"
     en=$(( (pc >> 3) & 7 ))
-    [ "$en" -eq 1 ] || die "emmc guard: EXT_CSD PARTITION_CONFIG=${pc} enables boot partition ${en}, not boot0 — writing boot0 would not change what boots; refusing"
+    [ "$en" -eq 1 ] || die "emmc guard: EXT_CSD PARTITION_CONFIG=${pc} enables boot partition ${en}, not boot0 — writing boot0 would not change what boots; use the RAUC bootloader slot (rzv2l-bootchain-authorize + rauc install); refusing"
     [ $(( bb & 3 )) -eq 2 ] || die "emmc guard: EXT_CSD BOOT_BUS_CONDITIONS=${bb} is not the 8-bit boot bus the ROM needs; refusing"
     [ $(( pc & 0x40 )) -eq 0 ] || die "emmc guard: EXT_CSD PARTITION_CONFIG=${pc} has BOOT_ACK set; the ROM needs it off; refusing"
     log "emmc guard: boot0 enabled for boot (PARTITION_CONFIG=${pc}), 8-bit boot bus"
@@ -495,9 +499,10 @@ restore_location_ok() {
 # required="conf", the key (by RSA modulus + exponent) behind each slot FIT.
 
 # Write the first DTB carrying /signature/key-* found in file $1 to $2.
+# LC_ALL=C: in a UTF-8 locale PCRE reads \xd0 as U+00D0, not the byte.
 fip_anchor() {
     local src="$1" out="$2" off size
-    for off in $(grep -obUaP '\xd0\x0d\xfe\xed' "$src" 2>/dev/null | cut -d: -f1); do
+    for off in $(LC_ALL=C grep -obUaP '\xd0\x0d\xfe\xed' "$src" 2>/dev/null | cut -d: -f1); do
         size=$(od -An -tu4 --endian=big -j$((off + 4)) -N4 "$src" | tr -d ' ')
         [ -n "$size" ] && [ "$size" -gt 64 ] && [ "$size" -lt 1048576 ] || continue
         dd if="$src" of="$out" iflag=skip_bytes,count_bytes skip="$off" count="$size" status=none
