@@ -49,4 +49,4 @@ do_install() {
 }
 
 FILES:${PN} = "${sbindir}/edge-rpi-bootfiles-update ${datadir}/rpi-boot"
-RDEPENDS:${PN} = "bash coreutils util-linux"
+RDEPENDS:${PN} = "bash coreutils util-linux dtc"

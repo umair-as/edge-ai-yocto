@@ -89,7 +89,8 @@ sudo edge-rpi-bootfiles-update --restore <run-id>    # roll back a run (ls /data
 ```
 
 In addition to the shared contract, `/boot` must be a mounted, writable FAT volume
-with room for each file. Each file is backed up to `/data/rpi-boot/backup/<run-id>/`,
+with room for each file, and a new `bcm2712-rpi-5-b.dtb` must trust the key behind
+each installed slot FIT; a restore that would remove the DTB is refused. Each file is backed up to `/data/rpi-boot/backup/<run-id>/`,
 copied to a temporary name, verified from the medium, then renamed over the old one
 and verified again; a failed copy leaves the current file in place. A restore that
 removes a file absent from the backup backs that file up first.

@@ -5,7 +5,8 @@
 #
 # Every case feeds the updater a condition it must refuse (corrupt artifact,
 # wrong manifest hash, wrong mtd label, wrong PMIC variant, image too large,
-# bad QSPI FIP address, wrong SD/eMMC medium, not root, operator "no", bad,
+# bad QSPI FIP address, wrong SD/eMMC medium, FIP anchor that does not trust
+# the slot FITs' key, not root, operator "no", bad,
 # corrupt, half-present or redirected restore run)
 # and passes only when the updater exits non-zero with the expected message
 # AND the bootchain storage is byte-identical afterwards. The storage
@@ -151,6 +152,31 @@ if [ "$HAVE_BOOT0" -eq 1 ]; then
     t M3 "operator answers 'n' at the prompt" "aborted by operator" sh -c "echo n | sudo env ROOT_DIR='$PKG' bash '$TOOL' --mode emmc --variant $VARIANT"
 else
     s M1-3 "no ${MMC}boot0 (booted from SD; eMMC not visible)"
+fi
+
+section "FIT anchor (U-Boot DTB inside the FIP)"
+# Alter the first modulus word of the FIT key in the FIP's U-Boot DTB (same
+# size, so the FIP layout is unchanged) and re-hash the manifest: every other
+# guard passes, only the anchor guard can refuse it.
+mk a1
+FIPA=$(artifact qspi fip)
+off=""
+for o in $(grep -obUaP '\xd0\x0d\xfe\xed' "$WORK/a1/$FIPA" | cut -d: -f1); do
+    sz=$(od -An -tu4 --endian=big -j$((o + 4)) -N4 "$WORK/a1/$FIPA" | tr -d ' ')
+    [ "$sz" -gt 64 ] && [ "$sz" -lt 1048576 ] || continue
+    dd if="$WORK/a1/$FIPA" of="$WORK/a1.dtb" iflag=skip_bytes,count_bytes skip="$o" count="$sz" status=none
+    fdtget -l "$WORK/a1.dtb" /signature 2>/dev/null | grep -q '^key-' && { off=$o; break; }
+done
+if [ -n "$off" ]; then
+    k=$(fdtget -l "$WORK/a1.dtb" /signature | grep '^key-' | head -1)
+    w=$(fdtget -t x "$WORK/a1.dtb" "/signature/$k" rsa,modulus)
+    # shellcheck disable=SC2086
+    fdtput -t x "$WORK/a1.dtb" "/signature/$k" rsa,modulus "$(printf '%x' $((0x${w%% *} ^ 1)))" ${w#* }
+    dd if="$WORK/a1.dtb" of="$WORK/a1/$FIPA" bs=1 seek="$off" conv=notrunc status=none
+    sed -i "s/$(sha256sum "$PKG/$FIPA" | cut -d' ' -f1)/$(sha256sum "$WORK/a1/$FIPA" | cut -d' ' -f1)/" "$WORK/a1/manifest.tsv"
+    t A1 "FIP whose U-Boot DTB does not trust the slot FITs' key" "anchor guard" sudo env ROOT_DIR="$WORK/a1" bash "$TOOL" --mode qspi --variant "$VARIANT" --yes
+else
+    s A1 "no U-Boot DTB with FIT keys found in $FIPA"
 fi
 
 section "restore path (--restore <run-id>)"
