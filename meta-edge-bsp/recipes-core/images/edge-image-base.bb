@@ -1,7 +1,9 @@
-SUMMARY = "edge-ai-yocto v0 base image: Weston + EDGE AI OS brand splash."
-DESCRIPTION = "Minimal bootable tier. Verifies the wrynose 6.0 + Renesas \
-vendor BSP (CIP-aligned linux-renesas) + custom 'edge-ai' distro composition. \
-Dev and prod tiers will extend this baseline once boot is confirmed."
+SUMMARY = "Base image: A/B verity rootfs with the EDGE AI OS brand splash"
+DESCRIPTION = "Minimal bootable tier of the edge-ai distro: A/B verity rootfs, \
+psplash brand splash, and Weston when EDGE_ENABLE_DISPLAY=1. edge-image-dev and \
+edge-image-prod are the extended tiers."
+HOMEPAGE = "https://github.com/umair-as/edge-ai-yocto"
+SECTION = "base"
 LICENSE = "MIT"
 
 inherit edge-ab-image

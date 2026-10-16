@@ -1,8 +1,7 @@
 SUMMARY     = "Pipeline-format setup helper for the OV5645 CSI camera"
-DESCRIPTION = "Installs /usr/libexec/edge-ov5645-init.sh which configures the \
-rzg2l-cru media-controller pipeline (sensor → CSI-2 → CRU IP → /dev/video0) \
-to a matching format/resolution. Without this, VIDIOC_STREAMON returns -1 \
-(Broken pipe). On-demand, not a boot-time service."
+DESCRIPTION = "Installs /usr/libexec/edge-ov5645-init.sh, which sets matching formats on the \
+rzg2l-cru media pipeline (sensor, CSI-2, CRU, /dev/video0); without it \
+VIDIOC_STREAMON fails with EPIPE. Run on demand, not at boot."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "multimedia"
 LICENSE     = "MIT"

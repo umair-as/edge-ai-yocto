@@ -1,8 +1,7 @@
 SUMMARY     = "journald hardening drop-in + persistent journal directory"
-DESCRIPTION = "Drops a journald.conf.d hardening drop-in (bounded disk, rate \
-limit, no syslog/kmsg forward, Storage=persistent) and a tmpfiles entry that \
-creates /var/log/journal. /var/log is bind-mounted from /data by edge-persistence \
-so journals survive RAUC slot swaps."
+DESCRIPTION = "journald.conf.d drop-in (bounded disk, rate limit, no syslog/kmsg forward, \
+persistent storage) and a tmpfiles entry creating /var/log/journal, which \
+edge-persistence binds from /data."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "base"
 LICENSE     = "MIT"

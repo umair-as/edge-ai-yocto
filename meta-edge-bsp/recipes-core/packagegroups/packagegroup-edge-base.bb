@@ -1,8 +1,7 @@
 SUMMARY     = "Edge base runtime: brand, slot udev, U-Boot env, hardening"
-DESCRIPTION = "Runtime packages pulled into every edge image tier — brand \
-assets, systemd presets, sudo/sysctl/journald hardening, audit, slot udev \
-rules, U-Boot env tooling. OTA backend packages live in the distro's \
-edge-ota-${EDGE_OTA_BACKEND}.inc."
+DESCRIPTION = "Runtime packages in every edge image tier: brand assets, systemd presets, \
+sudo/sysctl/journald hardening, audit, slot udev rules, U-Boot env tooling. \
+OTA backend packages come from edge-ota-${EDGE_OTA_BACKEND}.inc."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "base"
 LICENSE     = "MIT"

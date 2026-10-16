@@ -1,8 +1,7 @@
 SUMMARY     = "Rootless Podman quadlet: DX-M1 inference as edge-ctr"
-DESCRIPTION = "Systemd Quadlet (.container) that runs a DX-M1 inference \
-workload as the rootless edge-ctr principal, passing /dev/dxrt0 into the \
-container. The payload (runtime libs + compiled model + runner) is \
-bind-mounted from /data/dxm1, off the A/B rootfs."
+DESCRIPTION = "Systemd Quadlet that runs a DX-M1 inference workload as the rootless \
+edge-ctr principal with /dev/dxrt0 passed in; the payload (runtime, model, \
+runner) is bind-mounted from /data/dxm1, off the A/B rootfs."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "console/utils"
 LICENSE     = "MIT"

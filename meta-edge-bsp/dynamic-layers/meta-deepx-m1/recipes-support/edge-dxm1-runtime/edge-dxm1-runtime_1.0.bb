@@ -1,8 +1,7 @@
 SUMMARY     = "DX-M1 runtime integration: dxrt service account, device policy, dxrtd unit"
-DESCRIPTION = "Project-owned glue for the DEEPX DX-M1 accelerator: the dxrt \
-system account and group, udev ownership of /dev/dxrt* (root:dxrt 0660, \
-replacing the vendor's 0666), a confined systemd unit for the DXRT daemon, \
-and the host-side profile.d wiring for its fixed IPC endpoint."
+DESCRIPTION = "DX-M1 glue: the dxrt system account, udev ownership of /dev/dxrt* \
+(root:dxrt 0660 instead of the vendor's 0666), a confined DXRT daemon unit, \
+and profile.d wiring for its fixed IPC endpoint."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "base"
 LICENSE     = "MIT"

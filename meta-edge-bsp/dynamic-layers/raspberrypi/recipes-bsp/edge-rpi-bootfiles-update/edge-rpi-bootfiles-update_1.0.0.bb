@@ -1,8 +1,7 @@
 SUMMARY     = "Operator-driven Raspberry Pi 5 FAT boot-file updater"
-DESCRIPTION = "Guarded wrapper that rewrites U-Boot (kernel_2712.img), the board \
-DTB and config.txt on the shared FAT /boot partition, with manifest verification \
-and backup/restore. The FAT-file counterpart of rzv2l-bootloader-update; \
-operator-run, never wired into RAUC."
+DESCRIPTION = "Operator-run updater for U-Boot (kernel_2712.img), the board DTB and \
+config.txt on the shared FAT /boot, with manifest verification and \
+backup/restore. Never wired into RAUC."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "bootloaders"
 LICENSE     = "MIT"

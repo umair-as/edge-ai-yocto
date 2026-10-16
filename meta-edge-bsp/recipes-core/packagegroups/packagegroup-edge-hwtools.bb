@@ -1,9 +1,7 @@
 SUMMARY     = "Hardware probe: mmc, i2c, usb, pci, can, evdev, devmem, dt, fs"
-DESCRIPTION = "Direct hardware-poke userspace for bring-up: i2c-tools, \
-mmc-utils, devmem2, usbutils, pciutils, can-utils, evtest, dtc (fdtdump / \
-fdtget / dtc for /proc/device-tree inspection), tune2fs/e2label for ext4 \
-metadata, plus kernel-modules so newly-enabled drivers are runtime-available \
-without rebuilding the image."
+DESCRIPTION = "Bring-up userspace for direct hardware access: i2c, mmc, devmem, usb, pci, \
+CAN, evdev, device-tree and ext4 metadata tools, plus kernel-modules so newly \
+enabled drivers load without an image rebuild."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "base"
 LICENSE     = "MIT"

@@ -1,9 +1,7 @@
 SUMMARY = "U-Boot env init for RAUC's A/B slot state machine"
-DESCRIPTION = "Installs /etc/fw_env.config (locating the env in MMC raw area), \
-the RAUC-aware env-init oneshot service, the managed env defaults file, and \
-/etc/u-boot-initial-env (libubootenv's defenv fallback — without this file, \
-fw_setenv against an uninitialized env area returns -EACCES and the env-init \
-script bails on first boot, never writing the FIT-aware bootcmd to MMC)."
+DESCRIPTION = "Installs /etc/fw_env.config, the managed env defaults, /etc/u-boot-initial-env \
+(the libubootenv default env that first-boot fw_setenv needs) and the oneshot \
+service that seeds the RAUC A/B boot variables."
 HOMEPAGE = "https://github.com/umair-as/edge-ai-yocto"
 SECTION = "bootloaders"
 LICENSE = "MIT"

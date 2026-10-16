@@ -1,8 +1,7 @@
 SUMMARY     = "OTA credential user + directory layout for the edge distro"
-DESCRIPTION = "Creates the unprivileged 'ota' system user, the /etc/ota \
-directory layout, and (optionally) seeds dev OTA key material from the \
-host: the mTLS chain and the RAUC crypt-bundle recipient key. Makes the \
-file refs in rauc-conf-edge's [streaming] and [encryption] blocks resolve."
+DESCRIPTION = "Creates the unprivileged 'ota' user and the /etc/ota layout, optionally \
+seeded with dev mTLS and RAUC bundle-decryption keys from the host, so the \
+[streaming] and [encryption] paths in system.conf resolve."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "base"
 LICENSE     = "MIT"

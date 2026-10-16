@@ -1,10 +1,7 @@
 SUMMARY     = "Signed FIT image for the edge-ai distro on RZ/V2L"
-DESCRIPTION = "Assembles a U-Boot FIT image (kernel + DTB + signed config \
-node) for smarc-rzv2l using the wrynose kernel-fit-image class. Consumes \
-linux.bin / DTB / linux_comp artifacts published by linux-renesas via its \
-kernel-fit-extra-artifacts class. Replaces the pre-wrynose pattern where \
-the kernel recipe itself ran do_assemble_fitimage; that task no longer \
-exists on the kernel recipe in OE-Core wrynose."
+DESCRIPTION = "Assembles the signed U-Boot FIT (kernel, DTB, signed configuration) for \
+smarc-rzv2l with the kernel-fit-image class, from the artifacts linux-renesas \
+publishes through kernel-fit-extra-artifacts."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "kernel"
 LICENSE     = "MIT"

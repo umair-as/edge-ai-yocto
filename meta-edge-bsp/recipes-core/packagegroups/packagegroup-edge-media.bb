@@ -1,8 +1,7 @@
 SUMMARY     = "Media userspace: V4L2 (camera) + ALSA (audio) slices"
-DESCRIPTION = "Two slices: ${PN}-camera (v4l-utils plus the RZ/V2L OV5645 \
-pipeline-init helper, Renesas-patched gstreamer with vspmfilter, and the \
-VSPM/mmngr/mmngrbuf userspace modules) and ${PN}-audio (alsa-utils — \
-aplay, amixer, speaker-test). ${PN} pulls both."
+DESCRIPTION = "${PN}-camera: v4l-utils, the RZ/V2L OV5645 init helper, Renesas gstreamer \
+with vspmfilter and the VSPM/mmngr userspace modules. ${PN}-audio: \
+alsa-utils. ${PN} pulls both."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "multimedia"
 LICENSE     = "MIT"

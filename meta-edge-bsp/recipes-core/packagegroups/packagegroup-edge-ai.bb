@@ -1,9 +1,7 @@
 SUMMARY     = "DRP-AI inference enablement: kernel drivers + TVM runtime"
-DESCRIPTION = "On-device DRP-AI stack for RZ/V2L: the drpai kernel driver \
-(/dev/drpai0), the u-dma-buf and mmngr buffer providers, and the prebuilt \
-DRP-AI TVM (RUHMI) runtime that executes compiled models. ${PN}-test adds the \
-recon and measurement tools, for dev images only. Models are layered on top \
-separately."
+DESCRIPTION = "DRP-AI stack for RZ/V2L: the drpai driver (/dev/drpai0), the u-dma-buf and \
+mmngr buffer providers and the prebuilt DRP-AI TVM runtime. ${PN}-test adds \
+recon and measurement tools for dev images."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "kernel"
 LICENSE     = "MIT"

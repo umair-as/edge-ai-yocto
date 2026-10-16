@@ -1,8 +1,7 @@
 SUMMARY     = "Runtime config for the edge container stack"
-DESCRIPTION = "Installs sysctl user-namespace allowance (rootless podman), \
-network backend and image-copy scratch-dir settings in containers.conf, \
-Quadlet drop directories for systemd-managed containers, and a tmpfiles.d \
-entry to pre-create the rootless Quadlet path at boot."
+DESCRIPTION = "Container runtime config: user-namespace sysctl for rootless Podman, \
+containers.conf network and image-copy settings, Quadlet drop directories and \
+a tmpfiles.d entry for the rootless Quadlet path."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "console/utils"
 LICENSE     = "MIT"

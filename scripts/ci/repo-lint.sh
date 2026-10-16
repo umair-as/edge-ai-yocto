@@ -89,29 +89,41 @@ fi
 
 # ------------------------------------------------------------------ ADVISORY
 
-hdr "ADVISORY: literal IPv4 addresses outside patch payload"
-# A configurable RFC1918 default is fine; a specific bench host address is not.
+hdr "ADVISORY: private/link-local IPv4 addresses outside patch payload"
+# Flags LAN-shaped addresses (RFC1918, link-local): the shape a bench host
+# takes. A configurable RFC1918 default is fine and is reviewed by hand;
+# loopback, public probe targets and dotted version strings are not matched.
 ipf=$(git ls-files -- meta-edge-bsp meta-edge-distro kas scripts docs \
       | grep -vE '\.patch$|^scripts/ci/repo-lint\.sh$')
-[ -n "$ipf" ] && grep -nE '[0-9]{1,3}(\.[0-9]{1,3}){3}' $ipf 2>/dev/null \
-    | grep -vE '0\.0\.0\.0|127\.0\.0\.1|255\.|/24|/16|/8' | head -10 \
-    | sed 's/^/  warn /'
+[ -n "$ipf" ] && grep -nE '(^|[^0-9.])(10\.[0-9]{1,3}|172\.(1[6-9]|2[0-9]|3[01])|192\.168|169\.254)(\.[0-9]{1,3}){2}([^0-9.]|$)' \
+    $ipf 2>/dev/null | grep -vE '/(8|12|16|24)([^0-9]|$)' | sed 's/^/  warn /'
 
 hdr "ADVISORY: recipe metadata (recipe-metadata.md)"
 for f in $(git ls-files "$(echo $RECIPE_DIRS | tr ' ' '\n' | head -1)/*.bb" 2>/dev/null; \
            git ls-files 'meta-edge-distro/*.bb' 2>/dev/null); do
+    # A field may come from a require/include that lives in this repo.
+    src="$f"
+    for inc in $(sed -nE 's/^(require|include)[[:space:]]+([^[:space:]]+).*/\2/p' "$f" \
+                 | sed 's|\${EDGE_BSP_LAYERDIR}|meta-edge-bsp|'); do
+        for c in "$inc" "$(dirname "$f")/$inc"; do
+            [ -f "$c" ] && { src="$src $c"; break; }
+        done
+    done
     m=""
     for v in SUMMARY DESCRIPTION HOMEPAGE SECTION LICENSE; do
-        grep -q "^$v" "$f" || m="$m $v"
+        grep -q "^$v" $src || m="$m $v"
     done
     [ -n "$m" ] && warn "missing:$m  $f"
     awk -v F="$f" '/^SUMMARY[ \t]*=/ {gsub(/^[^"]*"|"[^"]*$/,"");
         if (length>80) printf "  warn SUMMARY %d chars (cap 80)  %s\n", length, F; exit}' "$f"
-    n=$(sed -n '/^DESCRIPTION/,/"$/p' "$f" | wc -l)
+    # Longest single DESCRIPTION assignment (a one-line value closes on its
+    # own line; per-package DESCRIPTION:<pkg> values count separately).
+    n=$(awk '/^DESCRIPTION/ { c = 1; open = (gsub(/"/, "&") == 1) ; if (c > m) m = c; next }
+             open { c++; if (c > m) m = c; if (/"[[:space:]]*$/) open = 0 }
+             END { print m + 0 }' "$f")
     [ "$n" -gt 3 ] && warn "DESCRIPTION $n lines (cap 3)  $f"
 done
-printf '\n  Advisory findings never fail the run. The DESCRIPTION cap is currently\n'
-printf '  exceeded by most recipes; either the recipes or the cap should move.\n'
+printf '\n  Advisory findings never fail the run.\n'
 
 hdr "RESULT"
 [ "$fail" -eq 0 ] && { ok "invariants hold"; exit 0; }

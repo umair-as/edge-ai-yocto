@@ -1,11 +1,7 @@
 SUMMARY     = "EDGE AI OS audit rules (CIS Level-1 baseline)"
-DESCRIPTION = "Ships /etc/audit/rules.d/10-edge.rules — a tight CIS-aligned \
-ruleset covering identity + auth events, login + session, sshd policy, \
-kernel module operations, time changes, network policy file edits, and \
-RAUC slot state. Full syscall auditing is deliberately NOT enabled — that \
-generates gigabytes/day without a SIEM pipeline to consume it. The ruleset \
-locks the audit config (-e 2) at the end so runtime tampering with the \
-rules requires a reboot."
+DESCRIPTION = "Installs /etc/audit/rules.d/10-edge.rules: a CIS Level-1 ruleset (identity, \
+login, sshd policy, kernel modules, time, network config, RAUC slot state) \
+without full syscall auditing, locked with -e 2 until the next reboot."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "base"
 LICENSE     = "MIT"
