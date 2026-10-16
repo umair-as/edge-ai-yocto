@@ -25,6 +25,7 @@ chmod 0700 "${PERSIST_DIR}" "${LIVE_DIR}"
 
 # Only ed25519 is managed — the edge sshd policy (sshd_hardening.conf) ships an
 # ed25519-only HostKey. ed25519 generation is instant (no RSA keygen cost).
+# shellcheck disable=SC2043  # single-entry list keeps the per-type variables
 for kt in ed25519; do
     priv="ssh_host_${kt}_key"
     pub="${priv}.pub"

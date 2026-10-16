@@ -561,7 +561,7 @@ check_anchor_compat() {
 # booted from (/chosen/edge,boot-source), else on the medium being written.
 current_anchor() {
     local out="$1" src medium region
-    medium="$(tr -d '\0' < /proc/device-tree/chosen/edge,boot-source 2>/dev/null || true)"
+    medium="$(tr -d '\0' 2>/dev/null < /proc/device-tree/chosen/edge,boot-source || true)"
     case "$medium" in qspi|esd|emmc) ;; *) medium="${MODE:-}" ;; esac
     region="$(mktemp /tmp/rzv2l-cur.XXXXXX)"
     case "$medium" in

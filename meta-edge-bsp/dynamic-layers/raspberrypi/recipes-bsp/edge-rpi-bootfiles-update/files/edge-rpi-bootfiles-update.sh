@@ -135,12 +135,7 @@ check_anchor_compat() {
         hint="$(fit_signer "$fit" "conf-${slot}")"
         [ -n "$hint" ] || die "anchor guard: ${fit} conf-${slot} carries no signature; refusing"
         fp=""; [ -f "$cur" ] && fp="$(key_fp "$cur" "key-${hint}")"
-        if [ -z "$fp" ]; then
-            [ -n "$(key_fp "$cand" "key-${hint}")" ] \
-                || die "anchor guard: candidate has no key '${hint}', which signed slot ${slot}; refusing"
-            log "anchor guard: slot ${slot} signer '${hint}' not in the current anchor; checked by name only"
-            continue
-        fi
+        [ -n "$fp" ] || die "anchor guard: slot ${slot} signer '${hint}' is not a key of the current ${ANCHOR}, so the candidate's key of that name cannot be shown to be the same key; refusing"
         printf '%s\n' "$trusted" | grep -qx "$fp" \
             || die "anchor guard: candidate ${ANCHOR} does not trust key '${hint}' (${fp:0:16}…) that signed slot ${slot} — slot ${slot} would not boot; refusing"
         log "anchor guard: slot ${slot} signer '${hint}' (${fp:0:16}…) trusted by the candidate"

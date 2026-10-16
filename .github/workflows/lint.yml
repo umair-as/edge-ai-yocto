@@ -35,6 +35,19 @@ jobs:
       - name: ModelPack host tests
         run: python3 -m unittest scripts/modelpack/tests/test_modelpack.py
 
+      # Warning severity and above; style-level findings (SC2015 and similar)
+      # are not gated. Covers *.sh and any tracked file with a sh/bash shebang.
+      - name: Shellcheck
+        run: |
+          { git ls-files '*.sh'; git grep -lI -E '^#!.*(ba)?sh( |$)' -- ':!*.patch'; } \
+              | sort -u | xargs shellcheck -S warning
+
+      # Host-only selftests: pty pair, no build artefacts. The rzv2l-bootchain
+      # and fit-gate selftests need rauc-native / fit_check_sign from a build
+      # and run on the build host.
+      - name: Serial console tee selftest
+        run: python3 scripts/ci/serial-console-tee-selftest.py
+
       - name: Staged private-key guard (same hook as commit stage)
         run: |
           pipx install pre-commit >/dev/null 2>&1 || pip install --quiet pre-commit
