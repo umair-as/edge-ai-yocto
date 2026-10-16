@@ -114,7 +114,7 @@ the script reports `kas/local.yml` missing in the *main* checkout, stop
 and ask the operator — do not invent cache paths.
 
 Layer setup stays fast regardless: `KAS_REPO_REF_DIR` defaults to
-`/mnt/yocto-nvme/layers-wrynose` in `Makefile:27` and `scripts/env.sh`,
+`/mnt/yocto-nvme/layers-wrynose` in the `Makefile` and `scripts/env.sh`,
 so git alternates work without `local.yml`. Only sstate and downloads
 go missing — the expensive half.
 

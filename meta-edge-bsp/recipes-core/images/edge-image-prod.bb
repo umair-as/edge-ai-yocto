@@ -25,6 +25,5 @@ python () {
     p = d.getVar('EDGE_PROFILE')
     if p != 'prod':
         raise bb.parse.SkipRecipe(
-            "requires EDGE_PROFILE=prod (got '%s'); build with 'make prod' "
-            "or set EDGE_PROFILE=prod" % p)
+            "requires EDGE_PROFILE=prod (got '%s'); build with 'make prod'" % p)
 }

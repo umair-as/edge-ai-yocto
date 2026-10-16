@@ -100,11 +100,26 @@ PACKAGE_DEBUG_SPLIT_STYLE = "debug-without-src"
 # entry (values containing spaces are not expressible there).
 EDGE_KERNEL_POLICY_EXTRA_CONFIG ?= ""
 
+# Persistent module signing key. Its checksum is part of do_configure's hash,
+# so a different key rebuilds the kernel and every module built against it.
+# do_shared_workdir stages it where out-of-tree modules_install signs from.
+do_configure[file-checksums] += "${EDGE_MODULE_SIG_KEY}:True"
+do_configure:append() {
+    if [ ! -f "${EDGE_MODULE_SIG_KEY}" ]; then
+        bbfatal "No module signing key at ${EDGE_MODULE_SIG_KEY}; run scripts/kernel-module-key-init.sh"
+    fi
+    install -D -m 0600 "${EDGE_MODULE_SIG_KEY}" "${B}/${EDGE_MODULE_SIG_KEY_REL}"
+}
+do_shared_workdir:append() {
+    install -D -m 0600 "${B}/${EDGE_MODULE_SIG_KEY_REL}" "${STAGING_KERNEL_BUILDDIR}/${EDGE_MODULE_SIG_KEY_REL}"
+}
+
 python do_edge_kernel_policy_assert() {
     import os
 
     required = [
         'CONFIG_MODULE_SIG_FORCE=y',
+        'CONFIG_MODULE_SIG_KEY="%s"' % d.getVar('EDGE_MODULE_SIG_KEY_REL'),
         'CONFIG_DM_VERITY=y',
         'CONFIG_DM_VERITY_VERIFY_ROOTHASH_SIG=y',
         'CONFIG_CRYPTO_SHA256=y',

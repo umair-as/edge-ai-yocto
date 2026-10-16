@@ -268,9 +268,8 @@ for b in "${BUILD_BOARDS[@]}"; do
     else
         status "yocto/bundle-$b" failure "edge-bundle failed"
     fi
-    # A fresh worktree has no build/conf, so the Makefile builds in
-    # build/<board>/ for every board. Current artefacts are the unversioned
-    # symlinks; copy their targets.
+    # The Makefile builds in build/<board>/. Current artefacts are the
+    # unversioned symlinks; copy their targets.
     deploy=$(find "$WT/build/$b/tmp/deploy/images" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | head -1 || true)
     if [ -n "$deploy" ]; then
         find "$deploy" -maxdepth 1 -type l \

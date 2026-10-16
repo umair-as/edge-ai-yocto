@@ -41,8 +41,8 @@ ifeq ($(BOOTLOADER_UPDATE),1)
 endif
 
 # On-disk layout. esd is the default; any other is kas/boot/<layout>.yml. The
-# layout last built is stamped in the build dir and reused when LAYOUT is not
-# given; build targets refuse a different LAYOUT unless LAYOUT_CHANGE=1. parse
+# layout last selected by a build target is stamped in the build dir and
+# reused when LAYOUT is not given; build targets refuse a different LAYOUT unless LAYOUT_CHANGE=1. parse
 # ignores the stamp, so parse-only checks stay independent of the tree.
 ifdef EDGE_BOOT_TARGET
   $(error EDGE_BOOT_TARGET is replaced by LAYOUT=<esd|emmc>)
@@ -96,6 +96,11 @@ define require_rauc_signer
 		echo "RAUC signing keys missing at keys/dev/rauc/. Run: ./scripts/rauc-init-certs.sh"; exit 1; }
 endef
 
+# Kernel module signing dev key, generated once; every kernel build signs with it.
+define require_module_key
+	@test -f keys/dev/kernel/module-signing.pem || ./scripts/kernel-module-key-init.sh
+endef
+
 define require_rzv2l
 	@test "$(BOARD)" = rzv2l || { echo "$@: RZ/V2L only (BOARD=rzv2l)"; exit 1; }
 endef
@@ -119,22 +124,25 @@ help: ## this list
 	@echo "  LAYOUT=esd|emmc               on-disk layout, remembered per build dir (LAYOUT_CHANGE=1 to switch)"
 	@echo "  IMAGE=dev|prod                image and tier a bundle carries (default dev)"
 	@echo "  SBOM_CVE=1                    image SBOM + CVE report in a dev bundle (always on for prod)"
-	@echo "  EDGE_PROFILE=dev|prod         tier for parse"
+	@echo "  EDGE_PROFILE=dev|prod         tier for parse, shell, layers"
 	@echo ""
 	@echo "Composition: $(STACK)"
 
 base: | $(KAS_DIRS) ## edge-image-base (dev tier)
 	$(layout_guard)
+	$(require_module_key)
 	$(check_rauc_keys)
 	$(call kas_run,EDGE_PROFILE=dev,bitbake edge-image-base)
 
 dev: | $(KAS_DIRS) ## edge-image-dev (dev tier; debug, profiling and stress tools)
 	$(layout_guard)
+	$(require_module_key)
 	$(check_rauc_keys)
 	$(call kas_run,EDGE_PROFILE=dev,bitbake edge-image-dev)
 
 prod: | $(KAS_DIRS) ## edge-image-prod (prod tier; hardened, no package management)
 	$(layout_guard)
+	$(require_module_key)
 	$(check_rauc_keys)
 	$(call kas_run,EDGE_PROFILE=prod,bitbake edge-image-prod)
 
@@ -144,6 +152,7 @@ bundle: | $(KAS_DIRS) ## edge-bundle (.raucb) for OTA; builds the image too
 	@case "$(IMAGE)" in dev|prod) ;; *) echo "IMAGE=$(IMAGE): expected dev or prod"; exit 1;; esac
 	$(layout_guard)
 	$(require_rauc_signer)
+	$(require_module_key)
 	$(check_rauc_keys)
 	$(call kas_run,EDGE_PROFILE=$(IMAGE) BUNDLE_IMAGE_NAME=edge-image-$(IMAGE)$(if $(filter 1,$(SBOM_CVE)), EDGE_BUNDLE_SBOM_CVE=1),bitbake edge-bundle)
 	@find $(KAS_BUILD_DIR)/tmp/deploy/images -name '*.raucb' -printf '    %p\n'
@@ -153,6 +162,7 @@ bootchain-bundle: | $(KAS_DIRS) ## RZ/V2L bootloader-only bundle for the eMMC bo
 	@test "$(LAYOUT_EFF)" = emmc || { echo "bootchain-bundle: needs LAYOUT=emmc (tree is $(LAYOUT_EFF))"; exit 1; }
 	$(layout_guard)
 	$(require_rauc_signer)
+	$(require_module_key)
 	$(check_rauc_keys)
 	$(call kas_run,EDGE_PROFILE=$(EDGE_PROFILE),bitbake rzv2l-bootchain-bundle)
 	@find $(KAS_BUILD_DIR)/tmp/deploy/images -name 'rzv2l-bootchain-bundle*.raucb' -printf '    %p\n'
@@ -174,6 +184,7 @@ KHC_OUT     ?= $(CURDIR)/build/khc/$(BOARD)-$(KHC_PROFILE).config
 KHC_DIR      = meta-edge-bsp/recipes-kernel/linux/files/khc
 
 kernel-config-export: | $(KAS_DIRS) ## expanded kernel .config (configure only) -> build/khc/<board>-prod.config
+	$(require_module_key)
 	$(call kas_run,EDGE_PROFILE=$(KHC_PROFILE),$(CURDIR)/scripts/ci/kernel-config-export.sh $(KHC_OUT))
 
 kernel-hardening-check: kernel-config-export ## KSPP gate on the exported .config
@@ -185,10 +196,10 @@ cve: ## host CVE monitor, no kas: make cve ARGS='<subcommand> …' (scripts/cve-
 	python3 scripts/cve-monitor.py $(ARGS)
 
 layers: | $(KAS_DIRS) ## bitbake-layers show-layers
-	$(call kas_run,,bitbake-layers show-layers)
+	$(call kas_run,EDGE_PROFILE=$(EDGE_PROFILE),bitbake-layers show-layers)
 
-shell: | $(KAS_DIRS) ## interactive kas shell
-	$(KAS) shell $(STACK)
+shell: | $(KAS_DIRS) ## interactive kas shell (EDGE_PROFILE= applies)
+	EDGE_PROFILE=$(EDGE_PROFILE) $(KAS) shell $(STACK)
 
 info: ## build configuration
 	@echo "kas:    $$($(KAS) --version 2>&1 | head -1)"

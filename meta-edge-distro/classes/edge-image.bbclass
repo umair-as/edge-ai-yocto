@@ -264,12 +264,11 @@ CORE_IMAGE_EXTRA_INSTALL += "${@'' if (d.getVar('EDGE_ACCEL') or 'none') == 'non
 # modules_install, and edge-sign-kernel-module.inc for recipes that hand-install
 # their .ko -- and neither proves the *image* is wholly signed. This does.
 #
-# Scope: this establishes that a signature trailer is PRESENT on every module.
-# It does not verify the signature cryptographically and does not prove the
-# target's keyring trusts it; the trailer is appended text, and a module signed
-# by the wrong key carries one too. Key trust is established at kernel build
-# time via the module signing key, not here.
+# Each signature must also name the module signing key: the signer serial
+# (modinfo sig_key) equals EDGE_MODULE_SIG_KEY's cert serial, the key the
+# kernel's built-in keyring holds. The signature itself is verified at load.
 ROOTFS_POSTPROCESS_COMMAND += "edge_check_modules_signed;"
+do_rootfs[depends] += "kmod-native:do_populate_sysroot openssl-native:do_populate_sysroot"
 
 edge_check_modules_signed() {
     # No /lib/modules means no kernel packages landed. A monolithic kernel
@@ -308,6 +307,29 @@ edge_check_modules_signed() {
 
     if [ -n "$unsigned" ]; then
         bbfatal "Unsigned kernel modules in the image; MODULE_SIG_FORCE would reject these at load time:$unsigned"
+    fi
+
+    want=$(openssl x509 -in "${EDGE_MODULE_SIG_KEY}" -noout -serial | sed 's/^serial=//; s/^0*//')
+    if [ -z "$want" ]; then
+        bbfatal "Cannot read the module signing cert serial from ${EDGE_MODULE_SIG_KEY}"
+    fi
+    tmpko=${WORKDIR}/edge-modsig-check.ko
+    wrongkey=""
+    for ko in $kos; do
+        case "$ko" in
+            *.ko.gz)  gzip -dc "$ko" > "$tmpko"; f="$tmpko" ;;
+            *.ko.xz)  xz -dc "$ko" > "$tmpko"; f="$tmpko" ;;
+            *.ko.zst) zstd -qdc "$ko" > "$tmpko"; f="$tmpko" ;;
+            *)        f="$ko" ;;
+        esac
+        got=$(modinfo -F sig_key "$f" | tr -d ':' | sed 's/^0*//')
+        if [ "$got" != "$want" ]; then
+            wrongkey="$wrongkey ${ko#${IMAGE_ROOTFS}}(sig_key=$got)"
+        fi
+    done
+    rm -f "$tmpko"
+    if [ -n "$wrongkey" ]; then
+        bbfatal "Kernel modules signed by a key other than the module signing key (serial $want); MODULE_SIG_FORCE rejects them at load:$wrongkey"
     fi
 }
 
