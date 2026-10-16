@@ -39,6 +39,12 @@ sshd is not up. The board's USB-serial adapter enumerates as
 - The device cannot be shared: `serial_close` before the operator
   starts `tio`, and expect open to fail while a `tio` session holds
   the port.
+- When the operator should see the console too (board bring-up, power
+  cycles, U-Boot work), run `scripts/dev/serial-console-tee.py serve`
+  detached instead of the MCP session: the operator `tail -f`s its log,
+  and commands go in with `serial-console-tee.py send --expect …`. Use
+  the `/dev/serial/by-id/` path; the adapter re-enumerates on board
+  power cycles and the tee reopens it.
 - When grepping operator-captured `tio` logs, the file can contain
   high-bit control bytes that make vanilla `grep` treat it as binary
   and silently skip lines. Use `grep -a` or `strings <log> | grep …`

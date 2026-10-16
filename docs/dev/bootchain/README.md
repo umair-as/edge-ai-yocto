@@ -85,6 +85,18 @@ host-side negative FIT fixtures from a signed `fitImage` and runs `fit_check_sig
 over them; `scripts/dev/serial-boot-capture.py` records a boot from the serial
 console.
 
+`scripts/dev/serial-console-tee.py` shares one console between a person and a tool:
+`serve` owns the port, appends everything the board prints to a log and reopens the
+port when a board-powered USB-serial adapter re-enumerates; `tail -f` the log to
+watch, `send` to type (with `--expect` to wait for a prompt and print the reply,
+`--ctrl-c` for an interrupt), `stop` to end it:
+
+```bash
+scripts/dev/serial-console-tee.py serve --port /dev/serial/by-id/<adapter> --log console.log &
+tail -f console.log
+scripts/dev/serial-console-tee.py send --log console.log --expect 'login: ' ''
+```
+
 ## Adding a board
 
 Write a backend that meets the guarantees above, gate it on
