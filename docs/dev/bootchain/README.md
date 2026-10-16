@@ -43,6 +43,12 @@ the image. Built without it, no bootchain updater is present.
 - **Restore.** `--restore <run-id>` writes a run back through the same guards, only
   to the backend's fixed bootchain locations, and backs up what it replaces, so a
   restore is itself reversible.
+- **Anchor compatibility.** A backend that replaces the FIT trust anchor (the DTB
+  holding U-Boot's public keys) refuses, on update and on restore, a candidate
+  that does not trust the key behind each installed slot FIT. Keys are compared by
+  RSA modulus and exponent, not by name; the candidate must hold each as
+  `required="conf"`. A key can therefore be added alongside the current one, and
+  retired only once no installed slot FIT is signed with it.
 - **`--dry-run`** prints the plan and writes nothing.
 
 `edge-rpi-eeprom` is the exception to backup, readback and restore: it stages a

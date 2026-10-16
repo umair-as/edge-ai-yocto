@@ -23,7 +23,8 @@
 #       [--check <dtb holding the public key>]
 #
 # --check runs fit_check_sign on every fixture against the given key DTB
-# (e.g. U-Boot's control DTB) and prints accept/reject per fixture.
+# (e.g. U-Boot's control DTB): v0 must be accepted and every other fixture
+# rejected; any other verdict exits non-zero.
 # Requires: python3, fdtget (dtc), mkimage/dumpimage (U-Boot tools).
 
 set -euo pipefail
@@ -49,6 +50,7 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$FIT" ] && [ -n "$OUT" ] || usage 1
 [ -f "$FIT" ] || die "no such FIT: $FIT"
+[ -z "$TOOLS" ] || TOOLS=$(readlink -f "$TOOLS")
 
 tool() { if [ -n "$TOOLS" ]; then echo "$TOOLS/$1"; else command -v "$1" || die "$1 not found (use --tools)"; fi; }
 MKIMAGE=$(tool mkimage); DUMPIMAGE=$(tool dumpimage)
@@ -135,8 +137,12 @@ fi
 if [ -n "$CHECK" ]; then
     FCS=$(tool fit_check_sign)
     echo "fit_check_sign against $CHECK:"
+    bad=0
     for f in "$OUT"/v*.itb; do
+        case "$(basename "$f")" in v0-*) want=ACCEPT ;; *) want=REJECT ;; esac
         if "$FCS" -f "$f" -k "$CHECK" -c "$CONF" >"${f%.itb}.check.log" 2>&1; then r=ACCEPT; else r=REJECT; fi
-        printf '  %-22s %s\n' "$(basename "$f")" "$r"
+        if [ "$r" = "$want" ]; then m=ok; else m=UNEXPECTED; bad=$((bad + 1)); fi
+        printf '  %-22s %-7s (expected %s) %s\n' "$(basename "$f")" "$r" "$want" "$m"
     done
+    [ "$bad" -eq 0 ] || die "$bad fixture(s) did not get the expected verdict"
 fi

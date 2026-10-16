@@ -81,7 +81,10 @@ In addition to the shared contract, before the first write:
 - the device on SDHI0 matches the mode: an SD card (no `boot0`) for `esd`, an eMMC
   for `emmc`. `--mode esd` on an eMMC would otherwise overwrite its GPT header at
   0x200;
-- each target holds offset + size.
+- each target holds offset + size;
+- the U-Boot DTB inside the candidate FIP (or the backup run's FIP) trusts the key
+  behind each installed slot FIT, compared with the anchor in the FIP the board
+  booted from (`/chosen/edge,boot-source`).
 
 Backups go to `/data/rzv2l-boot/backup/<run-id>/` as `<part>.img` plus `<part>.meta`
 (target, offset, size, SHA-256). A QSPI partition is saved whole, because `flashcp`
@@ -131,8 +134,8 @@ download mode.
 `scripts/dev/rzv2l-bootloader-failure-suite.sh` runs on the board and feeds the
 updater every condition it must refuse: corrupt artifact, wrong manifest hash, wrong
 mtd label, wrong variant, oversized image, bad QSPI FIP address, wrong SD/eMMC
-medium, not root, operator "no", missing, corrupt, half-present or redirected restore
-run:
+medium, FIP anchor that does not trust the slot FITs' key, not root, operator "no",
+missing, corrupt, half-present or redirected restore run:
 
 ```bash
 ssh devel@<board> 'bash -s -- --restore-run <run-id>' \

@@ -71,21 +71,21 @@ EDGE_DATA_SIZE_MB ?= "1024"
 # this to the matching WKS_FILE.
 EDGE_BOOT_TARGET ?= "esd"
 
-# FIT trust anchor, asserted on the artifact rather than assumed from config.
-#
-# UBOOT_SIGN_ENABLE = "1" only requests signing. The public key reaches
-# U-Boot's control FDT through board-specific wiring (concat_dtb on RZ/V2L,
-# fdt_add_pubkey on RPi5); without it the slot FITs are signed but boot
-# unverified. This checks the deployed DTB carries the signing key.
+# FIT trust gate on the artifacts: U-Boot verifies only keys marked
+# required="conf", so a missing or optional anchor key boots unsigned and
+# foreign-signed FITs. After do_image_verity_fit it covers WIC and bundles;
+# each slot FIT must verify against the shipped anchor.
+EDGE_FIT_TRUSTED_KEYNAMES ?= "${UBOOT_SIGN_KEYNAME}"
+EDGE_FIT_GATE = "${EDGE_DISTRO_LAYERDIR}/scripts/edge-fit-gate.py"
+
 do_image_wic[depends] += "u-boot-tools-native:do_populate_sysroot dtc-native:do_populate_sysroot"
 do_image_wic[prefuncs] += "edge_check_fit_anchor"
+do_image_verity_fit[depends] += "${EDGE_BOOT_DEPLOY_DEPS}"
+do_image_verity_fit[postfuncs] += "edge_check_fit_anchor edge_check_slot_fits"
+do_image_verity_fit[file-checksums] += "${EDGE_FIT_GATE}:True"
 
-python edge_check_fit_anchor() {
-    import subprocess, os
-    if d.getVar('UBOOT_SIGN_ENABLE') != '1':
-        bb.note("UBOOT_SIGN_ENABLE is not 1; FIT anchor check skipped.")
-        return
-
+def edge_fit_anchor_path(d):
+    import os
     dtb_name = (d.getVar('EDGE_FIT_PUBKEY_DTB') or '').strip()
     if not dtb_name:
         bb.fatal(
@@ -94,32 +94,35 @@ python edge_check_fit_anchor() {
             "  is U-Boot's control FDT at runtime. Without it the FIT would be\n"
             "  signed at build time and unverified at boot."
             % d.getVar('MACHINE'))
+    return os.path.join(d.getVar('DEPLOY_DIR_IMAGE'), dtb_name)
 
-    deploy = d.getVar('DEPLOY_DIR_IMAGE')
-    dtb = os.path.join(deploy, dtb_name)
-    if not os.path.exists(dtb):
-        bb.fatal("FIT anchor DTB not deployed: %s\n"
-                 "  EDGE_FIT_PUBKEY_DTB names it; nothing produced it." % dtb)
+def edge_fit_gate(d, args):
+    import subprocess
+    run = subprocess.run(['python3', d.getVar('EDGE_FIT_GATE')] + args,
+                         capture_output=True, text=True)
+    if run.returncode != 0:
+        bb.fatal("FIT trust gate failed:\n%s" % run.stderr.strip())
 
-    keyname = d.getVar('UBOOT_SIGN_KEYNAME')
-    want = "%s,%s" % (d.getVar('FIT_HASH_ALG'), d.getVar('FIT_SIGN_ALG'))
-    node = "/signature/key-%s" % keyname
-    try:
-        got = subprocess.check_output(
-            ['fdtget', dtb, node, 'algo'], stderr=subprocess.STDOUT).decode().strip()
-    except subprocess.CalledProcessError as e:
-        bb.fatal(
-            "No FIT verification key in the deployed control DTB.\n"
-            "  DTB:  %s\n"
-            "  Node: %s (from UBOOT_SIGN_KEYNAME)\n"
-            "  fdtget: %s\n"
-            "  UBOOT_SIGN_ENABLE = '1', so the slot FITs are signed -- but with\n"
-            "  no key in the control FDT U-Boot cannot verify them and boots\n"
-            "  them unverified. The key injection is board-specific wiring in\n"
-            "  the U-Boot or kernel recipe, and it did not run for this board."
-            % (dtb, node, e.output.decode().strip()))
-    if got != want:
-        bb.fatal("FIT anchor algo mismatch in %s %s: got '%s', expected '%s'"
-                 % (dtb, node, got, want))
-    bb.note("FIT anchor OK: %s carries %s (%s)" % (dtb_name, node, got))
+python edge_check_fit_anchor() {
+    if d.getVar('UBOOT_SIGN_ENABLE') != '1':
+        bb.note("UBOOT_SIGN_ENABLE is not 1; FIT trust gate skipped.")
+        return
+    dtb = edge_fit_anchor_path(d)
+    edge_fit_gate(d, ['anchor', '--dtb', dtb,
+                      '--keyname', d.getVar('UBOOT_SIGN_KEYNAME'),
+                      '--algo', '%s,%s' % (d.getVar('FIT_HASH_ALG'), d.getVar('FIT_SIGN_ALG')),
+                      '--bits', d.getVar('FIT_SIGN_NUMBITS'),
+                      '--trusted'] + d.getVar('EDGE_FIT_TRUSTED_KEYNAMES').split())
+    bb.note("FIT anchor OK: %s" % dtb)
+}
+
+python edge_check_slot_fits() {
+    import os
+    if d.getVar('UBOOT_SIGN_ENABLE') != '1':
+        return
+    dtb = edge_fit_anchor_path(d)
+    for name in (d.getVar('EDGE_VERITY_FIT_A'), d.getVar('EDGE_VERITY_FIT_B')):
+        fit = os.path.join(d.getVar('IMGDEPLOYDIR'), name)
+        edge_fit_gate(d, ['fit', '--dtb', dtb, '--fit', fit])
+        bb.note("slot FIT verifies against the shipped anchor: %s" % name)
 }

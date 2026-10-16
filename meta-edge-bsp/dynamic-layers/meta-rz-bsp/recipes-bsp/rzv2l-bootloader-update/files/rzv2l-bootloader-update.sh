@@ -45,6 +45,7 @@ MTD_FIP_LABEL=${MTD_FIP_LABEL:-fip}
 QSPI_FIP_ADDR=${QSPI_FIP_ADDR:-0x20000}
 # Must survive a reboot: /var/lib is a volatile overlay on the verity rootfs.
 BACKUP_DIR=${BACKUP_DIR:-/data/rzv2l-boot/backup}
+BOOT_DIR=${BOOT_DIR:-/boot}
 # 1 = accept a --variant that disagrees with the detected PMIC.
 ALLOW_VARIANT_MISMATCH=${ALLOW_VARIANT_MISMATCH:-0}
 
@@ -308,6 +309,97 @@ restore_location_ok() {
     esac
 }
 
+# --- FIT anchor compatibility ------------------------------------------------
+# U-Boot verifies the slot FITs against the public keys in its control DTB,
+# which is appended to U-Boot inside the FIP. A FIP whose DTB does not trust
+# the key that signed an installed slot FIT leaves that slot unbootable, so an
+# update or restore is refused unless the candidate anchor holds, as
+# required="conf", the key (by RSA modulus + exponent) behind each slot FIT.
+
+# Write the first DTB carrying /signature/key-* found in file $1 to $2.
+fip_anchor() {
+    local src="$1" out="$2" off size
+    for off in $(grep -obUaP '\xd0\x0d\xfe\xed' "$src" 2>/dev/null | cut -d: -f1); do
+        size=$(od -An -tu4 --endian=big -j$((off + 4)) -N4 "$src" | tr -d ' ')
+        [ -n "$size" ] && [ "$size" -gt 64 ] && [ "$size" -lt 1048576 ] || continue
+        dd if="$src" of="$out" iflag=skip_bytes,count_bytes skip="$off" count="$size" status=none
+        fdtget -l "$out" /signature 2>/dev/null | grep -q '^key-' && return 0
+    done
+    rm -f "$out"; return 1
+}
+
+key_fp() {  # dtb key-node -> sha256 of the key's modulus and exponent, or nothing
+    fdtget -t x "$1" "/signature/$2" rsa,modulus >/dev/null 2>&1 || return 0
+    { fdtget -t x "$1" "/signature/$2" rsa,modulus; fdtget -t x "$1" "/signature/$2" rsa,exponent; } \
+        | sha256sum | awk '{print $1}'
+}
+
+required_fps() {  # dtb -> fingerprints of its required="conf" keys
+    local k
+    for k in $(fdtget -l "$1" /signature 2>/dev/null); do
+        case "$k" in key-*) [ "$(fdtget "$1" "/signature/$k" required 2>/dev/null)" = conf ] && key_fp "$1" "$k" ;; esac
+    done
+    return 0
+}
+
+fit_signer() {  # fit conf -> key-name-hint of the config signature
+    local s
+    for s in $(fdtget -l "$1" "/configurations/$2" 2>/dev/null); do
+        case "$s" in signature*) fdtget "$1" "/configurations/$2/$s" key-name-hint 2>/dev/null; return 0 ;; esac
+    done
+    return 0
+}
+
+# check_anchor_compat <candidate-dtb> <current-dtb or "">
+check_anchor_compat() {
+    local cand="$1" cur="$2" trusted slot fit hint fp
+    need_cmd fdtget
+    trusted="$(required_fps "$cand")"
+    [ -n "$trusted" ] || die "anchor guard: candidate U-Boot DTB has no required=\"conf\" FIT key — it would boot unsigned FITs; refusing"
+    for slot in A B; do
+        fit="${BOOT_DIR}/fitImage-${slot}"
+        [ -f "$fit" ] || { log "anchor guard: no ${fit}; slot ${slot} not checked"; continue; }
+        hint="$(fit_signer "$fit" "conf-${slot}")"
+        [ -n "$hint" ] || die "anchor guard: ${fit} conf-${slot} carries no signature; refusing"
+        fp=""; [ -n "$cur" ] && fp="$(key_fp "$cur" "key-${hint}")"
+        if [ -z "$fp" ]; then
+            [ -n "$(key_fp "$cand" "key-${hint}")" ] \
+                || die "anchor guard: candidate has no key '${hint}', which signed slot ${slot}; refusing"
+            log "anchor guard: slot ${slot} signer '${hint}' not in the current anchor; checked by name only"
+            continue
+        fi
+        printf '%s\n' "$trusted" | grep -qx "$fp" \
+            || die "anchor guard: candidate U-Boot DTB does not trust key '${hint}' (${fp:0:16}…) that signed slot ${slot} — slot ${slot} would not boot; refusing"
+        log "anchor guard: slot ${slot} signer '${hint}' (${fp:0:16}…) trusted by the candidate"
+    done
+}
+
+# The anchor U-Boot currently verifies with: the FIP on the medium the board
+# booted from (/chosen/edge,boot-source), else on the medium being written.
+current_anchor() {
+    local out="$1" src medium region
+    medium="$(tr -d '\0' < /proc/device-tree/chosen/edge,boot-source 2>/dev/null || true)"
+    case "$medium" in qspi|esd|emmc) ;; *) medium="${MODE:-}" ;; esac
+    region="$(mktemp /tmp/rzv2l-cur.XXXXXX)"
+    case "$medium" in
+        qspi) cat "$MTD_FIP" > "$region" 2>/dev/null ;;
+        esd)  dd if="$MMC_DEV" of="$region" iflag=skip_bytes,count_bytes skip=$((0x20000)) count=$((4 << 20)) status=none 2>/dev/null ;;
+        emmc) dd if="${MMC_DEV}boot0" of="$region" iflag=skip_bytes skip=$((0x20000)) status=none 2>/dev/null ;;
+    esac
+    if fip_anchor "$region" "$out"; then rm -f "$region"; log "anchor guard: current anchor read from ${medium} FIP"; return 0; fi
+    rm -f "$region"; log "anchor guard: no anchor found in the ${medium:-unknown} FIP"; return 1
+}
+
+# Refuse unless the FIP image $1 carries an anchor compatible with the slot FITs.
+guard_fip_anchor() {
+    local cand cur
+    cand="$(mktemp /tmp/rzv2l-cand.XXXXXX)"; cur="$(mktemp /tmp/rzv2l-cur.XXXXXX)"
+    fip_anchor "$1" "$cand" || { rm -f "$cand" "$cur"; die "anchor guard: no U-Boot DTB with FIT keys found in $1; refusing"; }
+    current_anchor "$cur" || { rm -f "$cur"; cur=""; }
+    check_anchor_compat "$cand" "${cur:-}"
+    rm -f "$cand" ${cur:+"$cur"}
+}
+
 meta_get() { awk -F'\t' -v k="$2" '$1 == k { print $2; exit }' "$1"; }
 
 # Write back <run-dir>/{fip,bl2}.img to where they came from, FIP first. A run
@@ -341,6 +433,9 @@ do_restore() {
         esac
         check_fits "$img" "$target" "$offset" "$tag"
         log "restore $tag: ${img} -> $target @ $offset ($size B, $sha)"
+    done
+    for tag in "${tags[@]}"; do
+        if [ "$tag" = fip ]; then guard_fip_anchor "${dir}/fip.img"; fi
     done
     if [ "$ASSUME_YES" -ne 1 ] && [ "$DRY_RUN" -ne 1 ]; then
         printf 'Restore bootchain from backup run %s? [y/N]: ' "$RESTORE"
@@ -413,6 +508,7 @@ main() {
     log "BL2: ${bl2_base} (${bl2_hash})"
     log "FIP: ${fip_base} (${fip_hash})"
     log "A failed write is recoverable only via the SCIF Flash Writer over serial."
+    guard_fip_anchor "$fip"
 
     if [ "$ASSUME_YES" -ne 1 ] && [ "$DRY_RUN" -ne 1 ]; then
         printf 'Proceed with bootchain update (mode=%s variant=%s)? [y/N]: ' "$MODE" "$VARIANT"

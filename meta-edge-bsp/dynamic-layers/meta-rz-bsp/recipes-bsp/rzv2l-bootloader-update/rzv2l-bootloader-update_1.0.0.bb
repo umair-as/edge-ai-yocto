@@ -15,7 +15,7 @@ inherit deploy
 SRC_URI = "file://rzv2l-bootloader-update.sh"
 S = "${UNPACKDIR}"
 
-RDEPENDS:${PN} = "bash coreutils util-linux mtd-utils"
+RDEPENDS:${PN} = "bash coreutils util-linux mtd-utils dtc grep"
 
 # BL2/FIP (bl2_bp_{spi,esd,mmc}-${MACHINE}[_pmic].bin, fip-${MACHINE}[_pmic].bin)
 # are produced by firmware-pack's do_deploy into DEPLOY_DIR_IMAGE.

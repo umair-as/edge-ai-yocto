@@ -89,6 +89,60 @@ meta_get()   { awk -F'\t' -v k="$2" '$1==k{print $2; exit}' "$1"; }
 free_bytes() { df -Pk "$BOOT_MP" 2>/dev/null | awk 'NR==2{print $4*1024}'; }
 
 # /boot must be the mounted, writable FAT partition — never a bare directory.
+# --- FIT anchor compatibility ------------------------------------------------
+# U-Boot verifies the slot FITs against the keys in the board DTB. A DTB that
+# does not trust the key behind an installed slot FIT leaves that slot
+# unbootable, so a DTB change is refused unless the candidate holds, as
+# required="conf", the key (by RSA modulus + exponent) that signed each slot.
+ANCHOR=bcm2712-rpi-5-b.dtb
+
+key_fp() {  # dtb key-node -> sha256 of the key's modulus and exponent, or nothing
+    fdtget -t x "$1" "/signature/$2" rsa,modulus >/dev/null 2>&1 || return 0
+    { fdtget -t x "$1" "/signature/$2" rsa,modulus; fdtget -t x "$1" "/signature/$2" rsa,exponent; } \
+        | sha256sum | awk '{print $1}'
+}
+
+required_fps() {  # dtb -> fingerprints of its required="conf" keys
+    local k
+    for k in $(fdtget -l "$1" /signature 2>/dev/null); do
+        case "$k" in key-*) [ "$(fdtget "$1" "/signature/$k" required 2>/dev/null)" = conf ] && key_fp "$1" "$k" ;; esac
+    done
+    return 0
+}
+
+fit_signer() {  # fit conf -> key-name-hint of the config signature
+    local s
+    for s in $(fdtget -l "$1" "/configurations/$2" 2>/dev/null); do
+        case "$s" in signature*) fdtget "$1" "/configurations/$2/$s" key-name-hint 2>/dev/null; return 0 ;; esac
+    done
+    return 0
+}
+
+# check_anchor_compat <candidate-dtb>: the current anchor is ${BOOT_MP}/${ANCHOR}.
+check_anchor_compat() {
+    local cand="$1" cur="${BOOT_MP}/${ANCHOR}" trusted slot fit hint fp
+    need_cmd fdtget
+    [ -f "$cur" ] && [ "$(sha_of "$cand")" = "$(sha_of "$cur")" ] && return 0
+    trusted="$(required_fps "$cand")"
+    [ -n "$trusted" ] || die "anchor guard: candidate ${ANCHOR} has no required=\"conf\" FIT key — it would boot unsigned FITs; refusing"
+    for slot in A B; do
+        fit="${BOOT_MP}/fitImage-${slot}"
+        [ -f "$fit" ] || { log "anchor guard: no ${fit}; slot ${slot} not checked"; continue; }
+        hint="$(fit_signer "$fit" "conf-${slot}")"
+        [ -n "$hint" ] || die "anchor guard: ${fit} conf-${slot} carries no signature; refusing"
+        fp=""; [ -f "$cur" ] && fp="$(key_fp "$cur" "key-${hint}")"
+        if [ -z "$fp" ]; then
+            [ -n "$(key_fp "$cand" "key-${hint}")" ] \
+                || die "anchor guard: candidate has no key '${hint}', which signed slot ${slot}; refusing"
+            log "anchor guard: slot ${slot} signer '${hint}' not in the current anchor; checked by name only"
+            continue
+        fi
+        printf '%s\n' "$trusted" | grep -qx "$fp" \
+            || die "anchor guard: candidate ${ANCHOR} does not trust key '${hint}' (${fp:0:16}…) that signed slot ${slot} — slot ${slot} would not boot; refusing"
+        log "anchor guard: slot ${slot} signer '${hint}' (${fp:0:16}…) trusted by the candidate"
+    done
+}
+
 check_boot() {
     local line
     line=$(findmnt -no FSTYPE,OPTIONS "$BOOT_MP" 2>/dev/null) || die "$BOOT_MP is not a mount point"
@@ -156,6 +210,7 @@ do_update() {
         [ -n "$exp" ] || die "$a not in manifest"
         [ "$(sha_of "$src")" = "$exp" ] || die "$a artifact hash != manifest"
     done
+    check_anchor_compat "${ROOT_DIR}/${ANCHOR}"
     log "boot-file update for ${BOOT_MP}$([ "$DRY_RUN" -eq 1 ] && echo ' (dry-run)')"
     for a in "${ARTIFACTS[@]}"; do log "  $a ($(manifest_col "$a" 2))"; done
     log "The board DTB carries the FIT signing key — only apply boot files built with the key the installed slot FITs were signed with."
@@ -180,6 +235,12 @@ do_restore() {
             [ "$(sha_of "${dir}/${a}")" = "$(meta_get "$meta" sha256)" ] || die "${a} backup hash != meta — corrupt"
         fi
     done
+    meta="${dir}/${ANCHOR}.meta"
+    if [ -f "$meta" ]; then
+        [ "$(meta_get "$meta" present)" = "1" ] \
+            || die "anchor guard: run ${RESTORE} would remove ${ANCHOR}, the FIT trust anchor; refusing"
+        check_anchor_compat "${dir}/${ANCHOR}"
+    fi
     if [ "$ASSUME_YES" -ne 1 ] && [ "$DRY_RUN" -ne 1 ]; then
         printf 'Restore %s files from backup run %s? [y/N]: ' "$BOOT_MP" "$RESTORE"; read -r ans
         case "$ans" in y|Y) : ;; *) die "aborted by operator" ;; esac
