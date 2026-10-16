@@ -23,6 +23,22 @@ zstdcat build/<board>/tmp/deploy/images/<machine>/edge-image-dev-<machine>.rootf
   | sudo dd of=/dev/sdX bs=4M conv=fsync status=progress
 ```
 
+## RZ/V2L: writing the microSD in the board
+
+The card does not have to leave the board. A QSPI-booted U-Boot exports the module
+microSD over the USB OTG port as a mass-storage disk:
+
+1. Host: `scripts/dev/ums-host-guard.sh on`, so the desktop does not mount the disk.
+2. Board powered off: SW11 `OFF, OFF, OFF, ON` (QSPI), SW1-2 ON (microSD on SDHI0).
+3. Stop autoboot ([serial console](serial-console.md) `stop-autoboot`, started before
+   power-on), then `ums 0 mmc 0`.
+4. Host: the new `UMS disk 0` (USB ID `0000:0000`) is the card. Write it with either
+   method above, then Ctrl-C on the U-Boot console.
+5. Power off, SW11 to eSD `ON, ON, OFF, ON`, power on.
+
+With SW1-2 OFF the same `ums 0 mmc 0` exports the eMMC user area instead
+([eMMC provisioning](emmc/rzv2l.md)).
+
 ## Why a reused card needs the full write
 
 The U-Boot environment lives in a raw area of the medium at
