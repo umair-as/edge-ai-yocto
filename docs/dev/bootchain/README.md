@@ -85,6 +85,8 @@ host-side negative FIT fixtures from a signed `fitImage` and runs `fit_check_sig
 over them; `scripts/dev/serial-boot-capture.py` records a boot from the serial
 console.
 
+Procedures for driving a board console (reboot and read, stop autoboot, U-Boot
+commands) are in [../serial-console.md](../serial-console.md).
 `scripts/dev/serial-console-tee.py` shares one console between a person and a tool:
 `serve` owns the port, appends everything the board prints to a log and reopens the
 port when a board-powered USB-serial adapter re-enumerates; `tail -f` the log to

@@ -104,8 +104,9 @@ sudo ./edge-emmc-provision.sh \
 When the eMMC's own bootchain is not usable, a QSPI-booted U-Boot exports the eMMC
 user area the same way: SW11 `OFF, OFF, OFF, ON`, SW1-2 OFF, stop autoboot, then
 `ums 0 mmc 0` and the host steps of Option A. Before `ums`, keep the host desktop from
-auto-mounting the exported partitions (a udev rule setting `UDISKS_IGNORE=1` for the
-gadget's vendor ID `0000`); `ums` has no read-only mode. `mmc partconf 0` on the same
+auto-mounting the exported partitions with `scripts/dev/ums-host-guard.sh on` (a udev
+rule setting `UDISKS_IGNORE=1` for the gadget's USB ID `0000:0000`); `ums` has no
+read-only mode. `mmc partconf 0` on the same
 console shows which boot partition is selected.
 
 ## Recovery
