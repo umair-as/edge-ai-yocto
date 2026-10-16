@@ -107,7 +107,7 @@ installs of the same bundle leave both partitions with that bootchain. Going bac
 older bootchain means installing its bundle.
 
 Hardware-validated 2026-10-12: `boot0` → `boot1` install, read-back, switch and boot,
-then `boot1` → `boot0`.
+then `boot1` → `boot0`; repeated 2026-10-13 with the backported upstream RAUC handler fix.
 
 ### Guards
 
@@ -137,6 +137,9 @@ not come up:
   (`boot0`) or `mmc partconf 0 0 2 0` (`boot1`), and boot the eMMC again.
 - **No working U-Boot on any medium:** SCIF Flash Writer, `EM_SECSD` and `EM_W`
   ([eMMC provisioning](../emmc/rzv2l.md)).
+
+Both selection paths hardware-validated 2026-10-13: `bootpart enable` from Linux in
+both directions, `partconf` from the QSPI U-Boot.
 
 Before a first install, copy both partitions and the EXT_CSD dump to `/data` and off
 the board:
@@ -189,7 +192,7 @@ Addresses are those TF-A reads (`plat/renesas/rz/common/plat_storage.c`,
 | mode | BL2 | FIP | status |
 |---|---|---|---|
 | `qspi` | `mtd0` (QSPI 0x0) | QSPI 0x20000 = `mtd1` + (0x20000 − `mtd1` start), derived from sysfs | hardware-validated: header-last write, restore and boot 2026-10-11; killed mid-FIP and mid-BL2 write → ROM falls to SCIF download mode, `--restore` recovers, 2026-10-12 |
-| `esd` | boot SD @ 0x200 | boot SD @ 0x20000 (WIC sector 256) | write and boot hardware-validated 2026-10-07, in the earlier in-place order; the header-last order has not run on an SD |
+| `esd` | boot SD @ 0x200 | boot SD @ 0x20000 (WIC sector 256) | hardware-validated: header-last write and boot 2026-10-13 (MBR sector and partition table unchanged) |
 | `emmc` | `mmcblk0boot0` @ 0x200 (sector 1) | `mmcblk0boot0` @ 0x20000 (sector 256) | hardware-validated: header-last write and boot 2026-10-12 |
 
 `--mode emmc` writes `boot0` only and refuses while EXT_CSD enables `boot1`; after a
@@ -283,6 +286,9 @@ partition:
 => mmc partconf 0 0 1 0                         # select boot0
 => reset
 ```
+
+Hardware-validated 2026-10-13 from the QSPI U-Boot: a backup written into an erased
+`boot1` (`mmc dev 0 2`), read back, selected with `partconf 0 0 2 0` and booted.
 
 Without such a medium, re-flash BL2 and FIP with the Renesas SCIF Flash Writer
 (`Flash_Writer_SCIF_RZV2L_SMARC_PMIC_DDR4_2GB_1PCS.mot` for the PMIC board) in SCIF

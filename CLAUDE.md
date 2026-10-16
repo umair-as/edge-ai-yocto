@@ -36,6 +36,10 @@ console output — especially for U-Boot work and for boot states where
 sshd is not up. The board's USB-serial adapter enumerates as
 `/dev/ttyUSB0`, 115200 baud.
 
+- Board-driving procedures (reboot-and-read, stop autoboot, U-Boot commands,
+  console IP) have one entry point: `docs/dev/serial-console.md`, built on
+  `serial-console-tee.py`. Use its subcommands; do not write a new watcher or
+  stop-autoboot script, and add missing behaviour to the tool with a selftest case.
 - The device cannot be shared: `serial_close` before the operator
   starts `tio`, and expect open to fail while a `tio` session holds
   the port.
