@@ -1,3 +1,4 @@
+# shellcheck shell=sh
 # DXRT_DYNAMIC_IPC_ENDPOINT must match dxrtd.service's RuntimeDirectory
 # override in this recipe's files/dxrtd.service. Without it, libdxrt falls
 # back to @dxrt_dynamic_ipc.sock (host network namespace) or

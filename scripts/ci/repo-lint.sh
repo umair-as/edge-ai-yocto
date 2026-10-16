@@ -9,7 +9,6 @@
 set -u
 
 RECIPE_DIRS="meta-edge-bsp meta-edge-distro"
-SRC_GLOBS="meta-edge-bsp/**  meta-edge-distro/**  kas/**  scripts/**"
 fail=0
 
 hdr()  { printf '\n== %s ==\n' "$1"; }
