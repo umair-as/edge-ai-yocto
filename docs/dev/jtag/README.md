@@ -61,7 +61,7 @@ openocd -f interface/ftdi/olimex-arm-usb-tiny-h.cfg -f docs/dev/jtag/rzv2l-scan.
 openocd -f docs/dev/jtag/rzv2l-openocd.cfg -c init -c "targets r9a07g044l.a55.0" -c halt
 
 # 3. Attach gdb-multiarch (KASLR off → no offset):
-VM=$(find build/tmp/work -path '*linux-renesas*standard-build/vmlinux' | head -1)
+VM=$(find build/rzv2l/tmp/work -path '*linux-renesas*standard-build/vmlinux' | head -1)
 gdb-multiarch "$VM" -x docs/dev/jtag/rzv2l.gdb
 (gdb) bt          # symbolized kernel backtrace
 ```
@@ -120,7 +120,7 @@ The JTAG build generates `scripts/gdb/linux/constants.py` (`oe_runmake
 scripts_gdb`). Source the build-dir `vmlinux-gdb.py` after connecting:
 
 ```sh
-find build/tmp/work -path '*standard-build/vmlinux-gdb.py'   # locate it
+find build/rzv2l/tmp/work -path '*standard-build/vmlinux-gdb.py'   # locate it
 ```
 ```
 (gdb) source <that path>

@@ -22,8 +22,8 @@
 set -u
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 SRC="$ROOT/meta-edge-bsp/dynamic-layers/meta-rz-bsp/recipes-ota/rzv2l-bootchain/files"
-SYS="$ROOT/build/tmp/sysroots-components/x86_64"
-DEPLOY="${DEPLOY:-$ROOT/build/tmp/deploy/images/smarc-rzv2l}"
+SYS="$ROOT/build/rzv2l/tmp/sysroots-components/x86_64"
+DEPLOY="${DEPLOY:-$ROOT/build/rzv2l/tmp/deploy/images/smarc-rzv2l}"
 RAUC_BIN="$SYS/rauc-native/usr/bin/rauc"
 LIBS=$(ls -d "$SYS"/*/usr/lib 2>/dev/null | tr '\n' ':')
 [ -x "$RAUC_BIN" ] || { echo "no native rauc at $RAUC_BIN (build rauc-native)" >&2; exit 2; }

@@ -39,14 +39,15 @@ Capability toggles are **make flags, not shell environment**:
 make dev ACCEL=drpai-v2l         # select an accelerator stack
 make dev TPM=1                   # + meta-secure-core (TPM2 + IMA/EVM)
 make dev JTAG=1 BPF=1            # flags compose freely
-make dev EDGE_BOOT_TARGET=emmc   # GPT + systemd-repart eMMC layout
+make dev LAYOUT=emmc             # GPT + systemd-repart eMMC layout (remembered per build dir)
+make bundle IMAGE=prod           # bundle the prod image at the prod tier
 ```
 
-Full flag catalogue: `make help`. A bare `EDGE_*=1` exported in the
-shell is **silently dropped** — kas and bitbake filter the inherited
-environment (`BB_ENV_PASSTHROUGH_ADDITIONS`), so every toggle must go
-through the Makefile, which maps it to a kas capability fragment or a
-whitelisted env var.
+Full flag and setting catalogue: `make help`; the mechanics are in
+[docs/dev/build-system.md](docs/dev/build-system.md). A bare `EDGE_*=1`
+exported in the shell is **dropped** — kas forwards only the build settings
+listed under `env:` in `kas/base.yml`, and the Makefile `unexport`s those, so
+every toggle goes through a make flag (a kas fragment) or a make setting.
 
 ## KAS composition
 
@@ -70,9 +71,8 @@ kas build kas/base.yml:kas/machines/raspberrypi5.yml
 
 Board facts (slot devices, U-Boot env area, FIT addresses, boot files) live
 in `meta-edge-bsp/conf/machine/include/edge-board-<MACHINE>.inc`, pulled in
-by MACHINE from the distro conf. Build directories are per board: `build/`
-for the first board, `build/<BOARD>/` for every later one, sharing
-`DL_DIR`/`SSTATE_DIR`.
+by MACHINE from the distro conf. Build directories are per board, `build/<BOARD>/`,
+sharing `DL_DIR`/`SSTATE_DIR`.
 
 The Makefile always composes the tracked chain
 (`kas/base.yml:kas/machines/$(BOARD).yml`) and appends `kas/local.yml` last,
@@ -95,8 +95,7 @@ export BOARD=rzv2l        # or raspberrypi5
 ```
 
 `scripts/env.sh` reads `BOARD` and sets `KAS_BUILD_DIR` to the board's build
-directory (`build/` for the first board, `build/<BOARD>/` for the others), as
-the Makefile does. Pass the full chain: `kas/local.yml` is an additive host
+directory (`build/<BOARD>/`), as the Makefile does. Pass the full chain: `kas/local.yml` is an additive host
 overlay with no `includes:` (a host file never decides the board), so
 `kas shell kas/local.yml` alone loads no layers and fails with "Did not find
 any init-build-env script". Capability flags add their fragments to the chain;
@@ -329,7 +328,7 @@ What makes it actually work:
   image build. Don't launch a full image build to test a parse-level
   change.
 - On build failure, extract the **first causal error** from the task
-  log and cite log files by path (`build/tmp/work/.../temp/log.do_*`);
+  log and cite log files by path (`build/<BOARD>/tmp/work/.../temp/log.do_*`);
   don't paste whole BitBake logs into the conversation.
 - Don't re-run an equivalent failing command hoping for a different
   result — change one variable per retry.

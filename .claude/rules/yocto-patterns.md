@@ -15,7 +15,7 @@ don't paste whole build logs.
 
 ```bash
 # Task log for a failing recipe
-find build/tmp/work -path "*/<recipe>/*/temp/log.do_<task>" | head -1
+find build/<BOARD>/tmp/work -path "*/<recipe>/*/temp/log.do_<task>" | head -1
 
 # Variable inspection
 make shell   # then, inside:
@@ -300,7 +300,7 @@ upstream branch before assuming a feature or fix is absent.
 For known-good patches harvested from another tree (proven to apply
 against our target kernel), straight `cp` into the recipe's `files/`
 dir + a SRC_URI wire is fine. Confirm portability by checking the
-source project's `build/tmp/work/<recipe>/<version>/` already contains
+source project's `build/<BOARD>/tmp/work/<recipe>/<version>/` already contains
 the patches applied against a matching version line.
 
 Reach for the `devtool-workflow` skill (listed in `CLAUDE.md`) when:

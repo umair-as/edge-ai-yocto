@@ -24,7 +24,7 @@ import re
 import sys
 
 # Newest matching SBOM under the standard deploy tree when -i is absent.
-DEPLOY_GLOB = "build/tmp/deploy/images/*/*.sbom-cve-check.spdx.json"
+DEPLOY_GLOB = "build/*/tmp/deploy/images/*/*.sbom-cve-check.spdx.json"
 
 # License classification works on the SPDX expression string only, so it is
 # format-independent (SPDX 2.2 or 3.0.1). Risk is tuned for an embedded image:
@@ -91,7 +91,7 @@ def locate():
     """Return the newest SPDX SBOM under the deploy tree."""
     hits = glob.glob(DEPLOY_GLOB)
     if not hits:
-        die("no *.sbom-cve-check.spdx.json under build/tmp/deploy/images. "
+        die("no *.sbom-cve-check.spdx.json under build/*/tmp/deploy/images. "
             "Pass -i explicitly or build an image first.")
     return max(hits, key=os.path.getmtime)
 

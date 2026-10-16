@@ -75,7 +75,7 @@ local_conf_header:
     # EDGE_DEVEL_SSH_PUBKEY_FILE = "/home/your-user/.ssh/id_ed25519.pub"
 
   rm_work: |
-    # Reclaim build/tmp/work/ after each recipe finishes do_build, EXCEPT
+    # Reclaim build/<BOARD>/tmp/work/ after each recipe finishes do_build, EXCEPT
     # for the boot chain and the kernel — their work dirs stay for
     # `devtool modify`, patched-source inspection and failure triage without
     # a `cleansstate` + re-fetch.
@@ -101,13 +101,11 @@ local_conf_header:
     # "Bundle encryption" below). edge-floor.inc points the bundle build
     # at all of these by default.
     #
-    # BUNDLE_IMAGE_NAME defaults to edge-image-dev. For prod bundles:
-    # BUNDLE_IMAGE_NAME = "edge-image-prod"
+    # The bundled image follows `make bundle IMAGE=dev|prod` (default dev).
     #
     # Build sequence after a code change:
-    #     make dev                          # builds image + bakes CA into rootfs
-    #     make bundle                       # signs + emits edge-image-*-bundle.raucb
-    #     scp build/tmp/deploy/images/${MACHINE}/*.raucb root@<device>:/tmp/
+    #     make bundle                       # builds the image, signs, emits the .raucb
+    #     scp build/<BOARD>/tmp/deploy/images/${MACHINE}/*.raucb root@<device>:/tmp/
     #     ssh root@<device> rauc install /tmp/*.raucb
     # First-time device flash needed once so /etc/rauc/ca.cert.pem matches
     # the new CA; subsequent updates ride the OTA path.
@@ -193,8 +191,7 @@ local_conf_header:
     # declared with ?= in meta-edge-distro/conf/distro/include/edge-features.inc.
     # Set them here, or pass the corresponding make flag. A bare shell
     # export does NOT work: bitbake filters the inherited environment at
-    # startup, so only the variables the Makefile puts on
-    # BB_ENV_PASSTHROUGH_ADDITIONS survive. See AGENTS.md §Build commands.
+    # startup, and kas forwards only its env: keys. See AGENTS.md §Build commands.
 
     # --- Tier profile -----------------------------------------------------
     # "prod" — locked-down image (package-management removed, observability

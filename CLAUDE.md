@@ -134,7 +134,7 @@ What the first `make base` in a new worktree actually pays:
   `KAS_REPO_REF_DIR` (operator-set to a host-local layer cache) supplies
   git alternates; object copy from local disk, no network fetch. Seconds
   per layer.
-- **sstate restore** — bitbake populates `build/tmp/` from sstate for
+- **sstate restore** — bitbake populates `build/<BOARD>/tmp/` from sstate for
   every recipe whose signature matches. File copies from NVMe, not
   compiles.
 - **recipe rebuild** — only recipes modified in the worktree miss sstate

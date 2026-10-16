@@ -5,7 +5,7 @@ description = "CRA vulnerability-management analysis tooling for the edge-ai dis
 requires-python = ">=3.12"
 # Intentionally dependency-free: the analysis scripts in scripts/
 # (cve-report, sbom-report, cve-reconcile, cve-triage-funnel) are stdlib-only
-# and read-only over build/tmp/deploy. The venv exists to pin an interpreter,
+# and read-only over build/*/tmp/deploy. The venv exists to pin an interpreter,
 # not to pull packages.
 dependencies = []
 

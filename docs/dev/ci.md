@@ -83,7 +83,7 @@ Matrix cells are one uncached parse each (about two minutes on an 8-core host):
 
 - `quick`: both boards × `EDGE_PROFILE=dev|prod` — 4 cells.
 - `full`: `quick` plus, per board at the dev tier, `TPM=1`, `JTAG=1`, `BPF=1`,
-  `NETBOOT=1`, `OPTEE_EXAMPLES=1`, `SBOM_TUNE=1`, `EDGE_BOOT_TARGET=emmc`,
+  `NETBOOT=1`, `OPTEE_EXAMPLES=1`, `SBOM_TUNE=1`, `LAYOUT=emmc`,
   `ACCEL=none`, and one parse of the public composition with no host overlay
   — 21 cells. Optional fragments that nothing composes by default are the
   ones that rot unnoticed; this is where they are exercised.

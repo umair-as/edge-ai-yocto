@@ -101,7 +101,7 @@ build just removes that step.
 The `vmlinux` with symbols is the build artifact at:
 
 ```
-build/tmp/work/<machine>/linux-renesas/<version>/build/vmlinux
+build/rzv2l/tmp/work/<machine>/linux-renesas/<version>/build/vmlinux
 ```
 
 Point the debugger at this file (it is never stripped, regardless of image
@@ -133,7 +133,7 @@ the full host setup. Summary:
    `target extended-remote :3333` (KASLR off → no offset):
 
    ```sh
-   VM=$(find build/tmp/work -path '*linux-renesas*standard-build/vmlinux' | head -1)
+   VM=$(find build/rzv2l/tmp/work -path '*linux-renesas*standard-build/vmlinux' | head -1)
    gdb-multiarch "$VM" -x docs/dev/jtag/rzv2l.gdb
    (gdb) bt                 # source-level kernel backtrace, no offset
    ```

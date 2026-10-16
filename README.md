@@ -48,7 +48,7 @@ make base BOARD=raspberrypi5   # same for the Raspberry Pi 5; output under build
 
 # 4. Flash
 sudo bmaptool copy \
-  build/tmp/deploy/images/smarc-rzv2l/edge-image-base-smarc-rzv2l.wic.zst \
+  build/rzv2l/tmp/deploy/images/smarc-rzv2l/edge-image-base-smarc-rzv2l.wic.zst \
   /dev/sdX
 ```
 
