@@ -80,7 +80,7 @@ rzb_active_index() {
 # or boot1 enabled, both boot partitions present. Prints the active index.
 rzb_check_board() {
     local src type v pc bb idx
-    src="$(tr -d '\0' < "${RZB_DT}/chosen/edge,boot-source" 2>/dev/null || true)"
+    src="$(tr -d '\0' 2>/dev/null < "${RZB_DT}/chosen/edge,boot-source" || true)"
     [ "$src" = emmc ] || rzb_die "board booted from '${src:-unknown}', not emmc — the bootloader slot updates the eMMC boot partitions only; refusing"
     type="$(cat "${RZB_SYSFS}/block/$(basename "$RZB_MMC_DEV")/device/type" 2>/dev/null || true)"
     [ "$type" = MMC ] || rzb_die "${RZB_MMC_DEV} is '${type:-unknown}', not an eMMC; refusing"

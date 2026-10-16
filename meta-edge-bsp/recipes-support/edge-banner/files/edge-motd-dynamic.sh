@@ -69,7 +69,7 @@ _edge_motd_render() {
         _load=$(awk '{printf "%s, %s, %s", $1, $2, $3}' /proc/loadavg)
     fi
 
-    _mem_total=? _mem_avail=?
+    _mem_total='?' _mem_avail='?'
     if [ -r /proc/meminfo ]; then
         _mem_total=$(awk '/MemTotal:/ {printf "%.1f GB", $2/1024/1024; exit}' /proc/meminfo)
         _mem_avail=$(awk '/MemAvailable:/ {printf "%.1f GB", $2/1024/1024; exit}' /proc/meminfo)
