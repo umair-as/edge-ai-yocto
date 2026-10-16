@@ -21,25 +21,10 @@ _EDGE_REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 export KAS_WORK_DIR="${KAS_WORK_DIR:-${_EDGE_REPO_ROOT}/.kas}"
 export KAS_REPO_REF_DIR="${KAS_REPO_REF_DIR:-/mnt/yocto-nvme/layers-wrynose}"
-# Build dir at the traditional repo-root location. Without this, kas
-# defaults to ${KAS_WORK_DIR}/build (= .kas/build), which doesn't match
-# the universal Yocto convention.
-# Mirror the Makefile's resolution exactly, or a standalone `kas shell` writes
-# to a different tree than `make` does for the same board. A pre-existing
-# single-dir build/ keeps being used for the legacy default board only
-# (Yocto's TMPDIR is not relocatable, and another board must not share its
-# conf/); otherwise the tree is per-board. Checking BOARD here, not just
-# whether build/conf exists, matters once it does: on a host with an
-# established rzv2l build/, sourcing this with BOARD already set to
-# something else must not still land on the single-dir path.
-# Always derived from BOARD, like the Makefile's override: an inherited
-# KAS_BUILD_DIR (direnv, a shell used for another board) otherwise wins and
-# runs this board's kas config in the other board's tree.
-if [ -d "${_EDGE_REPO_ROOT}/build/conf" ] && [ "${BOARD:-rzv2l}" = "rzv2l" ]; then
-    export KAS_BUILD_DIR="${_EDGE_REPO_ROOT}/build"
-else
-    export KAS_BUILD_DIR="${_EDGE_REPO_ROOT}/build/${BOARD:-rzv2l}"
-fi
+# build/<BOARD>/, as the Makefile resolves it. Always derived from BOARD: an
+# inherited KAS_BUILD_DIR (direnv, a shell used for another board) would run
+# this board's kas config in the other board's tree.
+export KAS_BUILD_DIR="${_EDGE_REPO_ROOT}/build/${BOARD:-rzv2l}"
 
 # kas refuses to start if KAS_WORK_DIR doesn't exist (kas/context.py:
 # os.path.abspath but no mkdir). Makefile creates it as an order-only

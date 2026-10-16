@@ -220,7 +220,7 @@ The two loops and the reasons for them are in
   hardware-validated image, against the current CVE feeds. There is no build. The feed
   revisions of each scan are recorded, so the scan can be repeated
   ([`vuln-mgmt-architecture.md`](vuln-mgmt-architecture.md), D7). The tooling is
-  `scripts/cve-monitor.py` (`make cve-monitor`): it rescans, diffs against the release
+  `scripts/cve-monitor.py` (`make cve ARGS='monitor …'`): it rescans, diffs against the release
   report and writes the worklist.
 - **Exploitation review** is a separate manual step after each monitor scan. The open
   findings of both images are checked against the exploitation signals (CISA KEV, EUVD

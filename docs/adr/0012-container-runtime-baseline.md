@@ -49,8 +49,8 @@ distro-level identity an artifact of one accelerator on one board.
 `EDGE_ENABLE_CONTAINERS`) was considered and rejected: it changes the
 default but keeps the mechanism, and a platform dependency expressed as an
 operator-selected flag fails on hardware rather than at build time when it
-is eventually not selected. `VIRT=1` is retained as a warned no-op so
-existing invocations keep working.
+is eventually not selected. `VIRT=1` and `kas/virtualization.yml` were kept
+as warned no-ops for one release and have since been removed.
 
 ## Rationale
 

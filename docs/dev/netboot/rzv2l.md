@@ -16,7 +16,7 @@ NFS-root needs no kernel fragment. `eth0` is left unmanaged by systemd-networkd
 undisturbed; `eth1` is the DHCP uplink.
 
 `make netboot-sync` defaults to this board: `MACHINE=smarc-rzv2l`, deploy directory
-`build/tmp/deploy/images/smarc-rzv2l/`.
+`build/rzv2l/tmp/deploy/images/smarc-rzv2l/`.
 
 ## U-Boot env (once per board)
 

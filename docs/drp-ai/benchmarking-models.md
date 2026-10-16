@@ -41,7 +41,7 @@ From the repo root:
 ```sh
 source scripts/env.sh
 kas shell kas/local.yml -c 'bitbake drpai-tvm-runner'   # or use the copy in the image
-BIN=$(find build/tmp/work -path '*drpai-tvm-runner*/image/usr/bin/drpai-runner' | head -1)
+BIN=$(find build/rzv2l/tmp/work -path '*drpai-tvm-runner*/image/usr/bin/drpai-runner' | head -1)
 echo "$BIN"
 ```
 

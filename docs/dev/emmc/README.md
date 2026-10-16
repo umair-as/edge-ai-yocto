@@ -1,6 +1,6 @@
 # eMMC boot target
 
-`EDGE_BOOT_TARGET=emmc` builds the image for a board that boots from its eMMC: a GPT
+`LAYOUT=emmc` (`EDGE_BOOT_TARGET = "emmc"`) builds the image for a board that boots from its eMMC: a GPT
 user-area image with the same A/B layout as the SD image, grown to the device on
 first boot ([ADR-0006](../../adr/0006-emmc-gpt-boot-target.md)). Each board's
 `conf/machine/include/edge-board-<machine>.inc` maps the target to its WKS layout;
@@ -16,12 +16,14 @@ the default, `esd`, builds the SD image.
 ## Build
 
 ```bash
-make dev EDGE_BOOT_TARGET=emmc BOARD=<board>
-make bundle EDGE_BOOT_TARGET=emmc BOARD=<board>   # bundles for an eMMC-booted board
+make dev LAYOUT=emmc BOARD=<board>
+make bundle BOARD=<board>     # same tree, so the bundle is eMMC too
 ```
 
 A bundle must be built for the target the board boots: an SD-target bundle carries
-the SD grow path, which fails on the GPT layout.
+the SD grow path, which fails on the GPT layout. The build directory remembers its
+layout, so a bundle cannot silently come out for the other target; switching a tree
+between layouts needs `LAYOUT_CHANGE=1` ([build system](../build-system.md#on-disk-layout)).
 
 ## Layout
 

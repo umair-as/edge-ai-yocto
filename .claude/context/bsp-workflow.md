@@ -23,7 +23,7 @@ Setup --> Customize --> Build --> Sign --> Deploy --> Verify
 |---|---|
 | **Setup** | KAS composition (`kas/base.yml` + `kas/machines/<board>.yml`, plus opt-in capability fragments). Image tier is the bitbake target, not a kas overlay. Personal `kas/local.yml` for cache paths / parallelism (gitignored). |
 | **Customize** | Distro features in `meta-edge-distro/conf/distro/edge-ai.conf`; image recipes in `meta-edge-bsp/recipes-core/images/`; board facts in `meta-edge-bsp/conf/machine/include/edge-board-<machine>.inc`; board DTS / U-Boot patches under `meta-edge-bsp/dynamic-layers/<collection>/`; kernel policy shared by all boards in `meta-edge-bsp/recipes-kernel/linux/edge-kernel-policy.inc`. |
-| **Build** | `make base` / `make dev` / `make prod` (wraps `kas shell -c 'bitbake <target>'`), `BOARD=<name>` for a board other than the first. Artifacts under `build/tmp/deploy/images/<machine>/` for the first board, `build/<BOARD>/tmp/deploy/images/<machine>/` for later ones. |
+| **Build** | `make base` / `make dev` / `make prod` (wraps `kas shell -c 'bitbake <target>'`), `BOARD=<name>` for a board other than rzv2l. Artifacts under `build/<BOARD>/tmp/deploy/images/<machine>/`. |
 | **Sign** | HSM FIT chain (deferred). Trust profiles planned: `file-keys`, `softhsm`, `yubikey-rot`. Prod image gated to YubiKey ROT only. |
 | **Deploy** | RAUC A/B bundle (wired): build `edge-bundle`, `rauc install` to the inactive slot, reboot. WIC image to SD/eMMC for a fresh board. |
 | **Verify** | `make parse` (parse gate), boot + `systemctl --failed` (boot gate), RAUC bundle round-trip (OTA gate). |

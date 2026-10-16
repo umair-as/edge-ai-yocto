@@ -25,7 +25,8 @@ set -Eeuo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 IMAGE="${IMAGE:-edge-image-dev}"
 MACHINE="${MACHINE:-smarc-rzv2l}"
-DEPLOY_DIR="${DEPLOY_DIR:-${REPO_ROOT}/build/tmp/deploy/images/${MACHINE}}"
+BOARD="${BOARD:-rzv2l}"
+DEPLOY_DIR="${DEPLOY_DIR:-${REPO_ROOT}/build/${BOARD}/tmp/deploy/images/${MACHINE}}"
 NFS_ROOT="${NFS_ROOT:-/srv/nfs/edge-image-dev}"
 TFTP_DIR="${TFTP_DIR:-/srv/tftp/edge-fit-dev}"
 

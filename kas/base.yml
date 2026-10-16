@@ -29,6 +29,14 @@ distro: edge-ai
 # and the post-checkout banner ("To start the default build, run: ...").
 target: edge-image-base
 
+# Build settings read at bitbake startup. kas forwards each when set in its
+# environment and adds it to BB_ENV_PASSTHROUGH_ADDITIONS; null leaves the conf
+# default in force otherwise. The Makefile sets them per target.
+env:
+  EDGE_PROFILE: null
+  BUNDLE_IMAGE_NAME: null
+  EDGE_BUNDLE_SBOM_CVE: null
+
 repos:
   # --- Yocto upstream layers (SHA-pinned to the wrynose 6.0 baseline) ---
   openembedded-core:

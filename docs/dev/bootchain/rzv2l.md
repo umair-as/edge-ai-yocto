@@ -5,7 +5,7 @@ tools rewrite it:
 
 | Boot target | Tool | Writes |
 |---|---|---|
-| eMMC (`EDGE_BOOT_TARGET=emmc`) | RAUC bootloader slot, bundle `rzv2l-bootchain-bundle` ([ADR-0015](../../adr/0015-rzv2l-emmc-bootchain-rauc-boot-emmc.md)) | the inactive eMMC boot partition, then switches to it |
+| eMMC (`LAYOUT=emmc`) | RAUC bootloader slot, bundle `rzv2l-bootchain-bundle` ([ADR-0015](../../adr/0015-rzv2l-emmc-bootchain-rauc-boot-emmc.md)) | the inactive eMMC boot partition, then switches to it |
 | QSPI, eSD; eMMC `boot0` provisioning | `rzv2l-bootloader-update` ([ADR-0014](../../adr/0014-bootchain-update-mechanism.md)) | the medium in place, header last |
 
 The shared contract is in [README.md](README.md); eMMC placement is
@@ -44,8 +44,8 @@ Confirm the boot medium on the console:
 ### Build
 
 ```bash
-make dev EDGE_BOOT_TARGET=emmc             # image: patched RAUC, guards, bootloader slot
-make bootchain-bundle EDGE_BOOT_TARGET=emmc
+make dev LAYOUT=emmc                # image: patched RAUC, guards, bootloader slot
+make bootchain-bundle               # needs a tree built for LAYOUT=emmc
 ```
 
 The image's `/etc/rauc/system.conf` gains

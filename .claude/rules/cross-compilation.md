@@ -22,7 +22,7 @@ kas shell -c 'bitbake edge-image-base -c populate_sdk' \
   kas/base.yml:kas/machines/rzv2l.yml
 ```
 
-SDK installer lands under `build/tmp/deploy/sdk/`. Install with:
+SDK installer lands under `build/<BOARD>/tmp/deploy/sdk/`. Install with:
 
 ```bash
 ./poky-edgeai-glibc-x86_64-edge-image-base-aarch64-edgeai-toolchain-0.1.0.sh

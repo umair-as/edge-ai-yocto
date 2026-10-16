@@ -136,6 +136,11 @@ bit-for-bit reproducibility.
 - `kas purge` (the kas plugin) wipes `KAS_REPO_REF_DIR` contents in
   addition to `.kas/`, so `make purge` does a scoped `rm` directly
   instead of calling `kas purge`. See Makefile:`purge`.
+- Build settings that bitbake reads at startup (`EDGE_PROFILE`,
+  `BUNDLE_IMAGE_NAME`, `EDGE_BUNDLE_SBOM_CVE`) reach it through the
+  top-level `env:` block of `kas/base.yml`, which kas adds to
+  `BB_ENV_PASSTHROUGH_ADDITIONS`; [build-system.md](../dev/build-system.md)
+  describes how the Makefile sets them.
 
 ## Vendor layer series compatibility
 
@@ -170,10 +175,6 @@ a single-pass change:
 - **`signers:` + `signed: true`** — verify GPG signatures on each
   upstream layer's commit/tag before checkout. Hard CRA-posture
   statement; real setup cost (key distribution, signer policy).
-- **Top-level `env:` for feature-gate passthrough** — kas's top-level
-  `env:` block forwards listed vars into `BB_ENV_PASSTHROUGH_ADDITIONS`
-  automatically, which would replace the hand-wired Makefile passthrough
-  for runtime toggles.
 - **`kas/sdk.yml` with `task: populate_sdk`** — dedicated stack
   fragment so `make sdk` becomes a one-line wrapper. Only useful once
   the SDK is a deliverable.
