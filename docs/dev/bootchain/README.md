@@ -11,6 +11,7 @@ board has its own backend
 
 | Board (`BOARD=`) | Updater | What it writes | Page |
 |---|---|---|---|
+| `rzv2l` (eMMC boot target) | RAUC bootloader slot, `rzv2l-bootchain-bundle` | BL2 + FIP to the inactive eMMC boot partition, then switches to it | [rzv2l.md](rzv2l.md) |
 | `rzv2l` | `rzv2l-bootloader-update` | BL2 + FIP (TF-A, OP-TEE, U-Boot) to QSPI, the eSD raw area or eMMC `boot0` | [rzv2l.md](rzv2l.md) |
 | `raspberrypi5` | `edge-rpi-eeprom` | Broadcom bootloader in the SPI EEPROM, flashed by the firmware on reboot | [raspberrypi5.md](raspberrypi5.md) |
 | `raspberrypi5` | `edge-rpi-bootfiles-update` | U-Boot, board DTB and `config.txt` on the FAT boot partition | [raspberrypi5.md](raspberrypi5.md) |
@@ -55,9 +56,17 @@ the image. Built without it, no bootchain updater is present.
 signed image and the Pi firmware performs and verifies the flash on the next
 reboot; its recovery path is on [raspberrypi5.md](raspberrypi5.md).
 
-The storage itself is single-copy: there is no A/B redundancy and no runtime
+The RZ/V2L RAUC bootloader slot
+([ADR-0015](../../adr/0015-rzv2l-emmc-bootchain-rauc-boot-emmc.md)) meets the
+guarantees differently: it is attended through a one-attempt operator authorization
+rather than by running a tool, it has no `--dry-run` (the authorize step checks the
+bundle), and instead of a backup the previously selected boot partition stays intact
+until the next install. It reads the written partition back before switching.
+
+The updaters' storage is single-copy: there is no A/B redundancy and no runtime
 rollback. A power loss during a write is recovered with the board's out-of-band
-procedure, on the board's page.
+procedure, on the board's page. The eMMC boot partitions give the RAUC bootloader
+slot two copies, but the ROM still boots only the selected one, with no fallback.
 
 ## Trust anchor coupling
 
@@ -84,5 +93,6 @@ Write a backend that meets the guarantees above, gate it on
 
 ## Limitations
 
-Delivery is not RAUC-integrated or unattended, and no backend enforces an
+No backend delivers a bootchain unattended: the RZ/V2L eMMC path goes through RAUC
+but needs an operator authorization per install (ADR-0015). No backend enforces an
 anti-rollback floor at boot (ADR-0014, Open questions).

@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+#
+# Slot hooks of the bootloader slot (RAUC boot-emmc), called through the bundle
+# hook stub. RAUC 1.15 runs, in order: slot-pre-install, clear the inactive boot
+# partition, write the image, slot-post-install, re-enable force_ro, flip
+# EXT_CSD[179]. A failing hook stops the install before the flip, so the boot
+# partition the ROM reads is unchanged.
+#   slot-pre-install   consumes the pre-install handler's approval; the target
+#                      must be the inactive partition the handler checked
+#   slot-post-install  reads the written partition back; its first image-size
+#                      bytes must hash to the image digest
+set -euo pipefail
+IFS=$'\n\t'
+# shellcheck disable=SC2034  # read by common.sh
+RZB_TAG="rzv2l-bootchain-slot-hook"
+# shellcheck source=rzv2l-bootchain-common.sh
+. "${RZB_LIB:-/usr/lib/rzv2l-bootchain/common.sh}"
+
+[ "${RAUC_SLOT_CLASS:-}" = "$RZB_CLASS" ] || rzb_die "hook for slot class '${RAUC_SLOT_CLASS:-}', expected ${RZB_CLASS}"
+[ "$(readlink -f "${RAUC_SLOT_DEVICE:-}")" = "$(readlink -f "$RZB_MMC_DEV")" ] \
+    || rzb_die "RAUC slot device '${RAUC_SLOT_DEVICE:-}' is not ${RZB_MMC_DEV}"
+target="${RAUC_BOOT_PARTITION_ACTIVATING:-}"
+case "$target" in 0|1) ;; *) rzb_die "RAUC_BOOT_PARTITION_ACTIVATING='${target}' is not 0 or 1" ;; esac
+tdev="${RZB_MMC_DEV}boot${target}"
+digest="${RAUC_IMAGE_DIGEST:-}"
+[ -n "$digest" ] || rzb_die "no RAUC_IMAGE_DIGEST"
+
+active="$(rzb_active_index)" || exit 1
+[ "$active" -ne "$target" ] || rzb_die "boot${target} is the active boot partition; RAUC must write the inactive one"
+
+case "${1:-}" in
+    slot-pre-install)
+        ap="${RZB_RUN_DIR}/approved"
+        used="${RZB_RUN_DIR}/consumed/approved.$$"
+        install -d -m 0700 "${RZB_RUN_DIR}/consumed"
+        mv "$ap" "$used" 2>/dev/null || rzb_die "no approval from the pre-install handler — is [handlers] pre-install set in system.conf?; refusing"
+        [ "$(rzb_kv "$used" image_digest)" = "$digest" ] || rzb_die "approval is for another image; refusing"
+        [ "$(rzb_kv "$used" target)" = "$target" ] || rzb_die "approval is for boot$(rzb_kv "$used" target), RAUC targets boot${target}; refusing"
+        [ "$(rzb_kv "$used" boot_id)" = "$(rzb_boot_id)" ] || rzb_die "approval from another boot; refusing"
+        rzb_log "slot-pre-install: writing ${tdev} (boot${active} stays active until the flip)"
+        ;;
+    slot-post-install)
+        size="${RAUC_IMAGE_SIZE:-}"
+        case "$size" in ''|*[!0-9]*) rzb_die "RAUC_IMAGE_SIZE='${size}' not numeric" ;; esac
+        install -d -m 0700 "$RZB_RUN_DIR"
+        rb="$(mktemp "${RZB_RUN_DIR}/readback.XXXXXX")"
+        trap 'rm -f "$rb"' EXIT
+        blockdev --flushbufs "$tdev" 2>/dev/null || true
+        dd if="$tdev" of="$rb" bs=512 count=$(( (size + 511) / 512 )) ${RZB_DD_IFLAG-iflag=direct} status=none \
+            || rzb_die "cannot read back ${tdev}; not activating"
+        truncate -s "$size" "$rb"
+        h="$(sha256sum "$rb" | awk '{print $1}')"
+        [ "$h" = "$digest" ] || rzb_die "read-back of ${tdev} (${h:0:16}…) != image digest (${digest:0:16}…); EXT_CSD not flipped, boot${active} stays active"
+        rzb_log "slot-post-install: ${tdev} read back OK (${size} B, ${digest:0:16}…); RAUC flips EXT_CSD to boot${target} next"
+        ;;
+    *) rzb_die "unsupported hook '${1:-}'" ;;
+esac
