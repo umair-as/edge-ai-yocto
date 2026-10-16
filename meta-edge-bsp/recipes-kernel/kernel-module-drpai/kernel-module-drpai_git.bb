@@ -1,7 +1,8 @@
 SUMMARY     = "RZ/V2L DRP-AI accelerator kernel driver (out-of-tree module)"
 DESCRIPTION = "Loadable kernel module for the DRP-AI inference accelerator on \
 RZ/V2L. Creates /dev/drpai0, binds the renesas,rzv2l-drpai device-tree node, \
-and serves userspace runtimes via ioctl over dma-buf/CMA buffers."
+and serves userspace runtimes via read/write/ioctl over the physical \
+buffers in the drp_reserved memblock carveout (not a CMA pool)."
 HOMEPAGE    = "https://github.com/umair-as/rzv2l-drpai-driver"
 SECTION     = "kernel"
 LICENSE     = "GPL-2.0-only"
@@ -9,13 +10,14 @@ LIC_FILES_CHKSUM = "file://COPYING;md5=6bc538ed5bd9a7fc9398086aedcd7e46"
 
 inherit module
 
-# Renesas GPL-2.0 driver, repackaged out-of-tree and forward-ported to
-# linux-cip 6.12. DRP-AI is RZ/V2L-only SoC IP; the drpai DT node +
-# drp_reserved carveout are wired in the linux-renesas bbappend DTS.
+# Renesas GPL-2.0 driver 2.30 (RZ/V2L AI SDK v8.00), repackaged out-of-tree,
+# forward-ported to linux-cip 6.12 and hardened (see the repo README).
+# DRP-AI is RZ/V2L-only SoC IP; the drpai DT node + drp_reserved carveout are
+# wired in the linux-renesas bbappend DTS.
 SRC_URI = "git://github.com/umair-as/rzv2l-drpai-driver.git;protocol=https;branch=main"
-SRCREV  = "bfb9f19a265f87c5c29721a3fbde6e61f8d68002"
+SRCREV  = "5827b56eaef32a6fe3359323e6db4e1f963cb885"
 
-PV = "1.0+git${SRCPV}"
+PV = "2.30+git"
 
 COMPATIBLE_MACHINE = "smarc-rzv2l"
 
