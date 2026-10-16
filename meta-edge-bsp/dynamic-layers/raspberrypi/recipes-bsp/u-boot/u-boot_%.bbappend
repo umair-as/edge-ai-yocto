@@ -9,11 +9,12 @@ FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 SRC_URI:append:raspberrypi5 = " file://edge-rpi5-boot.cfg"
 SRC_URI:append:raspberrypi5 = " file://0001-rpi-forward-system-revision-to-kernel-fdt.patch"
 
-# U-Boot surface reduction, same three tokens as the RZ/V2L bbappend:
+# U-Boot feature tokens; the first three match the RZ/V2L bbappend:
 #   surface_reduce — USB host, serial download, DFU off. Boot is SD only.
 #   net_off        — network commands off; EDGE_DEV_NETBOOT=1 builds skip it.
 #   fit_enforce    — legacy image format off, fresh-media signed-FIT bootcmd.
-EDGE_UBOOT_FEATURES ?= "surface_reduce net_off fit_enforce"
+#   watchdog       — PM watchdog driver + `wdt`; bootcmd arms it until bootm.
+EDGE_UBOOT_FEATURES ?= "surface_reduce net_off fit_enforce watchdog"
 
 SRC_URI:append:raspberrypi5 = "${@' file://edge-rpi5-hardening.cfg' \
     if 'surface_reduce' in (d.getVar('EDGE_UBOOT_FEATURES') or '') else ''}"
@@ -25,6 +26,23 @@ SRC_URI:append:raspberrypi5 = "${@' file://edge-rpi5-net-off.cfg' \
 SRC_URI:append:raspberrypi5 = "${@' file://edge-rpi5-fit-enforce.cfg' \
     if 'fit_enforce' in (d.getVar('EDGE_UBOOT_FEATURES') or '') else ''}"
 
+SRC_URI:append:raspberrypi5 = "${@' file://edge-rpi5-watchdog.cfg' \
+    if 'watchdog' in (d.getVar('EDGE_UBOOT_FEATURES') or '') else ''}"
+
 # The board's raw env area asserted against the resolved .config -- shared
 # with every other U-Boot bbappend.
 require ${EDGE_BSP_LAYERDIR}/recipes-bsp/u-boot/edge-uboot-env-assert.inc
+
+# meta-raspberrypi's do_configure:append:raspberrypi5 forces
+# CONFIG_BOOTDELAY=-2 (no autoboot abort), which disables the keyed stop in
+# edge-rpi5-boot.cfg. A postfunc runs after every do_configure append and
+# restores the fragment's value.
+edge_rpi5_bootdelay() {
+    cfg="${UNPACKDIR}/edge-rpi5-boot.cfg"
+    [ -f "$cfg" ] || return 0
+    val="$(grep '^CONFIG_BOOTDELAY=' "$cfg")"
+    [ -n "$val" ] || bbfatal "edge-rpi5-boot.cfg sets no CONFIG_BOOTDELAY"
+    sed -i '/^CONFIG_BOOTDELAY=/d' "${B}/.config"
+    echo "$val" >> "${B}/.config"
+}
+do_configure[postfuncs] += "edge_rpi5_bootdelay"
