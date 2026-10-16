@@ -55,17 +55,21 @@ reboot the ROM runs `recovery.bin`, flashes `pieeprom.upd` after verifying it ag
 `pieeprom.sig`, renames `recovery.bin` to `RECOVERY.000` so it does not re-run, and
 boots on. `edge-rpi-eeprom status` then reports "up to date" and
 `vcgencmd bootloader_version` shows the new timestamp. `pieeprom.upd`/`pieeprom.sig`
-may remain on `/boot`; they are inert once `recovery.bin` has become `RECOVERY.000`.
-A `flashrom not found` note during `stage` is expected: the update uses the
-interruption-tolerant reboot-time flash, not the live `flashrom` path.
+may remain on `/boot`. The bootloader's self-update compares their timestamp with its
+own on every boot and skips them when they are not newer (console:
+`SELF-UPDATE timestamp current … new … skip`). A `flashrom not found` note during
+`stage` is expected: `/etc/default/rpi-eeprom-update` sets
+`RPI_EEPROM_IMMEDIATE_UPDATE=0`, so the update is a reboot-time flash, not a live
+`flashrom` write.
 
 Hardware-validated 2026-10-08: EEPROM moved to the May-2026 release, `RECOVERY.000`
 present, board booted on the new firmware with `/system/linux,revision` intact.
 
 ### Recovery
 
-The pinned `rpi-eeprom` has no A/B or tryboot rollback, so a bad or
-power-interrupted flash needs a physical recovery SD. Prepare one before flashing a
+EEPROM updates run with A/B disabled (`AB_EEPROM=0`) and the EEPROM keeps its
+single-copy layout, so there is no rollback: a bad or power-interrupted flash needs a
+physical recovery SD. Prepare one before flashing a
 board that cannot easily be re-imaged:
 
 - Format a spare SD as FAT and copy `recovery.bin` and a known-good
