@@ -14,8 +14,8 @@ setsid nohup $T serve --board rzv2l --log $L >/dev/null 2>&1 &   # or --port /de
 $T status --log $L
 ```
 
-`serve` refuses a port that another process holds (`tio`, an MCP serial session,
-`serial-boot-capture.py`); close those first. The input FIFO `<log>.in` is
+`serve` refuses a port that another process holds (`tio`, an MCP serial session);
+close those first. The input FIFO `<log>.in` is
 write-only: do not `cat`, `wc` or `tail` it, and glob logs by `*.log`.
 
 ## Procedures
@@ -25,6 +25,7 @@ write-only: do not `cat`, `wc` or `tail` it, and glob logs by `*.log`.
 | Reboot and read the boot | `off=$($T offset --log $L)`, trigger the reboot, `$T wait-boot --log $L --since $off` |
 | Stop at the U-Boot prompt | start `$T stop-autoboot --log $L` before the board powers up |
 | U-Boot commands | `$T uboot --log $L 'mmc dev 0 boot1' 'mmc info'` |
+| Log in at the console | `EDGE_CONSOLE_PASSWORD=… $T login --log $L [--user devel]` |
 | Console address of the board | `$T ip --log $L` (console logged in) |
 | Free-form input | `$T send --log $L --expect 'RE' 'text'` |
 
@@ -44,6 +45,9 @@ write-only: do not `cat`, `wc` or `tail` it, and glob logs by `*.log`.
   `env save|erase`, `ums`, `dfu`, …), including after a `;`, unless
   `--allow-destructive` is given. `mmc dev 0 user|boot0|boot1` is translated to
   `mmc dev 0 0|1|2`: U-Boot hardware partition 1 is `boot0`, 2 is `boot1`.
+- `login` is a no-op at a shell prompt and exits 2 when the login is rejected.
+  The password is read from `EDGE_CONSOLE_PASSWORD`, so it never shows in a
+  process listing; the console does not echo it into the log.
 - The board address changes with the install; `ip` reads the current one.
 
 ## Limits
