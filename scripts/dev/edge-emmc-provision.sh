@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Write an EDGE_BOOT_TARGET=emmc image to the RZ/V2L eMMC user area, from a
+# Write a LAYOUT=emmc image to the RZ/V2L eMMC user area, from a
 # running Linux that can see the eMMC (mmcblkX with a mmcblkXboot0).
 #
 # The eMMC bootloader (BL2 + FIP) lives in the hardware boot partition

@@ -18,8 +18,7 @@ GATE="$ROOT/meta-edge-distro/scripts/edge-fit-gate.py"
 CHECKER=""
 [ "${1:-}" = "--checker" ] && CHECKER=$2
 if [ -z "$CHECKER" ]; then
-    CHECKER=$(ls "$ROOT"/build/tmp/sysroots-components/x86_64/u-boot-tools-native/usr/bin/fit_check_sign \
-        "$ROOT"/build/*/tmp/sysroots-components/x86_64/u-boot-tools-native/usr/bin/fit_check_sign 2>/dev/null | head -1)
+    CHECKER=$(ls "$ROOT"/build/*/tmp/sysroots-components/x86_64/u-boot-tools-native/usr/bin/fit_check_sign 2>/dev/null | head -1)
 fi
 [ -x "$CHECKER" ] || { echo "no fit_check_sign (build u-boot-tools-native or pass --checker)" >&2; exit 2; }
 for t in openssl mkimage dtc fdtput fdtget; do

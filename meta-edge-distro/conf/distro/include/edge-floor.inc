@@ -199,8 +199,8 @@ SPDX_INCLUDE_VEX = "all"
 # ----- FIT verified boot (file-key dev profile) --------------------------
 
 # Repo-root key store, keys/ (gitignored). Anchored on the distro layer, not
-# TOPDIR: the build directory is build/ for the first board and build/<BOARD>/
-# for every later one, so a TOPDIR-relative path resolves per board and
+# TOPDIR: the build directory is build/<BOARD>/, so a TOPDIR-relative path
+# resolves per board and
 # FIT_GENERATE_KEYS would mint a second trust root for the second board.
 EDGE_KEYS_DIR ?= "${@os.path.normpath(d.getVar('EDGE_DISTRO_LAYERDIR') + '/../keys')}"
 

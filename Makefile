@@ -1,484 +1,227 @@
-.PHONY: help base dev prod bundle bootchain-bundle bootloader-package parse layers shell info clean-lock netboot-sync lock verify-pins purge hooks ci kernel-config-export kernel-hardening-check cve-archive cve-calibrate cve-refresh cve-monitor
+.PHONY: help base dev prod bundle bootchain-bundle bootloader-package parse layers shell info clean-lock netboot-sync lock verify-pins purge hooks ci kernel-config-export kernel-hardening-check cve
 
 KAS ?= kas
 
-# === Layer hosting (see docs/adr/0002-layer-hosting.md) ===
-#
-# KAS_REPO_REF_DIR points at a shared git-alternates cache. If a same-
-# named clone exists under <ref-dir>/<repo>, kas pulls objects from it
-# instead of re-downloading from upstream — near-instant repo setup,
-# zero extra disk per project. SHA pins from kas/base.yml are still
-# enforced; alternates only speed the fetch.
-#
-# Subdir is scoped per Yocto release line (`layers-wrynose/`) so a
-# scarthgap or kirkstone project on the same host using
-# `/mnt/yocto-nvme/layers-<release>/` doesn't cross-contaminate
-# ref-counts or surface stale objects after an upstream force-push.
-# Alternates are technically read-only and cross-release safe, but the
-# mental-model isolation is cheap.
-#
-# If the dir doesn't exist, kas silently falls back to full clones —
-# no error, no operator action needed for a first-time host.
-#
-# KAS_WORK_DIR relocates kas' clone target out of the repo root into
-# .kas/, which is gitignored as a category. This means the repo root
-# stays clean even on a host without a shared cache; you never get
-# upstream layer directories polluting `ls`.
+# Layer clones live in .kas/; KAS_REPO_REF_DIR is a git-alternates cache that
+# only speeds the fetch (absent = full clones). See docs/dev/build-system.md.
 KAS_REPO_REF_DIR ?= /mnt/yocto-nvme/layers-wrynose
 KAS_WORK_DIR     ?= $(CURDIR)/.kas
-# Bitbake build dir at the traditional repo-root location. Without this
-# kas would default KAS_BUILD_DIR to ${KAS_WORK_DIR}/build (= .kas/build),
-# which works but doesn't match the universal Yocto convention every
-# operator and doc references. .kas/ is for upstream layer clones only.
-
 export KAS_REPO_REF_DIR KAS_WORK_DIR
 
-# === Stack composition ===
-#
-# The kas stack is image-agnostic: base + machine. The image is selected
-# via the bitbake target (`bitbake edge-image-base|edge-image-dev`), not
-# via a kas overlay.
-#
-# BOARD=<name> selects kas/machines/<name>.yml. Named BOARD rather than
-# MACHINE because the fragment name (rzv2l) and the bitbake MACHINE it sets
-# (smarc-rzv2l) differ: the vendor MACHINE name is a frozen external
-# interface (RAUC_BUNDLE_COMPATIBLE, fielded devices).
+# BOARD selects kas/machines/<board>.yml, which sets MACHINE.
 BOARD ?= rzv2l
 ifeq ($(wildcard kas/machines/$(BOARD).yml),)
   $(error BOARD=$(BOARD) is unknown; kas/machines/$(BOARD).yml does not exist. \
 Available: $(patsubst kas/machines/%.yml,%,$(wildcard kas/machines/*.yml)))
 endif
-# The tracked composition always leads: base + the selected machine.
-# kas/local.yml, when present, is appended last as an additive host overlay
-# (cache paths, parallelism, credentials); it never selects the board. Being
-# last, its local_conf_header wins over the tracked fragments.
 BASE = kas/base.yml:kas/machines/$(BOARD).yml$(if $(wildcard kas/local.yml),:kas/local.yml,)
 
-# Per-machine build directory, sharing DL_DIR and SSTATE_DIR. Two machines in
-# one tree race on build/conf regeneration and tmp/; sstate keys on task
-# signatures, not paths, so separate trees cost no cache.
-#
-# An existing single-dir build/ stays in use for rzv2l only: TMPDIR is not
-# relocatable (sanity.bbclass: "Error, TMPDIR has changed location"), and
-# another board must not share its conf/.
-#
-# override, not ?=, on every branch: a KAS_BUILD_DIR already in the
-# environment (scripts/env.sh, loaded by direnv before BOARD=$(BOARD) was
-# known, or simply left over from a shell that last built the other board)
-# is never trustworthy once BOARD is known here. An explicit BOARD= must
-# determine the build dir on every invocation, in both directions -- an
-# inherited value winning for rzv2l specifically is the same bug as an
-# inherited value winning for any other board.
-ifneq ($(and $(wildcard $(CURDIR)/build/conf),$(filter rzv2l,$(BOARD))),)
-  override KAS_BUILD_DIR := $(CURDIR)/build
-else
-  override KAS_BUILD_DIR := $(CURDIR)/build/$(BOARD)
-endif
+# One tree per board; override: an inherited KAS_BUILD_DIR must never pick it.
+override KAS_BUILD_DIR := $(CURDIR)/build/$(BOARD)
 export KAS_BUILD_DIR
 
+# Capability flags: FLAG=1 composes kas/<fragment>.yml; `make help` lists them.
+FLAGS := TPM:tpm SBOM_TUNE:sbom-cve NETBOOT:dev-netboot JTAG:jtag-debug BPF:bpf-labs \
+         OPTEE_EXAMPLES:optee-examples BOOTLOADER_UPDATE:bootloader-update
+flag_var  = $(word 1,$(subst :, ,$(1)))
+flag_yml  = kas/$(word 2,$(subst :, ,$(1))).yml
+CAPABILITY_YMLS := $(strip $(foreach f,$(FLAGS),$(if $(filter 1,$($(call flag_var,$(f)))),$(call flag_yml,$(f)))))
 
-# === Capability fragments (opt-in via make flags) ===
-#
-#   make dev TPM=1         # add meta-secure-core TPM2 + IMA/EVM stack
-#   (container userspace is baseline; VIRT=1 is a retained no-op)
-#   make dev ACCEL=drpai-v2l  # select an accelerator (AI=1 is the old spelling)
-#   make dev SBOM_TUNE=1   # add SBOM/CVE per-build tuning knobs
-#   make dev JTAG=1        # KASLR off + kgdb + debug-safe (JTAG kernel labs)
-#   make dev BPF=1         # kernel BTF + bpftool (libbpf CO-RE labs; size-heavy)
-#   make dev OPTEE_EXAMPLES=1    # add the OP-TEE demo TAs (bring-up only)
-#
-# Flags compose: `make dev TPM=1 ACCEL=drpai-v2l` adds both. Each fragment is a
-# pure additive overlay with no `includes:` — composition is explicit.
-#
-# Capability defaults (board-gated): the RZ/V2L SMARC EVK has no
-# on-board TPM, so TPM2 is NOT default-on here. Boards with TPM
-# hardware will include kas/tpm.yml from their machines/<board>.yml.
-CAPABILITY_YMLS :=
-ifeq ($(TPM),1)
-  CAPABILITY_YMLS += kas/tpm.yml
-endif
-# VIRT=1 is a warned no-op: container userspace is baseline (ADR-0012).
-ifeq ($(VIRT),1)
-  $(warning note: VIRT=1 is a no-op; container userspace is baseline (ADR-0012))
-endif
-# ACCEL=<name> overrides the accelerator; the machine fragment already
-# composes one (kas/machines/<board>.yml -> kas/accel/<name>.yml), so a bare
-# `make dev` builds with it. ACCEL=none composes no extra fragment and does
-# not remove the machine's own. An unknown name fails here rather than as a
-# missing kas include.
+# ACCEL=<name> adds kas/accel/<name>.yml on top of the machine's own accelerator.
 ifneq ($(filter-out none,$(ACCEL)),)
   ifeq ($(wildcard kas/accel/$(ACCEL).yml),)
-    $(error ACCEL=$(ACCEL) is unknown; kas/accel/$(ACCEL).yml does not exist. \
-Available: none $(patsubst kas/accel/%.yml,%,$(wildcard kas/accel/*.yml)))
+    $(error ACCEL=$(ACCEL) is unknown. Available: none $(patsubst kas/accel/%.yml,%,$(wildcard kas/accel/*.yml)))
   endif
   CAPABILITY_YMLS += kas/accel/$(ACCEL).yml
 endif
-# AI=1 is a warned no-op: the machine fragment composes the accelerator.
-ifeq ($(AI),1)
-  $(warning note: AI=1 is a no-op; the machine fragment composes the accelerator)
-endif
-ifeq ($(SBOM_TUNE),1)
-  CAPABILITY_YMLS += kas/sbom-cve.yml
-endif
-ifeq ($(NETBOOT),1)
-  CAPABILITY_YMLS += kas/dev-netboot.yml
-endif
-ifeq ($(JTAG),1)
-  CAPABILITY_YMLS += kas/jtag-debug.yml
-endif
-ifeq ($(BPF),1)
-  CAPABILITY_YMLS += kas/bpf-labs.yml
-endif
-ifeq ($(OPTEE_EXAMPLES),1)
-  CAPABILITY_YMLS += kas/optee-examples.yml
-endif
 ifeq ($(BOOTLOADER_UPDATE),1)
-  CAPABILITY_YMLS += kas/bootloader-update.yml
-  # Bootchain update is per-board (ADR-0014). RZ/V2L (BL2/FIP) and Pi 5 (EEPROM)
-  # have backends; the image install is machine-gated, so the flag is a no-op on
-  # any other board.
   ifeq ($(filter $(BOARD),rzv2l raspberrypi5),)
     $(warning note: BOOTLOADER_UPDATE=1 has no backend for BOARD=$(BOARD); it is a no-op here)
   endif
 endif
 
+# On-disk layout. esd is the default; any other is kas/boot/<layout>.yml. The
+# layout last built is stamped in the build dir and reused when LAYOUT is not
+# given; build targets refuse a different LAYOUT unless LAYOUT_CHANGE=1. parse
+# ignores the stamp, so parse-only checks stay independent of the tree.
+ifdef EDGE_BOOT_TARGET
+  $(error EDGE_BOOT_TARGET is replaced by LAYOUT=<esd|emmc>)
+endif
+LAYOUT       :=
+LAYOUT_STAMP := $(KAS_BUILD_DIR)/edge-layout
+BUILT_LAYOUT := $(strip $(shell cat $(LAYOUT_STAMP) 2>/dev/null))
+LAYOUT_EFF    = $(or $(LAYOUT),$(BUILT_LAYOUT),esd)
+parse: LAYOUT_EFF = $(or $(LAYOUT),esd)
+ifneq ($(filter-out esd,$(LAYOUT)),)
+  ifeq ($(wildcard kas/boot/$(LAYOUT).yml),)
+    $(error LAYOUT=$(LAYOUT) is unknown. Available: esd $(patsubst kas/boot/%.yml,%,$(wildcard kas/boot/*.yml)))
+  endif
+endif
+layout_yml = $(if $(filter-out esd,$(LAYOUT_EFF)),:kas/boot/$(LAYOUT_EFF).yml)
+
 empty :=
 space := $(empty) $(empty)
-CAP_CHAIN := $(if $(CAPABILITY_YMLS),:$(subst $(space),:,$(CAPABILITY_YMLS)))
+STACK = $(BASE)$(if $(strip $(CAPABILITY_YMLS)),:$(subst $(space),:,$(strip $(CAPABILITY_YMLS))))$(layout_yml)
 
-STACK = $(BASE)$(CAP_CHAIN)
+# Build settings reach bitbake through kas/base.yml env:, set per command below.
+# := and unexport keep a value from the shell environment out of the build.
+EDGE_PROFILE := dev
+IMAGE        := dev
+unexport EDGE_PROFILE BUNDLE_IMAGE_NAME EDGE_BUNDLE_SBOM_CVE
 
-# === Boot target (on-disk layout) ===
-#
-#   make dev EDGE_BOOT_TARGET=emmc   # GPT user area + systemd-repart (eMMC boot)
-#
-# Unset → recipe default "esd" (MBR, eSD boot — unchanged behaviour). Passed
-# as a bitbake env var, not a kas layer; the recipe selects the matching
-# WKS_FILE and growth mechanism.
-BOOT_TARGET_ENV := $(if $(EDGE_BOOT_TARGET),EDGE_BOOT_TARGET=$(EDGE_BOOT_TARGET) ,)
+# $(1) = build settings for kas env:, $(2) = command run in the kas shell.
+kas_run = $(1) $(KAS) shell -c '$(2)' $(STACK)
 
-# === Bundle SBOM + CVE report ===
-#
-#   make bundle SBOM_CVE=1   # + image SBOM and sbom-cve-check report for the bundled rootfs
-#
-# Prod-tier bundles always produce it (recipe override); dev bundles only on
-# request — the two tasks add minutes per rootfs change.
-BUNDLE_SBOM_ENV := $(if $(filter 1,$(SBOM_CVE)),EDGE_BUNDLE_SBOM_CVE=1 ,)
-
-# === Build tier (EDGE_PROFILE) ===
-#
-# Tier is resolved at INVOCATION, not pinned in an image recipe (an image
-# recipe parses after the distro conf's `require edge-profile-${EDGE_PROFILE}`
-# already ran). EDGE_PROFILE must be whitelisted in BB_ENV_PASSTHROUGH_ADDITIONS
-# *in the shell env* — bitbake filters the inherited environment at startup,
-# before any conf is parsed, so the `.=` in edge-features.inc is too late to
-# rescue the startup import. Set both on the bitbake command line together.
-# $(1) = profile (dev|prod), $(2) = image target.
-define edge_build
-	$(KAS) shell -c 'BB_ENV_PASSTHROUGH_ADDITIONS="$$BB_ENV_PASSTHROUGH_ADDITIONS EDGE_PROFILE EDGE_OTA_BACKEND EDGE_BOOT_TARGET EDGE_KERNEL_DEV_FRAGMENTS" EDGE_PROFILE=$(1) $(BOOT_TARGET_ENV)bitbake $(2)' $(STACK)
+define layout_guard
+	@if [ -n "$(LAYOUT)" ] && [ -n "$(BUILT_LAYOUT)" ] && [ "$(LAYOUT)" != "$(BUILT_LAYOUT)" ] \
+	    && [ "$(LAYOUT_CHANGE)" != 1 ]; then \
+		echo "$(KAS_BUILD_DIR) is built for LAYOUT=$(BUILT_LAYOUT); add LAYOUT_CHANGE=1 to build LAYOUT=$(LAYOUT)"; \
+		exit 1; \
+	fi
+	@echo $(LAYOUT_EFF) > $(LAYOUT_STAMP)
 endef
 
-# EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION defaults to "1" (edge-features.inc), so
-# every image now pulls in ota-certs' encrypted-bundle key install, which
-# bbfatals deep inside do_install if keys/dev/rauc/ has no recipient key yet
-# (scripts/rauc-init-certs.sh not run). Advisory, not a gate: it greps the
-# composed $(STACK) files for an explicit override to "0" and stays silent
-# if it finds one — cheap, and covers the common case (kas/local.yml, a
-# capability fragment) without paying kas/bitbake's own startup cost. It
-# cannot see a shell-env override (BB_ENV_PASSTHROUGH_ADDITIONS), so it can
-# still misfire there; that is a known gap, not a claim of certainty. Its
-# job is only to turn a bbfatal several minutes into a cold build into a
-# one-line heads-up before kas even starts.
+# ota-certs fails at do_install without the bundle-encryption recipient key,
+# unless a composed kas file turns encryption off.
 define check_rauc_keys
 	@if [ ! -f keys/dev/rauc/rauc-recipient.key ] \
 	   && ! grep -lqE '^[[:space:]]*EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION[[:space:]]*=[[:space:]]*"0"' $(subst :, ,$(STACK)) 2>/dev/null; then \
-		echo "note: keys/dev/rauc/rauc-recipient.key not found."; \
-		echo "      Bundle encryption defaults on (EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION) and no"; \
-		echo "      composed kas file overrides it off, so this build will most likely fail"; \
-		echo "      at ota-certs' do_install. (A shell-env override is not checked here.)"; \
-		echo "      Run: ./scripts/rauc-init-certs.sh"; \
+		echo "note: keys/dev/rauc/rauc-recipient.key is missing and bundle encryption is on;"; \
+		echo "      ota-certs will fail. Run: ./scripts/rauc-init-certs.sh"; \
 	fi
 endef
 
-# kas refuses to run if KAS_WORK_DIR or KAS_BUILD_DIR is set to a non-existent
-# dir (kas/context.py: os.path.abspath but no mkdir). Order-only prereq so
-# every kas-invoking target finds both created on a fresh tree — build/<BOARD>/
-# for a board that has never been built here is the common case.
+define require_rauc_signer
+	@test -f keys/dev/rauc/rauc-signer.key || { \
+		echo "RAUC signing keys missing at keys/dev/rauc/. Run: ./scripts/rauc-init-certs.sh"; exit 1; }
+endef
+
+define require_rzv2l
+	@test "$(BOARD)" = rzv2l || { echo "$@: RZ/V2L only (BOARD=rzv2l)"; exit 1; }
+endef
+
+# kas refuses a KAS_WORK_DIR or KAS_BUILD_DIR that does not exist.
 KAS_DIRS := $(KAS_WORK_DIR) $(KAS_BUILD_DIR)
-$(KAS_WORK_DIR) $(KAS_BUILD_DIR):
+$(KAS_DIRS):
 	@mkdir -p $@
 
-help:
-	@echo "edge-ai-yocto build system"
-	@echo "=========================="
+help: ## this list
+	@echo "Targets:"
+	@awk -F ':.*## ' '/^[a-z-]+:.*## /{ printf "  make %-24s %s\n", $$1, $$2 }' $(firstword $(MAKEFILE_LIST))
 	@echo ""
-	@echo "Image targets (tier = EDGE_PROFILE, set per target):"
-	@echo "  make base                    Build edge-image-base (dev tier; v0 wired baseline)"
-	@echo "  make dev                     Build edge-image-dev  (dev tier; + debug/profile/stress tools)"
-	@echo "  make prod                    Build edge-image-prod (prod tier; hardened, no package-mgmt)"
-	@echo "  make bootloader-package      Host package: BL2/FIP + manifest + updater (RZ/V2L, out-of-band)"
-	@echo "  make bundle                  Build edge-bundle (.raucb) for OTA install (dev tier)"
-	@echo "  make bundle EDGE_PROFILE=prod  Bundle a prod image (set BUNDLE_IMAGE_NAME=edge-image-prod)"
-	@echo "  make bundle SBOM_CVE=1       + image SBOM + CVE report for the bundled rootfs (always on for prod)"
-	@echo "  make bootchain-bundle        Build the RZ/V2L bootloader-only bundle (eMMC boot-emmc slot, operator-installed)"
+	@echo "Capability flags (compose freely):"
+	@$(foreach f,$(FLAGS),printf '  %-29s %s\n' "$(call flag_var,$(f))=1" \
+	    "$$(sed -nE '1{s/^# *[A-Za-z ]*fragment: *//;s/\.$$//;p}' $(call flag_yml,$(f)))";)
 	@echo ""
-	@echo "Capability flags (composable; combine freely):"
-	@echo "  TPM=1                        + meta-secure-core (TPM2 + IMA/EVM userspace)"
-	@echo "  VIRT=1                       no-op; containers are baseline (ADR-0012)"
-	@echo "  BOARD=<name>                 select board: kas/machines/<name>.yml (rzv2l, raspberrypi5)"
-	@echo "  ACCEL=<name>                 override the machine's accelerator (rarely needed)"
-	@echo "  AI=1                         no-op; the accelerator is baseline and machine-composed"
-	@echo "  SBOM_TUNE=1                  + kas/sbom-cve.yml tuning knobs"
-	@echo "  NETBOOT=1                    + U-Boot 'netboot' env macro (TFTP/NFS dev workflow)"
-	@echo "  JTAG=1                       + KASLR off, kgdb, debug-safe boot (JTAG kernel labs)"
-	@echo "  BPF=1                        + kernel BTF + bpftool (libbpf CO-RE labs; size-heavy)"
-	@echo "  BOOTLOADER_UPDATE=1          + the board's bootchain updater (RZ/V2L BL2/FIP, Pi 5 EEPROM; per-board, ADR-0014)"
-	@echo "  OPTEE_EXAMPLES=1             + OP-TEE demo TAs (bring-up/debug; off in shipped images)"
-	@echo "  EDGE_BOOT_TARGET=emmc        GPT user area + systemd-repart (eMMC boot; default esd)"
-	@echo ""
-	@echo "  Example: make dev NETBOOT=1"
-	@echo "           sudo ./scripts/dev/sync-nfs-rootfs.sh   # after each rebuild"
-	@echo "  See docs/dev/netboot/README.md for host setup + per-board env."
-	@echo ""
-	@echo "Utility targets:"
-	@echo "  make hooks                   Install the git hooks (run once per clone)"
-	@echo "  make parse                   bitbake -p (parse-only sanity check)"
-	@echo "  make ci                      Parse-check origin/main in a worktree, post commit statuses"
-	@echo "                               (CI_ARGS='--ref pr/N --matrix full --build rzv2l --khc --no-status')"
-	@echo "  make kernel-config-export    Expanded prod kernel .config -> build/khc/<board>-prod.config"
-	@echo "  make kernel-hardening-check  kernel-hardening-checker gate on it (docs/security/kernel-config/)"
-	@echo "  make cve-refresh|cve-archive|cve-calibrate|cve-monitor"
-	@echo "                               Host CVE monitor, no kas/bitbake (see scripts/cve-monitor.py;"
-	@echo "                               needs CVE_EVIDENCE_DIR, SBOM_CVE_CHECK, NVD_CLONE, CVELIST_CLONE)"
-	@echo "  make layers                  bitbake-layers show-layers"
-	@echo "  make shell                   Interactive KAS shell"
-	@echo "  make info                    Show build configuration"
-	@echo "  make lock                    Resolve floating branches to SHAs (writes kas/base.lock.yml)"
-	@echo "  make verify-pins             Print every composed repo's checked-out HEAD"
-	@echo "  make purge CONFIRM=1         Wipe .kas/ + build/ (repo tree only; KAS_REPO_REF_DIR untouched)"
-	@echo "  make clean-lock              Remove the build dir's bitbake.lock if unheld"
-	@echo ""
-	@echo "Standalone kas (outside make):"
-	@echo "  . scripts/env.sh             Export KAS_WORK_DIR + KAS_REPO_REF_DIR into your shell"
-	@echo "                               (required before 'kas shell …' to avoid in-tree clones)"
+	@echo "Settings:"
+	@echo "  BOARD=<name>                  $(patsubst kas/machines/%.yml,%,$(wildcard kas/machines/*.yml)) (default rzv2l)"
+	@echo "  ACCEL=<name>                  add kas/accel/<name>.yml over the machine's accelerator"
+	@echo "  LAYOUT=esd|emmc               on-disk layout, remembered per build dir (LAYOUT_CHANGE=1 to switch)"
+	@echo "  IMAGE=dev|prod                image and tier a bundle carries (default dev)"
+	@echo "  SBOM_CVE=1                    image SBOM + CVE report in a dev bundle (always on for prod)"
+	@echo "  EDGE_PROFILE=dev|prod         tier for parse"
 	@echo ""
 	@echo "Composition: $(STACK)"
-	@echo ""
-	@echo "See AGENTS.md for the full orientation."
 
-base: | $(KAS_DIRS)
-	$(call check_rauc_keys)
-	@echo "==> Building edge-image-base (dev tier) [$(STACK)]"
-	$(call edge_build,dev,edge-image-base)
+base: | $(KAS_DIRS) ## edge-image-base (dev tier)
+	$(layout_guard)
+	$(check_rauc_keys)
+	$(call kas_run,EDGE_PROFILE=dev,bitbake edge-image-base)
 
-dev: | $(KAS_DIRS)
-	$(call check_rauc_keys)
-	@echo "==> Building edge-image-dev [$(STACK)]"
-	$(call edge_build,dev,edge-image-dev)
+dev: | $(KAS_DIRS) ## edge-image-dev (dev tier; debug, profiling and stress tools)
+	$(layout_guard)
+	$(check_rauc_keys)
+	$(call kas_run,EDGE_PROFILE=dev,bitbake edge-image-dev)
 
-prod: | $(KAS_DIRS)
-	$(call check_rauc_keys)
-	@echo "==> Building edge-image-prod [$(STACK)]"
-	$(call edge_build,prod,edge-image-prod)
+prod: | $(KAS_DIRS) ## edge-image-prod (prod tier; hardened, no package management)
+	$(layout_guard)
+	$(check_rauc_keys)
+	$(call kas_run,EDGE_PROFILE=prod,bitbake edge-image-prod)
 
-# RAUC bundle. Signs with the chain at keys/dev/rauc/ (run
-# scripts/rauc-init-certs.sh first if absent). BUNDLE_IMAGE_NAME selects the
-# image to bundle (default edge-image-dev; set in kas/local.yml). EDGE_PROFILE
-# must match that image's tier — defaults to dev; for a prod bundle:
-#     make bundle EDGE_PROFILE=prod        # with BUNDLE_IMAGE_NAME=edge-image-prod
-# EDGE_BOOT_TARGET must match the booted board: an emmc board needs
-#     make bundle EDGE_BOOT_TARGET=emmc    # else the slot rootfs ships the
-# esd grow path, which fails on the GPT layout.
-EDGE_PROFILE ?= dev
-bundle: | $(KAS_DIRS)
-	@if [ ! -f keys/dev/rauc/rauc-signer.key ]; then \
-		echo "RAUC signing keys missing at keys/dev/rauc/."; \
-		echo "Run: ./scripts/rauc-init-certs.sh"; \
-		exit 1; \
-	fi
-	$(call check_rauc_keys)
-	@echo "==> Building edge-bundle (EDGE_PROFILE=$(EDGE_PROFILE)) [$(STACK)]"
-	$(KAS) shell -c 'BB_ENV_PASSTHROUGH_ADDITIONS="$$BB_ENV_PASSTHROUGH_ADDITIONS EDGE_PROFILE EDGE_OTA_BACKEND BUNDLE_IMAGE_NAME EDGE_BOOT_TARGET EDGE_KERNEL_DEV_FRAGMENTS EDGE_BUNDLE_SBOM_CVE" EDGE_PROFILE=$(EDGE_PROFILE) $(BOOT_TARGET_ENV)$(BUNDLE_SBOM_ENV)bitbake edge-bundle' $(STACK)
-	@echo "==> Bundle artefacts:"
+bundle: | $(KAS_DIRS) ## edge-bundle (.raucb) for OTA; builds the image too
+	@test "$(origin EDGE_PROFILE)" != "command line" -a "$(origin BUNDLE_IMAGE_NAME)" != "command line" || { \
+		echo "bundle: IMAGE=dev|prod selects tier and image together; drop EDGE_PROFILE/BUNDLE_IMAGE_NAME"; exit 1; }
+	@case "$(IMAGE)" in dev|prod) ;; *) echo "IMAGE=$(IMAGE): expected dev or prod"; exit 1;; esac
+	$(layout_guard)
+	$(require_rauc_signer)
+	$(check_rauc_keys)
+	$(call kas_run,EDGE_PROFILE=$(IMAGE) BUNDLE_IMAGE_NAME=edge-image-$(IMAGE)$(if $(filter 1,$(SBOM_CVE)), EDGE_BUNDLE_SBOM_CVE=1),bitbake edge-bundle)
 	@find $(KAS_BUILD_DIR)/tmp/deploy/images -name '*.raucb' -printf '    %p\n'
 
-# Bootloader-only RAUC bundle for the RZ/V2L eMMC boot partitions (boot-emmc
-# slot). Installed by an operator after rzv2l-bootchain-authorize on the board;
-# never part of edge-bundle. The board's image must be built with
-# EDGE_BOOT_TARGET=emmc so it carries the slot and its guards.
-bootchain-bundle: | $(KAS_DIRS)
-	@if [ "$(BOARD)" != "rzv2l" ]; then echo "bootchain-bundle: RZ/V2L only (BOARD=rzv2l)"; exit 1; fi
-	@if [ ! -f keys/dev/rauc/rauc-signer.key ]; then \
-		echo "RAUC signing keys missing at keys/dev/rauc/."; \
-		echo "Run: ./scripts/rauc-init-certs.sh"; \
-		exit 1; \
-	fi
-	$(call check_rauc_keys)
-	@echo "==> Building rzv2l-bootchain-bundle [$(STACK)]"
-	$(KAS) shell -c 'BB_ENV_PASSTHROUGH_ADDITIONS="$$BB_ENV_PASSTHROUGH_ADDITIONS EDGE_PROFILE EDGE_OTA_BACKEND EDGE_BOOT_TARGET" EDGE_PROFILE=$(EDGE_PROFILE) $(BOOT_TARGET_ENV)bitbake rzv2l-bootchain-bundle' $(STACK)
+bootchain-bundle: | $(KAS_DIRS) ## RZ/V2L bootloader-only bundle for the eMMC boot-emmc slot (LAYOUT=emmc)
+	$(require_rzv2l)
+	@test "$(LAYOUT_EFF)" = emmc || { echo "bootchain-bundle: needs LAYOUT=emmc (tree is $(LAYOUT_EFF))"; exit 1; }
+	$(layout_guard)
+	$(require_rauc_signer)
+	$(check_rauc_keys)
+	$(call kas_run,EDGE_PROFILE=$(EDGE_PROFILE),bitbake rzv2l-bootchain-bundle)
 	@find $(KAS_BUILD_DIR)/tmp/deploy/images -name 'rzv2l-bootchain-bundle*.raucb' -printf '    %p\n'
 
-# Host-side bootchain updater package (RZ/V2L): BL2/FIP variants + manifest +
-# the guarded updater, tarred for out-of-band provisioning. Separate from RAUC;
-# does not build an image. Deploys rzv2l-bootloader-<machine>.tar.gz.
-bootloader-package: | $(KAS_DIRS)
-	@echo "==> Building rzv2l-bootloader-update package [$(STACK)]"
-	$(KAS) shell -c 'bitbake rzv2l-bootloader-update -c deploy' $(STACK)
-	@echo "==> Bootloader package:"
+bootloader-package: | $(KAS_DIRS) ## RZ/V2L host package: BL2/FIP + manifest + updater, out of band
+	$(require_rzv2l)
+	$(layout_guard)
+	$(call kas_run,EDGE_PROFILE=$(EDGE_PROFILE),bitbake rzv2l-bootloader-update -c deploy)
 	@find $(KAS_BUILD_DIR)/tmp/deploy/images -name 'rzv2l-bootloader-*.tar.gz' -printf '    %p\n'
 
-# ----- Host CVE monitor ----------------------------------------------------
-# Python wrapper around a separately installed, pinned sbom-cve-check. No kas or
-# BitBake. Required: CVE_EVIDENCE_DIR (and SBOM_CVE_CHECK, NVD_CLONE,
-# CVELIST_CLONE where the script header names them), passed as make variables.
-CVE_MONITOR = python3 scripts/cve-monitor.py
+parse: | $(KAS_DIRS) ## bitbake -p (parse-only check; EDGE_PROFILE=, LAYOUT= apply)
+	$(call kas_run,EDGE_PROFILE=$(EDGE_PROFILE),bitbake -p)
 
-cve-refresh:
-	@test -n "$(FEEDS)" || { echo "usage: make cve-refresh FEEDS=<id> [NVD_REF=<sha> CVELIST_REF=<sha>] [NO_FETCH=1]"; exit 2; }
-	$(CVE_MONITOR) refresh --feeds $(FEEDS) $(if $(NVD_REF),--nvd-ref $(NVD_REF)) $(if $(CVELIST_REF),--cvelist-ref $(CVELIST_REF)) $(if $(NO_FETCH),--no-fetch)
-
-cve-archive:
-	@test -n "$(RELEASE)" -a -n "$(IMAGE_DIR)" -a -n "$(IMAGE)" -a -n "$(MACHINE)" -a -n "$(STAMP)" -a -n "$(FEEDS)" || { echo "usage: make cve-archive RELEASE=<id> IMAGE_DIR=<deploy dir> IMAGE=<name> MACHINE=<name> STAMP=<yyyymmddhhmmss> FEEDS=<sealed snapshot id> [META='k=v k=v'] [PROVENANCE_NOTE='...']"; exit 2; }
-	$(CVE_MONITOR) archive --release $(RELEASE) --image-dir $(IMAGE_DIR) --image $(IMAGE) --machine $(MACHINE) --stamp $(STAMP) --feeds $(FEEDS) $(foreach m,$(META),--meta $(m)) $(if $(PROVENANCE_NOTE),--provenance-note "$(PROVENANCE_NOTE)")
-
-cve-calibrate:
-	@test -n "$(RELEASE)" || { echo "usage: make cve-calibrate RELEASE=<id>"; exit 2; }
-	$(CVE_MONITOR) calibrate --release $(RELEASE)
-
-cve-monitor:
-	@test -n "$(RELEASE)" -a -n "$(FEEDS)" -a -n "$(RUN)" || { echo "usage: make cve-monitor RELEASE=<id> FEEDS=<snapshot id> RUN=<new run id>"; exit 2; }
-	$(CVE_MONITOR) monitor --release $(RELEASE) --feeds $(FEEDS) --run $(RUN)
-
-parse: | $(KAS_DIRS)
-	@echo "==> Parsing BitBake recipes (EDGE_PROFILE=$(EDGE_PROFILE)) [$(STACK)]"
-	$(KAS) shell -c 'BB_ENV_PASSTHROUGH_ADDITIONS="$$BB_ENV_PASSTHROUGH_ADDITIONS EDGE_PROFILE EDGE_OTA_BACKEND EDGE_BOOT_TARGET EDGE_KERNEL_DEV_FRAGMENTS" EDGE_PROFILE=$(EDGE_PROFILE) $(BOOT_TARGET_ENV)bitbake -p' $(STACK)
-
-# Operator-run Yocto check of a committed tree, reported as GitHub commit
-# statuses. Runs in a detached worktree outside this tree; see the script
-# header for the stages and options. BOARD/flags do not apply — the script
-# owns its matrix.
-ci:
+ci: ## parse-check origin/main in a worktree, post commit statuses (CI_ARGS=…, docs/dev/ci.md)
 	scripts/ci/local-check.sh $(CI_ARGS)
 
-# Kernel-hardening gate inputs (docs/security/kernel-config/). Configure only,
-# no compile. The prod tier is the one under claim: EDGE_KERNEL_DEV_FRAGMENTS
-# adds debug fragments to the dev kernel.
 KHC_PROFILE ?= prod
 KHC_OUT     ?= $(CURDIR)/build/khc/$(BOARD)-$(KHC_PROFILE).config
 KHC_DIR      = meta-edge-bsp/recipes-kernel/linux/files/khc
-KHC_BASELINE = $(KHC_DIR)/$(BOARD)-$(KHC_PROFILE).baseline.json
 
-# Absolute script path: kas shell runs its command in the build directory.
-kernel-config-export: | $(KAS_DIRS)
-	@echo "==> Exporting kernel .config (EDGE_PROFILE=$(KHC_PROFILE)) [$(STACK)]"
-	$(KAS) shell -c 'BB_ENV_PASSTHROUGH_ADDITIONS="$$BB_ENV_PASSTHROUGH_ADDITIONS EDGE_PROFILE EDGE_OTA_BACKEND EDGE_BOOT_TARGET EDGE_KERNEL_DEV_FRAGMENTS" EDGE_PROFILE=$(KHC_PROFILE) $(BOOT_TARGET_ENV)$(CURDIR)/scripts/ci/kernel-config-export.sh $(KHC_OUT)' $(STACK)
+kernel-config-export: | $(KAS_DIRS) ## expanded kernel .config (configure only) -> build/khc/<board>-prod.config
+	$(call kas_run,EDGE_PROFILE=$(KHC_PROFILE),$(CURDIR)/scripts/ci/kernel-config-export.sh $(KHC_OUT))
 
-kernel-hardening-check: kernel-config-export
-	$(KHC_DIR)/khc-gate.py --config $(KHC_OUT) --baseline $(KHC_BASELINE) \
+kernel-hardening-check: kernel-config-export ## KSPP gate on the exported .config
+	$(KHC_DIR)/khc-gate.py --config $(KHC_OUT) --baseline $(KHC_DIR)/$(BOARD)-$(KHC_PROFILE).baseline.json \
 	    --report $(CURDIR)/build/khc/$(BOARD)-$(KHC_PROFILE)-report.md
 
-layers: | $(KAS_DIRS)
-	@echo "==> Showing layers [$(STACK)]"
-	$(KAS) shell -c 'bitbake-layers show-layers' $(STACK)
+cve: ## host CVE monitor, no kas: make cve ARGS='<subcommand> …' (scripts/cve-monitor.py)
+	@test -n "$(ARGS)" || { python3 scripts/cve-monitor.py --help; exit 2; }
+	python3 scripts/cve-monitor.py $(ARGS)
 
-shell: | $(KAS_DIRS)
-	@echo "==> Entering KAS shell [$(STACK)]"
+layers: | $(KAS_DIRS) ## bitbake-layers show-layers
+	$(call kas_run,,bitbake-layers show-layers)
+
+shell: | $(KAS_DIRS) ## interactive kas shell
 	$(KAS) shell $(STACK)
 
-info:
-	@echo "edge-ai-yocto"
-	@echo "============="
-	@echo ""
-	@echo "KAS:   $$($(KAS) --version 2>&1 | head -1)"
-	@echo "Stack: $(STACK)"
-	@echo ""
-	@echo "Composition:"
-	@echo "  base:         $(BASE)"
-	@echo "  capabilities: $(if $(CAPABILITY_YMLS),$(CAPABILITY_YMLS),(none))"
-	@echo ""
+info: ## build configuration
+	@echo "kas:    $$($(KAS) --version 2>&1 | head -1)"
+	@echo "board:  $(BOARD)   build dir: $(KAS_BUILD_DIR)"
+	@echo "layout: $(LAYOUT_EFF) (built: $(or $(BUILT_LAYOUT),none))"
+	@echo "stack:  $(STACK)"
 
-# bitbake decides whether to start a cooker or attach to a running one purely by
-# whether it can acquire $(KAS_BUILD_DIR)/bitbake.lock (bitbake/lib/bb/main.py, "Starting
-# bitbake server" vs "Reconnecting"). Removing the file while a server holds it
-# leaves that flock on the unlinked inode, so the next invocation creates a new
-# lock, takes it, and starts a SECOND server against the same TMPDIR. Only a
-# lock nothing holds is stale. bitbake writes the server pid into the file.
-clean-lock:
+lock: | $(KAS_DIRS) ## resolve floating branches to SHAs (writes kas/base.lock.yml)
+	$(KAS) lock $(STACK)
+
+verify-pins: | $(KAS_DIRS) ## checked-out HEAD of every composed repo (a kas-patched repo shows the patched commit)
+	$(KAS) for-all-repos $(STACK) 'echo "$$(basename $$(pwd)): $$(git rev-parse HEAD)"'
+
+# A held bitbake.lock means a live server; removing it starts a second server
+# on the same TMPDIR. Only an unheld lock is removed.
+clean-lock: ## remove the build dir's bitbake.lock if no server holds it
 	@if [ ! -e $(KAS_BUILD_DIR)/bitbake.lock ]; then \
 	    echo "no $(KAS_BUILD_DIR)/bitbake.lock — nothing to clean"; \
 	elif flock -n $(KAS_BUILD_DIR)/bitbake.lock true 2>/dev/null; then \
-	    rm -f $(KAS_BUILD_DIR)/bitbake.lock; \
-	    echo "removed stale $(KAS_BUILD_DIR)/bitbake.lock"; \
+	    rm -f $(KAS_BUILD_DIR)/bitbake.lock; echo "removed stale $(KAS_BUILD_DIR)/bitbake.lock"; \
 	else \
-	    holder=$$(cat $(KAS_BUILD_DIR)/bitbake.lock 2>/dev/null | tr -d '\n'); \
-	    echo "$(KAS_BUILD_DIR)/bitbake.lock is held by $${holder:-another process (pid not recorded)}"; \
-	    echo "A bitbake server is live; removing the lock would make the next"; \
-	    echo "bitbake start a second server on this build directory."; \
-	    echo "Shut it down instead:  make shell  then  bitbake -m"; \
-	    exit 1; \
-	fi
-	@if [ -S $(KAS_BUILD_DIR)/bitbake.sock ] && [ ! -e $(KAS_BUILD_DIR)/bitbake.lock ]; then \
-	    echo "warning: $(KAS_BUILD_DIR)/bitbake.sock exists with no lock file; a server may"; \
-	    echo "         still be running unlocked (pgrep -f bitbake-server)"; \
+	    echo "$(KAS_BUILD_DIR)/bitbake.lock is held by $$(tr -d '\n' < $(KAS_BUILD_DIR)/bitbake.lock)"; \
+	    echo "Shut the server down instead: make shell, then bitbake -m"; exit 1; \
 	fi
 
-# pre-commit installs into .git/hooks, which is per-clone and untracked —
-# a fresh clone has both gates silently disabled until this runs. Both
-# stages are needed: --hook-type commit-msg alone leaves the key guard off,
-# and a bare `pre-commit install` leaves the subject check off. Idempotent.
-hooks:
-	@command -v pre-commit >/dev/null || { \
-	  echo "pre-commit not on PATH — install it first: pipx install pre-commit"; exit 1; }
+hooks: ## install the commit and commit-msg git hooks (once per clone)
+	@command -v pre-commit >/dev/null || { echo "pre-commit not on PATH: pipx install pre-commit"; exit 1; }
 	@pre-commit install --hook-type pre-commit --hook-type commit-msg
 
-# Freeze floating upstream branches (e.g. meta-rauc on `wrynose`) to a
-# concrete SHA. Writes kas/base.lock.yml next to kas/base.yml; commit
-# the lock file so the build is bit-for-bit reproducible at this point
-# in time. Re-run when you deliberately want to bump a floating branch.
-lock: | $(KAS_DIRS)
-	@echo "==> Resolving floating branches to SHAs [$(STACK)]"
-	$(KAS) lock $(STACK)
-
-# Report the checked-out HEAD of every repo in the composition. Reads the
-# composition, so it covers pins wherever they live -- kas/base.yml and the
-# kas/bsp/*.yml BSP fragments alike.
-# A repo carrying a kas patch (meta-renesas) reports the patched commit, not
-# its `commit:` pin, so a raw diff against the pins always shows it drifted.
-verify-pins: | $(KAS_DIRS)
-	@echo "==> Reporting HEAD per repo [$(STACK)]"
-	$(KAS) for-all-repos $(STACK) 'echo "$$(basename $$(pwd)): $$(git rev-parse HEAD)"'
-
-# Wipe kas-managed workspace state IN THE REPO TREE ONLY:
-#   $(KAS_WORK_DIR)/  — kas-managed clones + the bitbake build dir under it
-#   $(CURDIR)/build/  — pre-restructure orphan build dir (no-op if absent)
-#
-# Deliberately does NOT use `kas purge $(STACK)` — on kas 4.8.2 that also
-# wipes $(KAS_REPO_REF_DIR), which is fleet-shared cache. The scoped rm
-# below is repo-tree only.
-#
-# Does NOT touch kas/local.yml, downloads/, sstate-cache/, or
-# $(KAS_REPO_REF_DIR). For a scorched-earth pass, blow those away
-# manually with the caveat that downloads/ + sstate-cache/ may be shared.
-#
-# Guarded with CONFIRM=1 so a tab-complete can't fire it accidentally.
-purge:
-	@if [ -z "$(CONFIRM)" ]; then \
-		echo "Refusing: 'make purge' is destructive. Re-run with CONFIRM=1."; \
-		echo "  Will remove: $(KAS_WORK_DIR)/  $(CURDIR)/build/"; \
-		echo "  Will NOT touch: KAS_REPO_REF_DIR ($(KAS_REPO_REF_DIR))"; \
-		exit 1; \
-	fi
-	@echo "==> Purging kas-managed state in repo tree only"
-	@echo "    Removing $(KAS_WORK_DIR)/ and $(CURDIR)/build/"
-	@echo "    KAS_REPO_REF_DIR ($(KAS_REPO_REF_DIR)) is NOT touched."
+# Not `kas purge`: on kas 4.8.2 that also wipes KAS_REPO_REF_DIR, a shared cache.
+purge: ## wipe .kas/ and build/ (every board's TMPDIR); CONFIRM=1 required
+	@test "$(CONFIRM)" = 1 || { echo "Refusing: removes $(KAS_WORK_DIR)/ and $(CURDIR)/build/. Re-run with CONFIRM=1."; exit 1; }
 	rm -rf $(KAS_WORK_DIR) $(CURDIR)/build
 
-# Push the freshly-built rootfs + fitImage to the host's NFS export and
-# TFTP dir so the next `run netboot` on the board picks them up. Requires
-# root for tar to preserve uid/gid/xattrs into the NFS root. Does NOT
-# rebuild — chain it with `make dev NETBOOT=1` if you want a fresh build:
-#   make dev NETBOOT=1 && sudo ./scripts/dev/sync-nfs-rootfs.sh
-# See docs/dev/netboot/README.md for one-time host + board setup.
-netboot-sync:
-	@echo "==> Syncing latest rootfs + fitImage to NFS/TFTP"
+netboot-sync: ## copy the last rootfs + fitImage to the NFS/TFTP export (docs/dev/netboot/)
 	sudo ./scripts/dev/sync-nfs-rootfs.sh

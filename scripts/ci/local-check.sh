@@ -51,7 +51,7 @@ WORKDIR="${EDGE_CI_WORKDIR:-/var/tmp/edge-ci}"
 BOARDS=(rzv2l raspberrypi5)
 # Dev-tier parse per optional fragment / make flag; see `make help`.
 FULL_FLAGS=("TPM=1" "JTAG=1" "BPF=1" "NETBOOT=1" "OPTEE_EXAMPLES=1" "SBOM_TUNE=1"
-            "EDGE_BOOT_TARGET=emmc" "ACCEL=none")
+            "LAYOUT=emmc" "ACCEL=none")
 
 while [ $# -gt 0 ]; do
     case $1 in

@@ -50,5 +50,5 @@
 <line x1="785.0" y1="309.0" x2="909.0" y2="409.0" stroke="#9AA6B8" stroke-width="1.6" marker-end="url(#arw)"/>
 <line x1="785.0" y1="309.0" x2="909.0" y2="509.0" stroke="#4F46E5" stroke-width="2.2" marker-end="url(#arwA)"/>
 <line x1="785.0" y1="437.0" x2="909.0" y2="409.0" stroke="#9AA6B8" stroke-width="1.6" marker-end="url(#arw)"/>
-<text x="48" y="616" font-size="12" fill="#94A3B8">Read-only over build/tmp/deploy - scanners are fed the rootfs (no scanner ingests SPDX 3.0.1)</text>
+<text x="48" y="616" font-size="12" fill="#94A3B8">Read-only over build/*/tmp/deploy - scanners are fed the rootfs (no scanner ingests SPDX 3.0.1)</text>
 </svg>

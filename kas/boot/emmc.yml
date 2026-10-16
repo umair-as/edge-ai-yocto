@@ -1,0 +1,12 @@
+# Layout fragment: eMMC boot — GPT user area, data partition grown by systemd-repart.
+#
+# Selected with LAYOUT=emmc; the Makefile stamps the layout per build dir and
+# reuses it, so image and bundle builds of one tree agree. esd is the default
+# layout and has no fragment (edge-ab-image.bbclass: EDGE_BOOT_TARGET ?= "esd").
+
+header:
+  version: 19
+
+local_conf_header:
+  edge-layout: |
+    EDGE_BOOT_TARGET = "emmc"

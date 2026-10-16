@@ -26,7 +26,7 @@ bootchain without `/chosen/edge,boot-source` is first rewritten with
 
 ## Prerequisites
 
-1. `make dev EDGE_BOOT_TARGET=emmc` — the deploy directory then has the GPT `…-emmc`
+1. `make dev LAYOUT=emmc` — the deploy directory then has the GPT `…-emmc`
    wic plus `bl2_bp_mmc-smarc-rzv2l_pmic.{bin,srec}` and
    `fip-smarc-rzv2l_pmic.{bin,srec}`.
 2. A serial console, and a host USB cable to the board's micro-USB **function** port

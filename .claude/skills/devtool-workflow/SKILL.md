@@ -263,7 +263,7 @@ Verified on `linux-renesas` (kernel-yocto):
 
 - **Workspace branch** is the kernel's machine branch (e.g. `rz-6.12-cip14`),
   not `devtool`. `git log` shows the layer's patches as commits on top.
-- **`devtool modify` moves `build/tmp/work-shared/<machine>/kernel-source`
+- **`devtool modify` moves `build/<BOARD>/tmp/work-shared/<machine>/kernel-source`
   into the workspace**, and `devtool reset` does not put it back: the
   work-shared directory stays empty until the next kernel build. A
   `git -C <that dir>` then silently runs against the enclosing repo.

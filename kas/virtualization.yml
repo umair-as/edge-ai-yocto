@@ -1,6 +1,0 @@
-# DEPRECATED -- container userspace is now baseline (ADR-0012).
-#
-# No-op shim for external compositions that name this path. meta-virtualization
-# is composed from kas/base.yml; the runtime policy lives in edge-floor.inc.
-header:
-  version: 19

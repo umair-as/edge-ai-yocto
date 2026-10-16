@@ -142,8 +142,7 @@ make bundle BOARD=<board>             # -> <build-dir>/tmp/deploy/images/<machin
 make bundle BOARD=<board> SBOM_CVE=1  # + SPDX SBOM and sbom-cve-check report of the bundled rootfs
 ```
 
-The build directory is `build/` for the first board (`rzv2l`) and `build/<BOARD>/`
-for every other board.
+The build directory is `build/<BOARD>/`.
 
 The image SBOM and CVE report are separate tasks of the image recipe, after
 `do_image_complete`, which is all a bundle needs. A dev bundle therefore skips

@@ -30,7 +30,7 @@ landscape the stack is drawn from).
   3.0.1, so scanners are fed the extracted **rootfs**, not the SBOM.
 - **Breadth scanner:** Grype (`dir:` over the extracted rootfs) — the only
   third-party scanner in use.
-- **Analysis scripts** (stdlib-only, read-only over `build/tmp/deploy`):
+- **Analysis scripts** (stdlib-only, read-only over `build/*/tmp/deploy`):
   `cve-report.py`, `sbom-report.py`, `cve-reconcile.py`, `cve-triage-funnel.py`.
   Scanner pins live in `install-scanners.sh` (binaries gitignored under
   `.tooling/`).
