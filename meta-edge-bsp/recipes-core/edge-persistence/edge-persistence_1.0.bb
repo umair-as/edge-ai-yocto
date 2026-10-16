@@ -1,8 +1,7 @@
 SUMMARY     = "Bind /var/log, /var/lib state, and /home from /data"
-DESCRIPTION = "Four .mount units bind /data/{log,containers,systemd,home} \
-over the matching paths; oneshot services restore /etc/machine-id from the \
-raw data partition before services start, capture it on first boot, and \
-persist the sshd host keys across RAUC slot swaps."
+DESCRIPTION = ".mount units binding /data/{log,containers,systemd,home} over their paths, \
+plus oneshots that restore /etc/machine-id early, capture it on first boot \
+and persist the sshd host keys across RAUC slot swaps."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "base"
 LICENSE     = "MIT"

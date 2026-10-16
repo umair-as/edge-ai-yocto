@@ -6,6 +6,8 @@ DESCRIPTION = "kernel.org linux-6.18.y pinned to a released tag, built from the 
 arm64 defconfig plus the edge-ai kernel policy fragments, with the BCM2712 \
 enablement patches mainline lacks (firmware RTC, AVS thermal zone, ramoops, RNG)."
 HOMEPAGE    = "https://www.kernel.org/"
+SECTION     = "kernel"
+LICENSE     = "GPL-2.0-with-Linux-syscall-note"
 BUGTRACKER  = "https://bugzilla.kernel.org/"
 LIC_FILES_CHKSUM = "file://COPYING;md5=6bc538ed5bd9a7fc9398086aedcd7e46"
 
