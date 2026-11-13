@@ -120,6 +120,8 @@ kas/                                   # KAS composition
                                        #   dispatch-only Yocto check (docs/dev/ci.md)
 scripts/ci/                            # repo-lint.sh, local-check.sh (`make ci`),
                                        #   kernel-config-export.sh
+scripts/agent-build/                   # build launcher: make in a logged tmux session
+                                       #   (docs/dev/agent-builds.md)
 docs/
   adr/                                 # Architecture Decision Records — read
                                        #   before re-deriving settled choices.
@@ -134,6 +136,7 @@ docs/
   rules/cross-compilation.md           # aarch64-edgeai-linux SDK notes
   settings.json                        # registers the hook below (Claude Code only)
   hooks/no-parallel-bitbake.py         # refuses a second bitbake/kas/make build or parse
+  agents/build-watcher.md              # read-only build-run reporter (Claude Code only)
 meta-edge-distro/                      # brand identity + DISTRO=edge-ai
   conf/distro/edge-ai.conf
   recipes-core/psplash/                # EDGE AI OS brand splash
@@ -341,22 +344,23 @@ What makes it actually work:
   background process stays a child of the agent's tool runner and dies
   with it — the build gets SIGTERM'd mid-task (`make` exits 241 with no
   bitbake `ERROR:` lines, which reads like a mystery failure). Instead,
-  from an ordinary foreground shell call:
+  launch it through the build launcher
+  ([docs/dev/agent-builds.md](docs/dev/agent-builds.md)):
 
   ```bash
-  setsid nohup make <target> > scratch/<topic>.log 2>&1 &
+  . scripts/env.sh && python3 scripts/agent-build/agent-build.py start <topic> -- <target> BOARD=<board>
   ```
 
-  `setsid` gives the job its own session; once the launching shell
-  exits it reparents to the init/user manager and nothing in the
-  agent's process tree can signal it. Watch progress with a
-  **separate** poller that only reads the log file — decouple the
+  It runs make in its own tmux session, records the command, board and
+  source commit in `build/agent-runs/<run-id>/run.json` and make's exit
+  code in `result.json`, and gives the operator a read-only `tmux
+  attach` view. Report the attach command right away, then watch with a
+  **separate** poller that only reads the log or `status` — decouple the
   watcher from the work, so a killed poller is just re-armed while the
   build survives. For builds that matter, prefer handing the operator
-  the one-liner to run in their own shell. A killed build is
-  recoverable either way (bitbake resumes from sstate), but the
-  detached form avoids the wasted hours and the misleading failure
-  mode.
+  the same command to run in their own shell. `setsid nohup make …` is
+  the fallback where tmux is missing. A killed build is recoverable
+  either way (bitbake resumes from sstate).
 - Stop at the requested milestone; report remaining work instead of
   continuing unprompted.
 
@@ -394,6 +398,7 @@ deferred until the first release needs them.
 | Vulnerability handling — reachability ladder, fix choice, release gate | `docs/security/VULN-HANDLING.md`, ADR-0013 |
 | Security docs — SBOM/CVE triage, SELinux, U-Boot hardening, kernel-config gate, vuln mgmt | `docs/security/README.md` (index) |
 | CI — hosted lint, operator-run Yocto check (`make ci`), kernel-hardening gate | `docs/dev/ci.md` |
+| Launching and watching long builds (agent-build launcher) | `docs/dev/agent-builds.md` |
 | OTA updates + rollback testing | `docs/dev/ota-updates.md`, `docs/dev/ota-rollback-test-plan.md` |
 | Bootchain update (per board) | `docs/dev/bootchain/README.md`, ADR-0014 |
 | Netboot dev workflow (per board) | `docs/dev/netboot/README.md` |

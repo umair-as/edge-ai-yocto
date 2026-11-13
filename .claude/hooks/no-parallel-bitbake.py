@@ -61,6 +61,12 @@ def starts_build(command, depth=0):
             return True
         if word == "make" and MAKE_BUILD_TARGETS & set(args):
             return True
+        # scripts/agent-build/agent-build.py start <topic> -- <make targets>,
+        # run directly or through python3.
+        if word.startswith("python") and args and args[0].endswith("agent-build.py"):
+            word, args = "agent-build.py", args[1:]
+        if word == "agent-build.py" and "start" in args and MAKE_BUILD_TARGETS & set(args):
+            return True
         if word in ("bash", "sh") and "-c" in args:
             rest = args[args.index("-c") + 1:]
             if rest and starts_build(rest[0], depth + 1):
