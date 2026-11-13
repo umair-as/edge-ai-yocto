@@ -80,10 +80,12 @@ IMAGE_INSTALL:remove = "virtual-ota-uboot-env u-boot-fw-utils"
 # Remoteproc and GPU firmware come from the vendor machine conf's
 # MACHINE_ESSENTIAL_EXTRA_RRECOMMENDS. Its QCA2066 Wi-Fi/BT firmware is
 # gated on the wifi and bluetooth DISTRO_FEATURES, which the distro does not
-# set, so it is listed here.
-EDGE_MACHINE_EXTRA_INSTALL ?= "linux-firmware-ath11k-qca2066 linux-firmware-qca-qca2066 wireless-regdb-static"
-# Dev tier: Wi-Fi userspace.
-EDGE_MACHINE_DEV_INSTALL = "iw wpa-supplicant"
+# set, so it is listed here, with the udev rule naming the RGB LEDs.
+EDGE_MACHINE_EXTRA_INSTALL ?= "linux-firmware-ath11k-qca2066 linux-firmware-qca-qca2066 wireless-regdb-static edge-ventunoq-leds"
+# Dev tier: the MCU RPC router, the FastRPC DSP daemons, Wi-Fi and Bluetooth
+# userspace. BlueZ is dev-only here; Bluetooth as a product feature would be the
+# distro `bluetooth` feature instead.
+EDGE_MACHINE_DEV_INSTALL = "arduino-router fastrpc iw wpa-supplicant bluez5"
 
 # --- Static IDs ---------------------------------------------------------
 # meta-qcom adds system groups the shared table does not list; a board

@@ -11,6 +11,8 @@ CVE_PRODUCT = "linux_kernel"
 # for the Bridge RPC and gs_usb for its CAN interfaces.
 SRC_URI:append:ventuno-q = " \
     file://0001-arm64-dts-qcom-monaco-monza-som-add-the-SerDes-0.9-V-supply.patch \
+    file://0002-arm64-dts-monaco-arduino-monza-microcontroller-LEDs.patch \
+    file://0003-leds-pca963x-Add-multicolor-LED-class-support.patch \
     file://cfg/ventuno-q-mcu.cfg \
     file://cfg/ventuno-q-qrtr.cfg \
     file://cfg/wireless-ventuno-q.cfg \
