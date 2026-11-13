@@ -7,6 +7,7 @@ the wired entry has KAS overlays today.
 |---|---|---|---|---|
 | Renesas RZ/V2L SMARC EVK | `smarc-rzv2l` | `kas/machines/rzv2l.yml` | wired (v0) | First board; dev-board for the EDGE AI OS platform. |
 | Raspberry Pi 5 | `raspberrypi5` | `kas/machines/raspberrypi5.yml` | wired | Second board. Mainline 6.18 kernel (ADR-0011), U-Boot 2026.01, GPT layout, board facts in `conf/machine/include/edge-board-raspberrypi5.inc`. DEEPX DX-M1 composed via `kas/accel/dxm1.yml`. Boot, RAUC install/slot switch, DX-M1 device identification and rootless inference through the shipped Quadlet all hardware-validated; the rollback matrix has been run on RZ/V2L only. |
+| Arduino VENTUNO Q (ABX00181) | `ventuno-q` | `kas/machines/ventuno-q.yml` | booted, OTA validated (dev) | Third board, Qualcomm QCS8275. `uefi-uki` boot chain (ADR-0016): Qualcomm firmware and UEFI untouched, systemd-boot on the ESP, one UKI per A/B slot on the ESP, RAUC `custom` backend (`edge-sdboot-backend`, boot counting in UKI file names, no EFI variable written), trust anchor `none`. Kernel `linux-qcom` 6.18 (ADR-0011 decision 6). No accelerator stack composed. Prod images fail at the trust-anchor gate by design; no KSPP baseline. Installed and recovered through EDL with `scripts/dev/ventunoq-flash.py` (`docs/dev/emmc/ventuno-q.md`). Ethernet does not carry traffic on this image. |
 | _slot_ | _tbd_ | `kas/machines/<board>.yml` | not wired | Add new machine overlays here as siblings are added. |
 
 ## Adding a new board
