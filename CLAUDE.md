@@ -24,6 +24,12 @@ apply to other agents.
   before PR, locked-worktree cleanup. Companion to §"Parallel sessions"
   below.
 
+`.claude/agents/build-watcher.md` is a read-only subagent that reports
+one `scripts/agent-build/agent-build.py` run in five lines and, on a
+failure, the first causal error from the task log. Use it after starting a
+build with the launcher, so the terminal log stays out of the main
+context.
+
 Where a skill and `.claude/rules/` ever disagree, **the rules win** —
 they are repo-specific and wrynose-current.
 
