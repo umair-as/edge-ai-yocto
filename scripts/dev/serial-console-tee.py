@@ -12,6 +12,7 @@ re-enumerate on every power cycle) and marks those events in the log as
   serve  (--port P | --board B) --log L [--fifo F] [--baud B] [--allow-shared]
   send   --log L [--fifo F] [--ctrl-c | --raw] [--expect RE [--timeout S]] [TEXT ...]
   stop   --log L
+  list   every running serve on this host: pid, port, log, last write
 
 Board-driving subcommands read the same log and write through the same FIFO, so
 a session never needs its own watcher script. `--since` is a byte offset into the
@@ -374,6 +375,38 @@ def cmd_offset(args):
     return 0
 
 
+def cmd_list(args):
+    """Every running serve on the host, found through /proc, so a forgotten one
+    shows up without knowing its log path."""
+    me, script = os.getpid(), os.path.basename(os.path.abspath(__file__))
+    rows = []
+    for d in os.listdir('/proc'):
+        if not d.isdigit() or int(d) == me:
+            continue
+        try:
+            argv = [a.decode(errors='replace') for a in open(f'/proc/{d}/cmdline', 'rb').read().split(b'\0') if a]
+            cwd = os.readlink(f'/proc/{d}/cwd')
+        except OSError:
+            continue
+        if 'serve' not in argv or not any(os.path.basename(a) == script for a in argv[:argv.index('serve')]):
+            continue
+        opts = argv[argv.index('serve') + 1:]
+
+        def opt(name):
+            for i, a in enumerate(opts):
+                if a == name and i + 1 < len(opts):
+                    return opts[i + 1]
+                if a.startswith(name + '='):
+                    return a.split('=', 1)[1]
+            return None
+        log = opt('--log')
+        log = os.path.join(cwd, log) if log else '?'
+        age = f'{time.time() - os.path.getmtime(log):.0f}s ago' if os.path.exists(log) else 'no log'
+        rows.append(f'pid {d}  port {opt("--port") or "board " + str(opt("--board"))}  log {log}  last write {age}')
+    print('\n'.join(rows) if rows else 'no serve running')
+    return 0
+
+
 def cmd_status(args):
     pid = None
     try:
@@ -566,6 +599,7 @@ def main():
 
     p = sub.add_parser('stop', help='stop the serve of a log')
     p.add_argument('--log', required=True)
+    sub.add_parser('list', help='every running serve on this host')
 
     def common(sp, since=False):
         sp.add_argument('--log', required=True, help='the log of the running serve')
@@ -601,7 +635,7 @@ def main():
     i.add_argument('--timeout', type=float, default=10)
 
     args = ap.parse_args()
-    table = {'serve': serve, 'send': send, 'stop': stop, 'offset': cmd_offset, 'status': cmd_status,
+    table = {'serve': serve, 'send': send, 'stop': stop, 'list': cmd_list, 'offset': cmd_offset, 'status': cmd_status,
              'profiles': cmd_profiles, 'wait-boot': cmd_wait_boot, 'stop-autoboot': cmd_stop_autoboot,
              'uboot': cmd_uboot, 'login': cmd_login, 'ip': cmd_ip}
     return table[args.cmd](args)

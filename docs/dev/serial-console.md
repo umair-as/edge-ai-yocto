@@ -15,7 +15,11 @@ $T status --log $L
 ```
 
 `serve` refuses a port that another process holds (`tio`, an MCP serial session);
-close those first. The input FIFO `<log>.in` is
+close those first.
+
+A `serve` holds its port until stopped. Stop it when the board work is done
+(`$T stop --log $L`); `$T list` shows every running `serve` on the host, and is
+empty at the end of a session. The input FIFO `<log>.in` is
 write-only: do not `cat`, `wc` or `tail` it, and glob logs by `*.log`.
 
 ## Procedures

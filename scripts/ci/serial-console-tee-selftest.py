@@ -3,8 +3,8 @@
 """Host self-test for scripts/dev/serial-console-tee.py on a pseudo-terminal pair:
 board output reaches the log, `send --expect` returns the reply with escapes
 stripped, Ctrl-C arrives as 0x03, a second serve on the same log and a port held
-by another process are refused, `stop` exits cleanly, `send` without a serve is
-refused. A scripted fake board covers the board-driving subcommands: wait-boot
+by another process are refused, `list` shows a running serve and drops it once
+stopped, `stop` exits cleanly, `send` without a serve is refused. A scripted fake board covers the board-driving subcommands: wait-boot
 (facts, panic, timeout), stop-autoboot (stop string taken from the countdown line,
 not interruptible), uboot (reply capture, destructive refusal, hwpart names), ip,
 offset/--since, status. Exit 0 when every case passes.
@@ -50,7 +50,11 @@ holder = os.open(name, os.O_RDWR | os.O_NOCTTY)
 r = subprocess.run([TOOL, "serve", "--port", name, "--log", f"{T}/d.log"], capture_output=True, text=True, timeout=5)
 ok(r.returncode != 0 and "open in another process" in r.stderr, "serve refuses a port another process holds")
 os.close(holder)
+r = subprocess.run([TOOL, "list"], capture_output=True, text=True)
+ok(r.returncode == 0 and f"log {L} " in r.stdout and name in r.stdout, "list shows the running serve with its port and log")
 subprocess.run([TOOL, "stop", "--log", L]); srv.wait(timeout=5)
+r = subprocess.run([TOOL, "list"], capture_output=True, text=True)
+ok(r.returncode == 0 and f"log {L} " not in r.stdout, "list drops a stopped serve")
 ok(srv.returncode == 0 and not os.path.exists(L + ".pid") and b"serve stopped" in open(L, "rb").read(), "stop: clean exit, pid file removed, marker logged")
 r = subprocess.run([TOOL, "send", "--log", L, "x"], capture_output=True, text=True)
 ok(r.returncode != 0 and "no serve" in r.stderr, "send without a serve is refused")
