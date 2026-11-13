@@ -40,6 +40,9 @@ EDGE_UPLINK_IFACE     = "eth1"
 # TF-A/OP-TEE -> U-Boot -> signed FIT verified against the key in U-Boot's
 # control DTB -> raw U-Boot env for RAUC boot-count.
 EDGE_BOOT_CHAIN = "uboot-fit"
+# U-Boot verifies the FIT with its built-in key; the ROM does not verify
+# U-Boot (ADR-0016 §2).
+EDGE_BOOT_ANCHOR = "loader-key"
 
 # --- Kernel provider ----------------------------------------------------
 # sbom-cve-check sets the SPDX compiled-sources flag for linux-yocto only.

@@ -36,3 +36,4 @@ and the reasoning behind them.
 - [ADR-0013](0013-vulnerability-handling-cadence-and-release-gate.md) — vulnerability handling: two loops, milestone releases, evidence-based acceptance
 - [ADR-0014](0014-bootchain-update-mechanism.md) — bootchain update is a per-board capability (RZ/V2L BL2/FIP backend first; attended, RAUC-independent)
 - [ADR-0015](0015-rzv2l-emmc-bootchain-rauc-boot-emmc.md) — RZ/V2L eMMC bootchain updates through an operator-authorized RAUC boot-emmc slot (amends ADR-0014)
+- [ADR-0016](0016-ventuno-q-uefi-uki-boot-chain.md) — VENTUNO Q joins as a `uefi-uki` boot-chain family; trust-anchor levels for all boards
