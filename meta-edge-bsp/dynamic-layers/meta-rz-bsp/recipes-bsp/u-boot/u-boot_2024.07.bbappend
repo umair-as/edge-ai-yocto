@@ -55,7 +55,7 @@ EDGE_BOOT_PROFILE  ?= "${EDGE_PROFILE}"
 EXTRA_OEMAKE:append = " KCPPFLAGS='-DEDGE_BOOT_VERSION=\"${EDGE_BOOT_VERSION}\" -DEDGE_BOOT_PROFILE=\"${EDGE_BOOT_PROFILE}\"'"
 
 # meta-renesas's do_deploy:append:rzg2l-family reads from
-# ${B}/<UBOOT_MACHINE>, but oe-core's u-boot.inc now names per-config dirs
+# ${B}/<UBOOT_MACHINE>, but oe-core's u-boot.inc names per-config dirs
 # ${B}/<UBOOT_MACHINE>-<UBOOT_CONFIG>. Symlink the legacy path to the real
 # dir post-compile so the meta-renesas install resolves through it.
 do_compile:append:smarc-rzv2l() {
@@ -150,7 +150,7 @@ EOF
 
 # Repair the deployed control DTB and nodtb binary.
 #
-# uboot-sign.bbclass deploy_dtb() (:222-245) installs each artifact as
+# uboot-sign.bbclass deploy_dtb() installs each artifact as
 # u-boot[-nodtb]-${type}-${PV}-${PR} then `ln -sf` it onto UBOOT_{DTB,NODTB}_IMAGE,
 # which is u-boot[-nodtb]-${MACHINE}-${PV}-${PR}. smarc-rzv2l.conf:26 sets
 # UBOOT_CONFIG ??= "smarc-rzv2l", so type == MACHINE, both names are one string

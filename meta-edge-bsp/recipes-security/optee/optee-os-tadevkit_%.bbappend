@@ -1,14 +1,10 @@
 # meta-arm's optee-os-tadevkit_4.9.0.bb does `require optee-os_${PV}.bb`,
-# which inherits SRC_URI/SRCREV from mainline meta-arm — but bbappend
-# filename matching is on the base recipe name (optee-os-tadevkit), so
-# optee-os_%.bbappend overrides don't propagate to tadevkit — mirror them here.
-# the source/platform overrides in this bbappend separately, or the
-# TA dev kit headers/signing-key would be built against mainline
-# OP-TEE 4.9.0 while the running OP-TEE binary is Renesas 4.8.0/rz —
-# which risks subtle TA-side ABI mismatches (TA struct layouts,
-# syscall numbering for plat-rz-specific helpers, signing-key drift).
+# but bbappends match by recipe name, so optee-os_%.bbappend does not reach
+# tadevkit. Without the same source and flags, the TA dev kit headers and
+# signing key would be built against mainline OP-TEE 4.9.0 while BL32 runs
+# Renesas 4.8.0/rz — TA-side ABI mismatches (struct layouts, plat-rz
+# syscall numbering, signing-key drift).
 #
-# Keeping this aligned with meta-edge-bsp/recipes-security/optee/optee-os_%.bbappend.
 # Source pin and platform flags must match optee-os_%.bbappend.
 
 COMPATIBLE_MACHINE:smarc-rzv2l = "smarc-rzv2l"

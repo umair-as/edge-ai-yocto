@@ -54,6 +54,6 @@ FILES:${PN} = " \
 # task signature must track it.
 do_install[vardeps] += "EDGE_ENABLE_JTAG_DEBUG"
 
-# fw_setenv (edge-debug-mode --bootargs) comes from u-boot-fw-utils, already
-# in packagegroup-edge-base. systemctl/sysctl are part of systemd.
+# fw_setenv (edge-debug-mode --bootargs) comes from u-boot-fw-utils, installed
+# by edge-ota-rauc.inc on U-Boot boards. systemctl/sysctl are part of systemd.
 RDEPENDS:${PN} = "systemd"

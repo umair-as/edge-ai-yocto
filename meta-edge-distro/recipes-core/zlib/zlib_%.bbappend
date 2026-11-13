@@ -7,11 +7,11 @@ SRC_URI += "file://CVE-2026-85091.patch"
 # caller went on to index off strm->next_in while it still pointed into the
 # caller's buffer. Carried from PR #1281 rather than authored locally; the
 # same PR fixes the upstream report the CVE was raised from (issue #1256).
-# No fixed release exists yet — upstream's newest tag is v1.3.2, which is
-# the affected version — so this is carried until a release includes it.
+# Carried until oe-core's zlib recipe moves to a release that contains
+# PR #1281.
 #
 # No CVE_STATUS here on purpose. The patch header carries `CVE: CVE-2026-85091`
-# and cve-check derives the patched status from that. An explicit CVE_STATUS
+# and sbom-cve-check derives the patched status from that. An explicit CVE_STATUS
 # overrides the automatic detection: if the patch were dropped from SRC_URI,
 # the override would still claim the CVE fixed. Derived from the patch, the
 # CVE reappears as Unpatched instead.

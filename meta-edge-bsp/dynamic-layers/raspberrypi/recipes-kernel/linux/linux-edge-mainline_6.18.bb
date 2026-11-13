@@ -28,9 +28,8 @@ KBRANCH = "linux-6.18.y"
 KMETA = "kernel-meta"
 # v6.18.52
 SRCREV_machine = "8f3741e6feb045da5b406df0a80b42a1adfb289b"
-# yocto-kernel-cache yocto-6.18, the revision oe-core's linux-yocto_6.18 pins
-# at the layer pin. Only the tooling side is used: no KERNEL_FEATURES are
-# taken from it.
+# yocto-kernel-cache yocto-6.18. Only the tooling side is used: no
+# KERNEL_FEATURES are taken from it.
 SRCREV_meta = "2f71b0a288c307062fc60948ac793d8d51c685e2"
 SRCREV_FORMAT = "machine_meta"
 
@@ -54,9 +53,7 @@ require ${EDGE_BSP_LAYERDIR}/recipes-kernel/linux/edge-kernel-policy.inc
 # parent in (RP1 and the accelerator sit behind them); boot-devices-rpi5.cfg
 # builds the SD host in (the dm-verity root cannot wait for a module);
 # rng-rpi5.cfg builds the RNG driver the new node binds. wireless-rpi5.cfg
-# comes after the policy fragments on purpose: later fragments win the
-# merge, and it re-enables the 802.11 stack security-hardening.cfg turns off
-# for boards without a radio.
+# enables the 802.11 stack and brcmfmac for the on-board radio.
 SRC_URI:append = " \
     file://patches/0001-rtc-rtc-rpi-add-simple-RTC-driver-for-Raspberry-Pi.patch \
     file://patches/0002-arm64-dts-broadcom-bcm2712-add-rpi-rtc-node.patch \
@@ -94,7 +91,7 @@ EDGE_KERNEL_POLICY_EXTRA_CONFIG = " \
 # firmware, which loads the board DTB this recipe deploys, so the FIT public
 # key goes into that DTB here. fdt_add_pubkey writes the same
 # /signature/key-<name> node mkimage -K does, from the certificate alone.
-# edge_check_fit_anchor (edge-ab-image.bbclass) verifies the deployed file
+# edge_check_fit_anchor (edge-ab-uboot-fit.bbclass) verifies the deployed file
 # before the image is assembled.
 DEPENDS += "u-boot-tools-native"
 UBOOT_FDT_ADD_PUBKEY ?= "${STAGING_BINDIR_NATIVE}/fdt_add_pubkey"

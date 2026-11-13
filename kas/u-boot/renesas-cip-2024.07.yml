@@ -19,11 +19,6 @@
 # meta-renesas's meta-rz-bsp ships u-boot_2021.10, _2023.10, _2024.07
 # for rzg2l-family. The 2024.07 line carries the required RAUC A/B
 # bootcmd parsing; pinned to that here.
-#
-# Future direction: sibling kas/u-boot/<variant>.yml files can add a
-# version-selection family without changing kas/base.yml. A future
-# kas/u-boot/mainline-2025.xx.yml would point at denx mainline and
-# require a patch rebase to renesas_rzg2l_smarc_defconfig naming.
 
 header:
   version: 19

@@ -20,7 +20,7 @@ LINUX_VERSION = "6.12.59-cip14"
 # what is specific to this provider or this board.
 require ${EDGE_BSP_LAYERDIR}/recipes-kernel/linux/edge-kernel-policy.inc
 
-# display-rzv2l.cfg: RZ/G2L DU + MIPI-DSI + Lontium LT8912B bridge are =m
+# display-rzv2l.cfg: RZ/G2L DU + MIPI-DSI + ADV7535 (adv7511) bridge are =m
 # in defconfig; force built-in so the pipeline is up at boot without
 # depending on userspace autoload or which kernel-module-* land in rootfs.
 #
@@ -48,6 +48,21 @@ SRC_URI:append:smarc-rzv2l = " \
     file://patches/0007-arm64-export-dcache-poc-ops-for-drpai-module.patch \
     file://patches/0008-arm64-dts-rzv2l-smarc-add-isu-node.patch \
 "
+# Asserted with the platform symbols: boot SDHI, Ethernet, watchdog, clock
+# and pin control, and the display pipeline display-rzv2l.cfg forces
+# built-in. A modular or dropped one is a green build without a root device,
+# network or display at boot.
+EDGE_KERNEL_POLICY_EXTRA_CONFIG:smarc-rzv2l = " \
+    CONFIG_MMC_SDHI=y \
+    CONFIG_MMC_SDHI_INTERNAL_DMAC=y \
+    CONFIG_RAVB=y \
+    CONFIG_RENESAS_RZG2LWDT=y \
+    CONFIG_CLK_R9A07G044=y \
+    CONFIG_PINCTRL_RZG2L=y \
+    CONFIG_DRM_RZG2L_DU=y \
+    CONFIG_DRM_RZG2L_MIPI_DSI=y \
+"
+
 # Kernel CVE backports newer than the pinned rz-6.12-cip14 (6.12.59): fixes
 # for compiled-in code from later 6.12 stable releases, or from mainline where
 # the vulnerable change reached this tree only through a vendor backport
@@ -70,8 +85,8 @@ SRC_URI:append:smarc-rzv2l = " \
     file://patches/cve/CVE-2026-72322.patch \
 "
 
-# QSPI FIP alignment — platform boots via eSD; uncomment if QSPI is wired.
-# SRC_URI:append:smarc-rzv2l = " file://patches/0004-arm64-dts-rzg2l-smarc-som-align-qspi-fip-partition-to-0x20000.patch"
+# Patch 0004 (QSPI FIP partition alignment) is not applied: the board does
+# not boot from QSPI.
 
 KERNEL_FEATURES:append = ""
 

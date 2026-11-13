@@ -8,8 +8,8 @@ dirs755:append = " /data"
 
 # The board include sets EDGE_HOSTNAME; a board without one gets "edge".
 # OE-Core would derive ${MACHINE} (e.g. "smarc-rzv2l"). fstab is per board:
-# files/<machine>/fstab is selected by the MACHINE override, files/fstab is
-# the default.
+# base-files/<machine>/fstab is selected by the MACHINE override,
+# base-files/fstab is the default.
 EDGE_HOSTNAME ?= "edge"
 
 SRC_URI += " \

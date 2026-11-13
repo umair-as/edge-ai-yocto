@@ -20,10 +20,8 @@
 # parsed outside the edge-features.inc distro config.
 EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION ?= "0"
 EDGE_RAUC_BUNDLE_ENCRYPT_RECIPIENTS ?= ""
-# Same expression as edge-features.inc's global default, which is what
-# actually applies in this distro; this line is only the standalone-recipe
-# fallback and, more importantly, a same-file reminder of the derivation
-# next to where RAUC_BUNDLE_FORMAT below consumes it.
+# Mirrors edge-features.inc's global default, which is what applies in this
+# distro; this line is the fallback for parsing outside it.
 EDGE_RAUC_BUNDLE_FORMAT ?= "${@bb.utils.contains('EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION', '1', 'crypt', 'verity', d)}"
 RAUC_BUNDLE_FORMAT = "${EDGE_RAUC_BUNDLE_FORMAT}"
 

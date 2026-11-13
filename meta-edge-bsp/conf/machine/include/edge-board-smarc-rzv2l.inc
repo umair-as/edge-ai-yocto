@@ -24,11 +24,9 @@ EDGE_KHC_BOARD ?= "rzv2l"
 # --- Accelerator ---------------------------------------------------------
 # DRP-AI is RZ/V2L-only SoC IP. This is the allowlist for the machine, not
 # the selection; the selection is EDGE_ACCEL from kas/accel/<name>.yml.
-# Plain `=`, not `?=`: edge-features.inc declares EDGE_ACCEL_SUPPORTED ?= ""
-# and is required before this file, so a `?=` here would be a no-op against
-# that empty default and every accelerator would read as unsupported. The
-# rule for this file: `?=` for values only this file declares, `=` for values
-# the distro pre-declares or the vendor machine conf sets.
+# Plain `=`, per the rule for this file: `?=` for values only this file
+# declares, `=` for values the distro pre-declares (edge-features.inc:
+# EDGE_ACCEL_SUPPORTED ??= "") or the vendor machine conf sets.
 EDGE_ACCEL_SUPPORTED = "drpai-v2l"
 
 # --- Network interface roles --------------------------------------------
@@ -86,6 +84,11 @@ EDGE_FIT_PUBKEY_DTB ?= "u-boot-${MACHINE}.dtb"
 # what keeps that from happening; the toggle still applies inside.
 EDGE_MACHINE_EXTRA_INSTALL ?= "mtd-utils \
     ${@bb.utils.contains('EDGE_ENABLE_OPTEE', '1', 'packagegroup-edge-optee', '', d)}"
+# Dev tier: the OP-TEE conformance suite, the -test output package of
+# packagegroup-edge-optee; follows EDGE_ENABLE_OPTEE like its parent.
+EDGE_MACHINE_DEV_INSTALL = "${@bb.utils.contains('EDGE_ENABLE_OPTEE', '1', 'packagegroup-edge-optee-test', '', d)}"
+# BL2/FIP updater, installed with BOOTLOADER_UPDATE=1.
+EDGE_MACHINE_BOOTLOADER_UPDATE_INSTALL = "rzv2l-bootloader-update"
 
 # --- Boot artifacts (contract in edge-ab-image.bbclass) ------------------
 # Flat deploy basename of the DTB consumed when the image task builds its

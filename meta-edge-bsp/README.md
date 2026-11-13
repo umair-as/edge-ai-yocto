@@ -1,10 +1,10 @@
 # meta-edge-bsp
 
 Board support, image scaffolding, and board-level integration for
-EDGE AI OS. This layer carries the image recipes for the RZ/V2L SMARC EVK and
-the Raspberry Pi 5, per-board facts, machine-gated BSP patches, RAUC helper
-configuration, OP-TEE integration, boot assets, and runtime hardening
-packages that belong below the distro policy layer.
+EDGE AI OS. This layer carries the image recipes for the RZ/V2L SMARC EVK,
+the Raspberry Pi 5 and the Arduino VENTUNO Q, per-board facts, machine-gated
+BSP patches, RAUC helper configuration, OP-TEE integration, boot assets, and
+runtime hardening packages that belong below the distro policy layer.
 
 ## Dependencies
 
@@ -29,6 +29,7 @@ carry a dangling append:
 | `meta-rz-distro` | Renesas RZ multimedia userspace recipes extended for the image tiers |
 | `raspberrypi` | Raspberry Pi 5 machine configuration and firmware boot files |
 | `meta-deepx-m1` | DEEPX DX-M1 runtime, driver and service glue |
+| `qcom` | Qualcomm (meta-qcom) kernel and boot integration for the VENTUNO Q |
 
 ## Maintainer
 

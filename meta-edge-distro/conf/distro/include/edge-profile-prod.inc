@@ -1,7 +1,7 @@
 # EDGE_PROFILE = "prod" — production tier defaults.
 #
-# Required by edge-ai.conf when EDGE_PROFILE = "prod". Operators flip
-# the profile via EDGE_PROFILE in kas/local.yml or environment.
+# Required by edge-ai.conf when EDGE_PROFILE = "prod". Selected by the make
+# target (make prod, make bundle IMAGE=prod) through the kas/base.yml env: key.
 
 # No observability tooling in prod. Operators who want it set
 # EDGE_ENABLE_OBSERVABILITY = "1" explicitly.

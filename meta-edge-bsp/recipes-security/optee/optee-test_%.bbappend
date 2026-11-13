@@ -7,6 +7,5 @@
 # crypto regression, IPC stress, etc. ~10 MB binary; only on the dev
 # image (edge-image-dev), not in the base. ABI: meta-arm pins this to
 # v4.9.0; optee-os here is on the Renesas 4.8.0/rz fork. Same client-side
-# ABI stability argument as optee-client / optee-examples (see those
-# bbappends for the full rationale).
+# ABI stability argument as optee-client (see optee-client_%.bbappend).
 COMPATIBLE_MACHINE:smarc-rzv2l = "smarc-rzv2l"

@@ -6,10 +6,8 @@
 #   kas build kas/base.yml:kas/machines/<board>.yml:kas/tpm.yml
 #   make dev TPM=1                                # via Makefile flag
 #
-# Composition by default: boards with TPM hardware include this from
-# their kas/machines/<board>.yml. RZ/V2L SMARC EVK has no on-board TPM
-# and does NOT compose this fragment by default; the Makefile TPM=1
-# flag is the manual opt-in for bench rigs with an external TPM module.
+# No machine fragment composes it; the Makefile TPM=1 flag is the opt-in.
+# RZ/V2L SMARC EVK has no on-board TPM and needs an external module.
 #
 # Sublayers loaded:
 #   meta-secure-core-common  — scaffolding required by the others
@@ -20,8 +18,8 @@
 #   meta-integrity           — IMA/EVM kernel integrity userspace
 #
 # Sublayers intentionally NOT loaded:
-#   meta-efi-secure-boot     — no UEFI on RZ/V2L
-#   meta-ids                 — heavyweight intrusion detection; later phase
+#   meta-efi-secure-boot     — no board boots with UEFI Secure Boot enabled
+#   meta-ids                 — heavyweight intrusion detection
 #
 # meta-tpm2 LAYERDEPENDS on meta-python (in meta-openembedded). meta-python
 # is unconditionally activated by kas/base.yml so bitbake's LAYERDEPENDS

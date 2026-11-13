@@ -12,7 +12,7 @@
 # Reasoning: dev images are for bring-up / profiling / stress testing.
 # Every interactive command path is repeated dozens of times per
 # session; the password prompt is friction without security value on a
-# bench box. Production (edge-image-base) keeps the password gate
+# bench box. edge-image-base and edge-image-prod keep the password gate
 # because that is the CRA-aligned posture for shipped devices.
 
 %wheel ALL=(ALL:ALL) NOPASSWD: ALL

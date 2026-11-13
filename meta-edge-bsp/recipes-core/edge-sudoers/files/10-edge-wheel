@@ -16,5 +16,5 @@
 # pulled into edge-image-dev only. sudo evaluates drop-ins in lexical
 # order, last match wins per spec, so 15-… overrides the password
 # requirement above only when the sub-package is installed.
-# edge-image-base does NOT install it. Any other recipe that ships a
+# edge-image-base and edge-image-prod do NOT install it. Any other recipe that ships a
 # drop-in here is a bug.

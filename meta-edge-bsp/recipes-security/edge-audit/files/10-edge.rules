@@ -49,8 +49,7 @@
 
 ## --- Boot / kernel modules ----------------------------------------------
 
-## Module load/unload — every loaded kernel module is auditable. On a
-## prod image with modules_disabled=1 this rule never fires.
+## Module load/unload — every loaded kernel module is auditable.
 -w /sbin/insmod  -p x -k modules
 -w /sbin/rmmod   -p x -k modules
 -w /sbin/modprobe -p x -k modules

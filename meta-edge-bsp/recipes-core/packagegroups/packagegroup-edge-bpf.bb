@@ -13,8 +13,6 @@ PACKAGE_ARCH = "${MACHINE_ARCH}"
 
 inherit packagegroup
 
-# bpftrace + bcc + a CO-RE compiler (clang/libbpf) join here when the 6a/6b
-# labs are wired; they drag in LLVM, so they stay out until needed.
 RDEPENDS:${PN} = " \
     bpftool \
 "

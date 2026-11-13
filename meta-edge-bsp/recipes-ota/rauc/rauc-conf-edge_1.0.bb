@@ -223,10 +223,9 @@ do_install() {
 # entry in directory mode, or whichever of RAUC_DEVICE_KEYRING/RAUC_CERT_FILE
 # is used in legacy single-cert mode -- is a host path outside SRC_URI, so its
 # content is not otherwise in the task signature: rotating a CA at the same
-# path restores a stale keyring from sstate. Same class of bug already fixed
-# for the recipient key (ota-certs' EDGE_RAUC_DECRYPT_CHECKSUMS) and the
-# bundle recipe (edge-bundle-common.inc's do_bundle[file-checksums]); this
-# recipe's own keyring install had no equivalent.
+# path restores a stale keyring from sstate. Same pattern as ota-certs'
+# EDGE_RAUC_DECRYPT_CHECKSUMS and edge-bundle-crypt.inc's
+# do_bundle[file-checksums].
 def _rauc_keyring_checksum_entries(d):
     certs = (d.getVar('EDGE_RAUC_KEYRING_CERTS') or '').split()
     if not certs:
@@ -245,6 +244,6 @@ FILES:${PN} = " \
 "
 
 # ota-certs creates the unprivileged 'ota' user (referenced by [streaming]
-# sandbox-user) and the /etc/ota directory layout so system.conf parses
-# cleanly even when an OTA streaming server isn't wired yet.
-RDEPENDS:${PN} += "ota-certs"
+# sandbox-user) and the /etc/ota directory layout, so system.conf parses
+# with no streaming server configured.
+RDEPENDS:${PN} += "ota-certs ${@'edge-sdboot-backend' if d.getVar('EDGE_RAUC_BOOTLOADER') == 'custom' else ''}"

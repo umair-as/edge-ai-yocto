@@ -1,6 +1,5 @@
-# Shared by every U-Boot bbappend: the board include declares the raw env
-# area and the resolved .config must agree with it.
-# Assert the board's declared env area against the resolved U-Boot .config.
+# Shared by every U-Boot bbappend: asserts the board include's declared raw
+# env area against the resolved U-Boot .config.
 #
 # EDGE_UBOOT_ENV_* (board include) tells userspace where the raw environment
 # lives; CONFIG_ENV_OFFSET / _OFFSET_REDUND / _SIZE tell U-Boot the same

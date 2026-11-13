@@ -9,11 +9,10 @@ inherit edge-ab-image
 
 WKS_SEARCH_PATH = "${THISDIR}/files/wic"
 
-# Bootchain updaters, per machine (RZ/V2L BL2/FIP; Pi 5 EEPROM + FAT boot
-# files). Off by default: single-copy bootchain storage. BOOTLOADER_UPDATE=1.
+# Bootchain updaters, named by the board (EDGE_MACHINE_BOOTLOADER_UPDATE_INSTALL).
+# Off by default: single-copy bootchain storage. BOOTLOADER_UPDATE=1.
 EDGE_ENABLE_BOOTLOADER_UPDATE ?= "0"
-IMAGE_INSTALL:append:smarc-rzv2l = "${@bb.utils.contains('EDGE_ENABLE_BOOTLOADER_UPDATE', '1', ' rzv2l-bootloader-update', '', d)}"
-IMAGE_INSTALL:append:raspberrypi5 = "${@bb.utils.contains('EDGE_ENABLE_BOOTLOADER_UPDATE', '1', ' rpi-eeprom edge-rpi-eeprom edge-rpi-bootfiles-update', '', d)}"
+IMAGE_INSTALL:append = "${@bb.utils.contains('EDGE_ENABLE_BOOTLOADER_UPDATE', '1', ' ' + (d.getVar('EDGE_MACHINE_BOOTLOADER_UPDATE_INSTALL') or ''), '', d)}"
 
 # Prod tier. EDGE_PROFILE is resolved at distro-parse from the environment
 # (make prod exports it); setting it here would be too late to steer the
