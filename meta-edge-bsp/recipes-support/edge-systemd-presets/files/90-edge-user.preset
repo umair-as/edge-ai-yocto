@@ -1,0 +1,9 @@
+# edge-ai-yocto user-manager presets; installed as user-preset/90-edge.preset.
+#
+# Ordered before the recipe-generated 98-<pkg>.preset files; first match wins.
+
+# podman.socket stays enabled and starts the API service on the first
+# connection. Started eagerly at user-manager start, podman.service races the
+# other podman user units for the rootless pause process and exits 125
+# ("unexpected fd received from systemd").
+disable podman.service
