@@ -51,6 +51,10 @@ jobs:
       - name: systemd-boot RAUC backend selftest
         run: bash scripts/ci/edge-sdboot-backend-selftest.sh
 
+      - name: VENTUNO Q flash tool selftest
+        run: |
+          sudo apt-get install -y --no-install-recommends mtools dosfstools >/dev/null
+          python3 scripts/ci/ventunoq-flash-selftest.py
 
       - name: Staged private-key guard (same hook as commit stage)
         run: |
