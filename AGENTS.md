@@ -12,6 +12,12 @@ per-board vendor BSP and kernel (ADR-0011): the Renesas RZ/V2L SMARC EVK
 on the CIP-aligned `linux-renesas` 6.12 (the SLTS intent of ADR-0001), the
 Raspberry Pi 5 on mainline-stable 6.18. `BOARD=<name>` selects the board.
 
+**Scale.** This is a personal portfolio project. The engineering follows best
+practice (validation, SBOM/CVE, signed updates), but process is sized to one
+maintainer, not to a production release cycle. When a step costs more in
+downloads, rebuilds or triage time than it demonstrates, use the lighter variant
+that still shows the practice, and say which one was used.
+
 ## Build commands
 
 Always prefer `make` over raw `kas`/`bitbake` — the wrapper resolves
