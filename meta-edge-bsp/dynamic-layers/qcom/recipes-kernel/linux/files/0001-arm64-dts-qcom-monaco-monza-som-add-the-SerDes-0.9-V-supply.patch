@@ -1,0 +1,39 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Umair Ahmed Shah <umairahmedshah@hotmail.com>
+Date: Thu, 12 Nov 2026 16:30:00 +0100
+Subject: [PATCH] arm64: dts: qcom: monaco-monza-som: add the SerDes 0.9 V
+ supply
+
+The SGMII SerDes PHY is powered by a 0.9 V and a 1.2 V rail. The Monza
+SoM describes only the 1.2 V one (phy-supply = vreg_l5a), so the driver
+falls back to a dummy regulator for vdda-0p9 and nothing votes for
+vreg_l4a on behalf of the SerDes. Whenever no other consumer holds that
+rail, SerDes calibration fails on interface open:
+
+  qcom-dwmac-sgmii-phy 8909000.phy: QSERDES_COM_C_READY_STATUS timed-out
+  qcom-ethqos 23040000.ethernet eth0: __stmmac_open: Serdes powerup failed
+
+Add vdda-0p9-supply = vreg_l4a, the 0.9 V rail the QCS8300 Ride and
+Monaco EVK use for the same PHY. phy-supply stays: the qcom-6.18.y
+driver requests only vdda-0p9 by name and relies on the PHY core's
+phy-supply vote for the 1.2 V rail. Mainline's two-supply driver
+(vdda-0p9 and vdda-1p2, phy-supply deprecated) needs the upstream form
+of this change instead.
+
+Upstream-Status: Pending
+Assisted-by: claude-code:claude-opus-5-5
+---
+ arch/arm64/boot/dts/qcom/monaco-monza-som.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm64/boot/dts/qcom/monaco-monza-som.dtsi b/arch/arm64/boot/dts/qcom/monaco-monza-som.dtsi
+--- a/arch/arm64/boot/dts/qcom/monaco-monza-som.dtsi
++++ b/arch/arm64/boot/dts/qcom/monaco-monza-som.dtsi
+@@ -289,6 +289,7 @@
+ /* Ethernet/SGMII */
+ &serdes0 {
+ 	phy-supply = <&vreg_l5a>;
++	vdda-0p9-supply = <&vreg_l4a>;
+
+ 	status = "okay";
+ };

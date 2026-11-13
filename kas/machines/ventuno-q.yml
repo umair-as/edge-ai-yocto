@@ -1,0 +1,14 @@
+# Machine overlay: Arduino VENTUNO Q (Qualcomm QCS8275).
+#
+# Composes onto kas/base.yml. Composition only: board facts live in
+# meta-edge-bsp/conf/machine/include/edge-board-ventuno-q.inc.
+#
+# Boot chain family uefi-uki (ADR-0016): Qualcomm firmware and UEFI are
+# prebuilt and never written by this build's installer.
+
+header:
+  version: 19
+  includes:
+    - kas/bsp/qcom.yml
+
+machine: ventuno-q

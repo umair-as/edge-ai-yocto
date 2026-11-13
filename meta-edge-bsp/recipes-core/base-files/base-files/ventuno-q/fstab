@@ -1,0 +1,24 @@
+# EDGE AI OS fstab (ventuno-q).
+#
+# Factory GPT p1-p70 kept; slots carved from the factory system region
+# (ADR-0016):
+#   /dev/mmcblk0p69  PARTLABEL=efi    vfat   factory ESP; firmware-maintained
+#                                            files stay, edge-grow-data stamp
+#   /dev/mmcblk0p71  efiA / p72 efiB  vfat   per-slot UKI with RAUC's efi backend;
+#                                            empty with the custom backend
+#   /dev/mmcblk0p73  rootfs A         ext4   RAUC slot A (dm-verity)
+#   /dev/mmcblk0p74  rootfs B         ext4   RAUC slot B (dm-verity)
+#   /dev/mmcblk0p75  PARTLABEL=data   ext4   persistent state, grown on first boot
+#
+# The root mapping comes from the UKI command line (/dev/root). p70 persist
+# is unit data owned by the firmware side and is not mounted.
+
+/dev/root            /                    auto       ro                    0  0
+PARTLABEL=efi        /boot                vfat       noatime,nofail        0  2
+PARTLABEL=data       /data                ext4       defaults,noatime,nodiratime,commit=60,nofail    0  2
+
+proc                 /proc                proc       defaults              0  0
+devpts               /dev/pts             devpts     mode=0620,ptmxmode=0666,gid=5    0  0
+tmpfs                /run                 tmpfs      mode=0755,nodev,nosuid,strictatime    0  0
+tmpfs                /var/volatile        tmpfs      defaults              0  0
+tmpfs                /tmp                 tmpfs      mode=1777,nodev,nosuid,strictatime    0  0

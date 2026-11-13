@@ -1,0 +1,9 @@
+# Static GIDs for groups only the VENTUNO Q composition creates; appended
+# to USERADD_GID_TABLES by edge-board-ventuno-q.inc. GIDs continue the
+# range in meta-edge-distro/files/group and must not overlap it.
+
+# meta-qcom systemd bbappend: /dev/dma_heap/system is group dmaheap.
+dmaheap:*:630:
+
+# meta-qcom fastrpc: owner group of the /dev/fastrpc-* DSP nodes.
+fastrpc:*:631:

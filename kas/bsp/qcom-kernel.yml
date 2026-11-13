@@ -1,0 +1,19 @@
+# Kernel selection for the Arduino VENTUNO Q.
+#
+# Recipe: linux-qcom_6.18 (meta-qcom). Qualcomm's qcom-6.18.y tree, which
+#   follows the kernel.org 6.18 stable releases with Qualcomm's SoC
+#   enablement on top; the board device tree is in no longterm line
+#   (ADR-0011). SRCREV is meta-qcom's, so the kernel moves with the
+#   meta-qcom pin in kas/bsp/qcom.yml.
+#
+# meta-qcom's qcom-base.inc sets PREFERRED_PROVIDER_virtual/kernel ?=
+# "linux-qcom"; the plain assignment here makes the choice explicit and
+# keeps linux-qcom-next (mainline-based) from being picked.
+
+header:
+  version: 19
+
+local_conf_header:
+  kernel: |
+    PREFERRED_PROVIDER_virtual/kernel = "linux-qcom"
+    PREFERRED_VERSION_linux-qcom = "6.18%"

@@ -29,7 +29,7 @@ make ci                                  # origin/main, quick parse matrix
 make ci CI_ARGS='--ref pr/16'            # a pull request head
 make ci CI_ARGS='--matrix full'          # every optional capability fragment
 make ci CI_ARGS='--build rzv2l'          # + edge-image-dev and edge-bundle for one board
-make ci CI_ARGS='--khc'                  # + kernel-hardening gate, both boards (~5 min each)
+make ci CI_ARGS='--khc'                  # + kernel-hardening gate, rzv2l and raspberrypi5 (~5 min each)
 make ci CI_ARGS='--no-status'            # run without posting
 ```
 
@@ -73,7 +73,7 @@ to start while another build is running.
 
 | Status context | Stage |
 |---|---|
-| `yocto/pins` | every composed repo carries a `commit:` pin and `kas dump --resolve-refs` agrees with it, for both boards |
+| `yocto/pins` | every composed repo carries a `commit:` pin and `kas dump --resolve-refs` agrees with it, for every board |
 | `yocto/parse` | `make parse` for each cell of the matrix |
 | `yocto/image-<board>` | `make dev BOARD=<board>` (`--build`) |
 | `yocto/bundle-<board>` | `make bundle BOARD=<board>` (`--build`) |
@@ -81,11 +81,14 @@ to start while another build is running.
 
 Matrix cells are one uncached parse each (about two minutes on an 8-core host):
 
-- `quick`: both boards × `EDGE_PROFILE=dev|prod` — 4 cells.
-- `full`: `quick` plus, per board at the dev tier, `TPM=1`, `JTAG=1`, `BPF=1`,
+- `quick`: every board at `EDGE_PROFILE=dev`, and rzv2l and raspberrypi5 at
+  `EDGE_PROFILE=prod` — 5 cells. A ventuno-q prod image fails at the
+  trust-anchor gate by design (ADR-0016 §2), so it has no prod cell, and with
+  no KSPP baseline it has no `yocto/khc` stage.
+- `full`: `quick` plus, for rzv2l and raspberrypi5 at the dev tier, `TPM=1`, `JTAG=1`, `BPF=1`,
   `NETBOOT=1`, `OPTEE_EXAMPLES=1`, `SBOM_TUNE=1`, `LAYOUT=emmc`,
   `ACCEL=none`, and one parse of the public composition with no host overlay
-  — 21 cells. Optional fragments that nothing composes by default are the
+  — 22 cells. Optional fragments that nothing composes by default are the
   ones that rot unnoticed; this is where they are exercised.
 
 Logs land in `<workdir>/logs/<sha7>/<cell>.log`; `--build` artefacts
