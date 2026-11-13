@@ -23,7 +23,7 @@
 #   scripts/ci/local-check.sh --ref pr/16           # a PR head; status lands in the PR checks
 #   scripts/ci/local-check.sh --matrix full         # + every optional capability fragment
 #   scripts/ci/local-check.sh --build rzv2l         # + image and bundle for one board
-#   scripts/ci/local-check.sh --khc                 # + kernel-hardening gate, both boards
+#   scripts/ci/local-check.sh --khc                 # + kernel-hardening gate, boards with a baseline
 #   scripts/ci/local-check.sh --no-status           # dry run, nothing posted
 #
 # Host overlay: kas/ci-local.yml from the main checkout when present, else
@@ -48,7 +48,11 @@ KHC=0
 POST=1
 KEEP=0
 WORKDIR="${EDGE_CI_WORKDIR:-/var/tmp/edge-ci}"
-BOARDS=(rzv2l raspberrypi5)
+BOARDS=(rzv2l raspberrypi5 ventuno-q)
+# A ventuno-q prod image fails at the trust-anchor gate by design (ADR-0016
+# §2), and the board has no KSPP baseline; prod parse, the full flag matrix
+# and the khc stage run on these boards only.
+PROD_BOARDS=(rzv2l raspberrypi5)
 # Dev-tier parse per optional fragment / make flag; see `make help`.
 FULL_FLAGS=("TPM=1" "JTAG=1" "BPF=1" "NETBOOT=1" "OPTEE_EXAMPLES=1" "SBOM_TUNE=1"
             "LAYOUT=emmc" "ACCEL=none")
@@ -218,7 +222,10 @@ fi
 
 cells=()
 for b in "${BOARDS[@]}"; do
-    cells+=("parse-$b-dev|parse BOARD=$b EDGE_PROFILE=dev" "parse-$b-prod|parse BOARD=$b EDGE_PROFILE=prod")
+    cells+=("parse-$b-dev|parse BOARD=$b EDGE_PROFILE=dev")
+done
+for b in "${PROD_BOARDS[@]}"; do
+    cells+=("parse-$b-prod|parse BOARD=$b EDGE_PROFILE=prod")
     if [ "$MATRIX" = full ]; then
         for f in "${FULL_FLAGS[@]}"; do
             cells+=("parse-$b-dev-${f%%=*}=${f#*=}|parse BOARD=$b EDGE_PROFILE=dev $f")
@@ -289,11 +296,11 @@ if [ "$KHC" -eq 1 ]; then
     if ! command -v kernel-hardening-checker >/dev/null; then
         echo "FAIL khc: kernel-hardening-checker not on PATH"
         FAILED+=(khc)
-        for b in "${BOARDS[@]}"; do status "yocto/khc-$b" error "kernel-hardening-checker not installed"; done
+        for b in "${PROD_BOARDS[@]}"; do status "yocto/khc-$b" error "kernel-hardening-checker not installed"; done
     fi
 fi
 if [ "$KHC" -eq 1 ] && command -v kernel-hardening-checker >/dev/null; then
-    for b in "${BOARDS[@]}"; do
+    for b in "${PROD_BOARDS[@]}"; do
         status "yocto/khc-$b" pending "exporting prod kernel .config"
         t0=$(date +%s)
         if ! cell "khc-export-$b" kernel-config-export "BOARD=$b"; then

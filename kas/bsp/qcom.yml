@@ -1,0 +1,40 @@
+# Qualcomm vendor BSP composition (Arduino VENTUNO Q).
+#
+# meta-qcom supplies the SoC machine includes, the linux-qcom kernel, the
+# prebuilt boot firmware and the image classes; meta-qcom-arduino supplies
+# the ventuno-q machine, its kernel config fragment and board kernel
+# patches. meta-qcom declares
+# LAYERDEPENDS on lts-linux-firmware-mixin, so meta-lts-mixins
+# (wrynose/linux-firmware) is part of this composition, and its
+# linux-firmware replaces oe-core's for this board only. Included from
+# kas/machines/ventuno-q.yml, not from kas/base.yml (ADR-0016).
+
+header:
+  version: 19
+  includes:
+    - kas/bsp/qcom-kernel.yml
+
+repos:
+  meta-qcom:
+    url: https://github.com/qualcomm-linux/meta-qcom.git
+    branch: wrynose
+    # The revision meta-qcom-arduino's ci/base.lock.yml builds against.
+    commit: a6c92fad47164e6f051ab5d90567bc92afa661ae
+    layers:
+      .:
+
+  meta-qcom-arduino:
+    url: https://github.com/qualcomm-linux/meta-qcom-arduino.git
+    branch: wrynose
+    commit: 2760e59c4d3dac6b5b1c4c5e4e8410c7e4731f3f
+    layers:
+      .:
+
+  meta-lts-mixins:
+    url: https://git.yoctoproject.org/meta-lts-mixins
+    branch: wrynose/linux-firmware
+    # Moves with meta-qcom: its firmware recipes RDEPEND on linux-firmware
+    # packages that only newer revisions of this branch provide.
+    commit: d0fd372d1da9cacca04585f7a1b088fdfb32b77e
+    layers:
+      .:

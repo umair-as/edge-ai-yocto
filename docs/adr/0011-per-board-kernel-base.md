@@ -32,10 +32,19 @@ line carries.
 ## Decision
 
 **1. The kernel base is chosen per board family, and recorded per board.**
+In order of preference:
 
-- CIP/SLTS where the vendor BSP provides it. RZ/V2L keeps
-  `linux-renesas` on `rz-6.12-cip14` (ADR-0001 unchanged).
+- CIP/SLTS where the vendor BSP provides it.
 - A pinned kernel.org **longterm** line otherwise.
+- The SoC vendor's tree, when it follows a kernel.org longterm line and the
+  board's enablement exists in no longterm line. Its horizon is the lower of
+  the longterm EOL and the vendor's maintenance of the branch.
+
+| Board | Kernel | Pattern | Selected in | Horizon |
+|---|---|---|---|---|
+| rzv2l | `linux-renesas`, `rz-6.12-cip14` (ADR-0001) | CIP SLTS | `kas/bsp/renesas-rz-kernel.yml` | CIP SLTS |
+| raspberrypi5 | `linux-edge-mainline`, kernel.org 6.18 | longterm, pinned | `kas/bsp/raspberrypi-kernel.yml` | Dec 2028 |
+| ventuno-q | `linux-qcom` 6.18, Qualcomm `qcom-6.18.y` | vendor tree on a longterm line | `kas/bsp/qcom-kernel.yml` | Dec 2028, or earlier if Qualcomm stops the branch (no published end date) |
 
 **2. Raspberry Pi 5 uses mainline-stable 6.18**, pinned by `SRCREV`,
 carrying the board enablement patches its hardware needs.
@@ -52,8 +61,22 @@ load-bearing kernel symbols are checked against the *resolved* `.config`
 and the build fails when one is missing. This is what makes a
 multi-provider arrangement safe; it is not optional per board.
 
-**5. Maintenance horizons are recorded per board and may differ.**
-RZ/V2L: CIP SLTS. Raspberry Pi 5: kernel.org longterm, Dec 2028.
+**5. Maintenance horizons are recorded per board and may differ** (table
+above).
+
+**6. VENTUNO Q uses Qualcomm's `linux-qcom` 6.18.** The board's device tree
+(`monaco-arduino-monza.dts`) is absent from the 6.18 longterm line and from
+mainline v7.0, and present from v7.1; at decision time (2026-10-19) the newest
+longterm line is 6.18. `meta-qcom`'s `wrynose` default kernel carries it, on a
+branch that follows the 6.18 stable releases: at the pinned revision, 2404
+non-merge commits over v6.18.44. The `SRCREV` is `meta-qcom`'s, so the kernel
+moves with the `meta-qcom` pin in `kas/bsp/qcom.yml`; fixes between pin bumps
+are patches in this repo's `linux-qcom` bbappend. Mainline and stable 7.x
+(including `meta-qcom`'s `linux-qcom-next`) are rejected as non-longterm;
+6.18 longterm with the board carried locally is rejected because it means
+carrying the vendor's SoC enablement as well. CVE matching sees only the stable
+base version, so fixes or flaws in Qualcomm's own commits are per-CVE
+dispositions.
 
 ## Rationale
 
@@ -97,4 +120,8 @@ built — which is what a second provider would multiply.
 - A Raspberry Pi 5 kernel appears on a CIP branch.
 - The chosen 6.18 pin approaches its Dec 2028 EOL, or the board's
   enablement lands in a longer-lived line.
-- A third board joins whose vendor BSP fits neither pattern.
+- A board joins whose vendor BSP fits none of the three patterns. (The
+  third pattern was added for the VENTUNO Q under this trigger.)
+- For the VENTUNO Q: `meta-qcom` moves its default kernel off 6.18, the
+  vendor branch stops following the 6.18 stable releases, or a longterm line
+  carries the board.
