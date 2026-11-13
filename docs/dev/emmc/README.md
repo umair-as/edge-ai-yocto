@@ -12,6 +12,7 @@ the default, `esd`, builds the SD image.
 |---|---|---|
 | `rzv2l` | supported: bootloader in `mmcblk0boot0`, GPT user area | [rzv2l.md](rzv2l.md) |
 | `raspberrypi5` | not applicable: the Pi 5 has no eMMC; its SD image is already GPT | — |
+| `ventuno-q` | always: installed over EDL into the factory GPT (`uefi-uki` boot chain; `LAYOUT` does not apply) | [ventuno-q.md](ventuno-q.md) |
 
 ## Build
 
