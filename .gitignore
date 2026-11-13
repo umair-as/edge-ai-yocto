@@ -21,8 +21,8 @@ kas/*-local.yml
 *.secrets.yml
 .env
 keys/
-# CLOSED-licensed vendor blobs: present in the tree at build time, never committed.
-meta-edge-bsp/recipes-security/libsecureip/files/*.tar.gz
+# CLOSED-licensed vendor archives: present in the tree at build time, never committed.
+**/renesas-secureip-library*.tar.gz
 # FIT signing dev keys are generated on first build under keys/dev/
 # (UBOOT_SIGN_KEYDIR in meta-edge-distro/conf/distro/edge-ai.conf).
 # Never commit them; treat as ephemeral dev material.
