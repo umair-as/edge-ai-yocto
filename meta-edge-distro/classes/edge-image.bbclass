@@ -195,10 +195,10 @@ python () {
                 "  Expected \"group:user\" per entry, space separated."
                 % entry)
 
-    # Boot-chain family. Only one is implemented; a board from another
-    # family (UEFI/extlinux, Jetson-class) must fail here naming the gap
-    # rather than build an image whose verity table is anchored to nothing.
-    EDGE_BOOT_CHAINS_IMPLEMENTED = ("uboot-fit",)
+    # Boot-chain family. A board from an unimplemented family (extlinux,
+    # Jetson-class) must fail here naming the gap rather than build an image
+    # whose verity table nothing loads or anchors. ADR-0016 adds uefi-uki.
+    EDGE_BOOT_CHAINS_IMPLEMENTED = ("uboot-fit", "uefi-uki")
     chain = (d.getVar('EDGE_BOOT_CHAIN') or '').strip()
     if not chain:
         bb.fatal(
@@ -211,11 +211,36 @@ python () {
         bb.fatal(
             "EDGE_BOOT_CHAIN = '%s' is not implemented (MACHINE = '%s').\n"
             "  Implemented: %s\n"
-            "  The boot, signing and OTA-env recipes assume the U-Boot/FIT\n"
-            "  family; another family needs its own trust anchor and\n"
-            "  boot-count store, not a fallback."
+            "  Each family has its own boot payload, trust anchor and\n"
+            "  boot-count store (edge-ab-<family>.bbclass); there is no\n"
+            "  fallback between them."
             % (chain, d.getVar('MACHINE'),
                ' '.join(EDGE_BOOT_CHAINS_IMPLEMENTED)))
+
+    # Trust anchor (ADR-0016 §2): the boot stage that verifies the artifact
+    # carrying the dm-verity root hash. "none" builds verity that detects
+    # corruption without authenticating the rootfs; prod needs an explicit
+    # waiver for it.
+    EDGE_BOOT_ANCHORS = {
+        "uboot-fit": ("loader-key", "hardware"),
+        "uefi-uki": ("none", "hardware"),
+    }
+    anchor = (d.getVar('EDGE_BOOT_ANCHOR') or '').strip()
+    if anchor not in EDGE_BOOT_ANCHORS[chain]:
+        bb.fatal(
+            "EDGE_BOOT_ANCHOR = '%s' is not valid for EDGE_BOOT_CHAIN = '%s'\n"
+            "  (MACHINE = '%s'). Valid: %s. Set it in\n"
+            "  conf/machine/include/edge-board-%s.inc."
+            % (anchor, chain, d.getVar('MACHINE'),
+               ' '.join(EDGE_BOOT_ANCHORS[chain]), d.getVar('MACHINE')))
+    if (anchor == 'none' and d.getVar('EDGE_PROFILE') == 'prod'
+            and d.getVar('EDGE_ALLOW_UNANCHORED_VERITY') != '1'):
+        bb.fatal(
+            "EDGE_BOOT_ANCHOR = 'none' on a prod image (MACHINE = '%s').\n"
+            "  dm-verity on this image detects corruption of the rootfs; it\n"
+            "  does not authenticate it: no boot stage verifies the root hash.\n"
+            "  Set EDGE_ALLOW_UNANCHORED_VERITY = \"1\" in the board include to\n"
+            "  accept that explicitly." % d.getVar('MACHINE'))
 
     accel = (d.getVar('EDGE_ACCEL') or 'none').strip()
     if accel == 'none':

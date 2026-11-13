@@ -35,6 +35,9 @@ EDGE_UPLINK_IFACE     = "eth0"
 # partition) -> signed FIT verified against the key in the board DTB ->
 # raw U-Boot env for RAUC boot-count.
 EDGE_BOOT_CHAIN = "uboot-fit"
+# U-Boot verifies the FIT with its built-in key; the ROM does not verify
+# U-Boot (ADR-0016 §2).
+EDGE_BOOT_ANCHOR = "loader-key"
 
 # --- Kernel provider ----------------------------------------------------
 # Mainline stable 6.18 (ADR-0011); the vendor recipes are masked in

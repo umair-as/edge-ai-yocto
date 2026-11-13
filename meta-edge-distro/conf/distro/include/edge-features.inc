@@ -57,9 +57,10 @@ EDGE_MACHINE_BOOTLOADER_UPDATE_INSTALL ??= ""
 # the board include (edge-ai.conf), so a ?= default here would turn the
 # board's own ?= into a no-op.
 #
-# Boot-chain family: firmware -> U-Boot -> signed FIT verified against a key
-# in U-Boot's control DTB -> raw U-Boot env for RAUC's boot-count. Only
-# "uboot-fit" is implemented; edge-image.bbclass refuses anything else.
+# Boot-chain family: "uboot-fit" (firmware -> U-Boot -> signed FIT verified
+# against a key in U-Boot's control DTB; raw U-Boot env for RAUC's boot-count)
+# or "uefi-uki" (firmware -> UEFI -> one UKI per slot, ADR-0016).
+# edge-image.bbclass refuses anything else.
 EDGE_BOOT_CHAIN ??= ""
 
 # Network interface roles. Board facts: which interfaces systemd-networkd must

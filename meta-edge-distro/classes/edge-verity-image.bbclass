@@ -3,20 +3,15 @@
 inherit image_types_verity kernel-arch uboot-config
 require conf/image-fitimage.conf
 
-IMAGE_FSTYPES:append = " verity"
-IMAGE_FEATURES:append = " read-only-rootfs"
-
-# Stable per-image salt preserves reproducibility while avoiding the shared
-# class default. The root hash still changes whenever rootfs content changes.
-VERITY_SALT = "${@__import__('hashlib').sha256(('%s:%s:%s' % (d.getVar('PN'), d.getVar('MACHINE'), d.getVar('DISTRO'))).encode()).hexdigest()}"
+inherit edge-verity-settings
 
 EDGE_VERITY_FIT_A = "${IMAGE_LINK_NAME}.fitImage-A"
 EDGE_VERITY_FIT_B = "${IMAGE_LINK_NAME}.fitImage-B"
 EDGE_VERITY_DTB   = "${EDGE_BOOT_DTB}"
 
-# These arguments become part of the signed DTB. Mutable environment
-# arguments are deliberately absent from the authenticated-root boot path.
-EDGE_VERITY_KERNEL_ARGS ?= "earlycon security=selinux hash_pointers=always hardened_usercopy=1 kfence.sample_interval=100 proc_mem.force_override=never init_on_alloc=1 init_on_free=1 slab_nomerge page_alloc.shuffle=1 randomize_kstack_offset=on vsyscall=none"
+# EDGE_VERITY_KERNEL_ARGS becomes part of the signed DTB. Mutable
+# environment arguments are deliberately absent from the authenticated-root
+# boot path.
 
 do_image_verity_fit[depends] += " \
     virtual/kernel:do_deploy \
