@@ -372,6 +372,27 @@ if command -v podman >/dev/null 2>&1; then
                 fail "root podman run alpine:3 failed: $(printf '%s' "${podman_run_err}" | tail -1 | cut -c1-160)" ;;
         esac
     fi
+
+    # Rootless as the invoking user: pasta networking, subuid mapping and the
+    # image-copy scratch dir (<graphroot>/tmp, pre-created by tmpfiles) that a
+    # root run never touches. --pull=always: a cached image skips the scratch dir.
+    if [ "$(id -u)" -ne 0 ]; then
+        rootless_err=$(podman run --rm --pull=always docker.io/library/alpine:3 echo "container-ok" 2>&1 >/dev/null)
+        if [ $? -eq 0 ]; then
+            pass "rootless podman run alpine:3 as $(id -un) — OK"
+        else
+            case "${rootless_err}" in
+                *"creating a temporary directory"*)
+                    fail "rootless podman run failed: <graphroot>/tmp missing (tmpfiles entry for $(id -un))" ;;
+                *"no such host"*|*"lookup "*|*"Temporary failure in name resolution"*)
+                    warn "rootless podman run failed on name resolution (first-boot DNS); rerun later" ;;
+                *)
+                    fail "rootless podman run as $(id -un) failed: $(printf '%s' "${rootless_err}" | tail -1 | cut -c1-160)" ;;
+            esac
+        fi
+    else
+        info "running as root: rootless podman not checked"
+    fi
 else
     fail "podman not installed"
 fi
@@ -559,6 +580,150 @@ for u in edge-ctr devel; do
         fail "${u} (uid ${uid}): linger marker present but user@${uid} inactive / no /run/user/${uid}"
     fi
 done
+
+section "Rootless containers as edge-ctr"
+
+# AI workloads run rootless as edge-ctr (ADR-0012); a root run proves nothing
+# about its namespace, storage, networking or cgroups. Run from /tmp (edge-ctr
+# cannot enter the caller's cwd) with its user-session environment so podman
+# uses the systemd cgroup manager. Containers are removed afterwards.
+ectr_uid=$(id -u edge-ctr 2>/dev/null || true)
+if [ -z "${ectr_uid}" ] || ! command -v podman >/dev/null 2>&1; then
+    info "edge-ctr or podman absent: rootless edge-ctr checks skipped"
+elif ! sudo -n true 2>/dev/null; then
+    info "no passwordless sudo: rootless edge-ctr checks skipped"
+else
+    ectr_home=$(awk -F: '$1=="edge-ctr"{print $6}' /etc/passwd)
+    ectr() {
+        (cd /tmp && sudo -n -u edge-ctr env XDG_RUNTIME_DIR="/run/user/${ectr_uid}" \
+            DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${ectr_uid}/bus" HOME="${ectr_home}" "$@")
+    }
+
+    ectr_root=$(ectr podman info --format '{{.Store.GraphRoot}}' 2>/dev/null || true)
+    case "${ectr_root}" in
+        /data/*) pass "edge-ctr storage on /data (${ectr_root})" ;;
+        *)       fail "edge-ctr storage not on /data (${ectr_root:-podman info failed})" ;;
+    esac
+
+    # Fresh pull (scratch dir), user-namespace mapping, DNS and HTTPS in one run.
+    ectr_out=$(ectr podman run --rm --pull=always docker.io/library/alpine:3 sh -c \
+        'id -u; nslookup -type=a example.com >/dev/null 2>&1 && echo dns-ok; wget -q -O /dev/null https://example.com && echo https-ok' 2>&1)
+    if printf '%s\n' "${ectr_out}" | grep -qx 0 \
+            && printf '%s\n' "${ectr_out}" | grep -qx dns-ok \
+            && printf '%s\n' "${ectr_out}" | grep -qx https-ok; then
+        pass "edge-ctr rootless run: fresh pull, root mapped, DNS + HTTPS"
+    else
+        case "${ectr_out}" in
+            *"creating a temporary directory"*)
+                fail "edge-ctr rootless pull failed: <graphroot>/tmp missing (edge-ctr.tmpfiles)" ;;
+            *"no such host"*|*"lookup "*|*"Temporary failure in name resolution"*)
+                warn "edge-ctr rootless run failed on name resolution (first-boot DNS); rerun later" ;;
+            *)
+                fail "edge-ctr rootless run incomplete: $(printf '%s' "${ectr_out}" | tr '\n' ' ' | cut -c1-160)" ;;
+        esac
+    fi
+
+    # Published port through pasta, answered on loopback.
+    ectr podman rm -f edge-smoke-port >/dev/null 2>&1 || true
+    if ectr podman run -d --name edge-smoke-port -p 127.0.0.1:18089:80 docker.io/library/alpine:3 \
+            sh -c 'while true; do printf "HTTP/1.0 200 OK\r\n\r\nedge-smoke\n" | nc -l -p 80; done' >/dev/null 2>&1; then
+        sleep 2
+        if curl -s --max-time 5 http://127.0.0.1:18089/ 2>/dev/null | grep -qx edge-smoke; then
+            pass "edge-ctr rootless published port answers"
+        else
+            fail "edge-ctr rootless published port did not answer on 127.0.0.1:18089"
+        fi
+    else
+        fail "edge-ctr rootless container with a published port failed to start"
+    fi
+    ectr podman rm -f edge-smoke-port >/dev/null 2>&1 || true
+
+    # cgroup delegation: cpuset lets demos pin to a core type (--cpuset-cpus).
+    ectr_cg=$(ectr podman info --format '{{.Host.CgroupControllers}}' 2>/dev/null || true)
+    case "${ectr_cg}" in
+        *cpuset*) pass "edge-ctr delegated controllers ${ectr_cg}" ;;
+        *)        fail "edge-ctr delegated controllers ${ectr_cg:-unknown}: cpuset missing (user@${ectr_uid} drop-in)" ;;
+    esac
+
+    # Quadlet: the user generator must run cleanly for edge-ctr's units.
+    if ectr /usr/lib/systemd/user-generators/podman-user-generator --dryrun >/dev/null 2>&1; then
+        pass "Quadlet user generator runs for edge-ctr"
+    else
+        fail "Quadlet user generator failed for edge-ctr"
+    fi
+fi
+
+section "Podman API socket (user managers)"
+
+# The user API service is socket-activated, not started with the user manager:
+# started eagerly it races the other podman user units for the rootless pause
+# process and exits 125. Inactive is its idle state, not a failure.
+if [ ! -e /usr/lib/systemd/user/podman.service ]; then
+    info "no podman user units: API socket checks skipped"
+else
+    svc_en=$(systemctl --global is-enabled podman.service 2>/dev/null || true)
+    sock_en=$(systemctl --global is-enabled podman.socket 2>/dev/null || true)
+    if [ "${svc_en}" = "disabled" ]; then
+        pass "podman.service not enabled for user managers (socket-activated)"
+    else
+        fail "podman.service is '${svc_en:-unknown}' for user managers: it starts eagerly and races"
+    fi
+    if [ "${sock_en}" = "enabled" ]; then
+        pass "podman.socket enabled for user managers"
+    else
+        fail "podman.socket is '${sock_en:-unknown}' for user managers: no on-demand API"
+    fi
+
+    # One user manager started at boot (edge-ctr, linger), one at this login.
+    api_check() {
+        label=$1 uid=$2; shift 2
+        if [ "$("$@" systemctl --user is-active podman.socket 2>/dev/null)" != "active" ]; then
+            fail "${label}: podman.socket not listening"
+            return
+        fi
+        if "$@" systemctl --user is-failed --quiet podman.service 2>/dev/null; then
+            fail "${label}: podman.service failed before any API request"
+        else
+            info "${label}: podman.service $("$@" systemctl --user is-active podman.service 2>/dev/null) before the first request"
+        fi
+        failed_units=$("$@" systemctl --user list-units --failed --plain --no-legend 'podman*' 2>/dev/null | awk '{print $1}' | tr '\n' ' ')
+        if [ -n "${failed_units}" ]; then
+            fail "${label}: failed podman user units: ${failed_units}"
+        else
+            pass "${label}: no failed podman user units"
+        fi
+        ping=$("$@" curl -s --max-time 15 --unix-socket "/run/user/${uid}/podman/podman.sock" http://d/_ping 2>/dev/null || true)
+        if [ "${ping}" = "OK" ]; then
+            pass "${label}: API socket activation answers /_ping"
+        else
+            fail "${label}: API socket activation, /_ping returned '${ping:-nothing}'"
+        fi
+    }
+
+    ectr_uid=$(id -u edge-ctr 2>/dev/null || true)
+    if [ -n "${ectr_uid}" ] && sudo -n true 2>/dev/null; then
+        api_check "edge-ctr" "${ectr_uid}" sudo -n -u edge-ctr env XDG_RUNTIME_DIR="/run/user/${ectr_uid}" \
+            DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${ectr_uid}/bus"
+    fi
+    if [ "$(id -u)" != 0 ] && [ -S "/run/user/$(id -u)/bus" ]; then
+        api_check "$(id -un)" "$(id -u)" env
+    fi
+
+    if sudo -n true 2>/dev/null; then
+        # Count only a journal that was read: an unreadable one must not pass.
+        if boot_journal=$(sudo -n journalctl -b -q --no-pager -o cat 2>/dev/null); then
+            fd_errs=$(printf '%s\n' "${boot_journal}" | grep -c "unexpected fd received from systemd" || true)
+            if [ "${fd_errs}" -eq 0 ]; then
+                pass "no podman 'unexpected fd received from systemd' errors this boot"
+            else
+                fail "podman API startup race this boot: ${fd_errs} 'unexpected fd' errors (journalctl -b)"
+            fi
+        else
+            fail "boot journal unreadable: podman API startup race not checked"
+        fi
+        unset boot_journal
+    fi
+fi
 
 # ---------------- 13. accelerator ----------------
 
