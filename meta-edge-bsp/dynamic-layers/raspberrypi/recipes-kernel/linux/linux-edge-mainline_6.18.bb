@@ -20,14 +20,14 @@ RECIPE_NO_UPDATE_REASON = "Pinned to a linux-6.18.y tag; bump SRCREV_machine and
 
 COMPATIBLE_MACHINE = "^raspberrypi5$"
 
-LINUX_VERSION = "6.18.52"
+LINUX_VERSION = "6.18.59"
 LINUX_VERSION_EXTENSION = ""
 PV = "${LINUX_VERSION}+git"
 
 KBRANCH = "linux-6.18.y"
 KMETA = "kernel-meta"
-# v6.18.52
-SRCREV_machine = "8f3741e6feb045da5b406df0a80b42a1adfb289b"
+# v6.18.59
+SRCREV_machine = "1253a6aa5d104312bf0992afacc15220ae35bdf9"
 # yocto-kernel-cache yocto-6.18. Only the tooling side is used: no
 # KERNEL_FEATURES are taken from it.
 SRCREV_meta = "2f71b0a288c307062fc60948ac793d8d51c685e2"
