@@ -686,7 +686,13 @@ if [ "${accel}" = "dxm1" ]; then
         warn "podman-user-wait no-op drop-in missing — first inference likely delayed ~90s at boot"
     fi
 elif [ "${accel}" = "none" ]; then
-    fail "no accelerator stack installed — the accelerator is baseline on every board, so this is a build or composition fault, not an image variant"
+    composed=$(sed -n 's/^EDGE_ACCEL=//p' /etc/buildinfo 2>/dev/null)
+    allowed=$(sed -n 's/^EDGE_ALLOW_NO_ACCEL=//p' /etc/buildinfo 2>/dev/null)
+    if [ "${composed}" = "none" ] && [ "${allowed}" = "1" ]; then
+        warn "no accelerator: bring-up composition (EDGE_ALLOW_NO_ACCEL=1 in /etc/buildinfo); not a product image"
+    else
+        fail "no accelerator stack installed (composed: ${composed:-unrecorded}) — the accelerator is baseline on every board, so this is a build or composition fault, not an image variant"
+    fi
 else
     # Accelerator + zero-copy buffer nodes. render-group 0660 ownership (from
     # edge-drpai-udev) is what lets the rootless container open them via
