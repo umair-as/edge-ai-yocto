@@ -21,6 +21,8 @@
 # The script does not modify RAUC state or touch anything destructive.
 
 set -u
+# A serial login gives non-root users no sbin (oe-core /etc/profile); sshd does.
+PATH=$PATH:/usr/sbin:/sbin
 # pipefail makes `producer | grep -q` report failure whenever grep exits on
 # the first match before the producer is done writing (SIGPIPE); every grep
 # fed by a pipe below therefore reads to EOF (`grep ... >/dev/null`), never -q.

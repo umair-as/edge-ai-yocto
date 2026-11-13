@@ -1,0 +1,4 @@
+# bootctl update rewrites the ESP's single loader copy when the rootfs carries
+# a newer systemd-boot; the loader is not updated by OTA (ADR-0016 §9).
+# Sorts before 90-systemd.preset, which enables it; first match wins.
+disable systemd-boot-update.service
