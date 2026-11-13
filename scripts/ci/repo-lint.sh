@@ -42,6 +42,18 @@ hits=""
 if [ -n "$hits" ]; then echo "$hits" | sed 's/^/    /'; bad "leaked agent path, host home path or key material"
 else ok "clean"; fi
 
+hdr "INVARIANT: no vendor binaries or archives tracked"
+# Vendor SDK archives and prebuilt libraries are supplied at build time, never
+# committed: a recipe with a CLOSED or Proprietary LICENSE keeps only its
+# metadata in git, and no tracked file is an archive or a shared/static object.
+hits=$(git ls-files | grep -E '\.(a|o|so(\.[0-9]+)*|ko|elf|zip|7z|rpm|deb|ipk|whl|tar|tgz|tar\.(gz|xz|bz2|zst))$')
+for r in $(git grep -lE '^LICENSE[[:space:]]*[?:]?=[[:space:]]*"(CLOSED|Proprietary)' -- '*.bb' '*.bbappend' 2>/dev/null); do
+    hits="$hits
+$(git ls-files -- "$(dirname "$r")" | grep -vE '\.(bb|bbappend|inc)$')"
+done
+hits=$(printf '%s\n' "$hits" | sed '/^$/d' | sort -u)
+if [ -n "$hits" ]; then echo "$hits" | sed 's/^/    /'; bad "vendor binary or archive tracked"; else ok "none"; fi
+
 hdr "INVARIANT: relative links in docs/ resolve"
 broken=0
 for f in $(git ls-files 'docs/*.md' '*.md'); do
