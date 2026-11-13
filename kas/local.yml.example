@@ -85,6 +85,8 @@ local_conf_header:
     INHERIT += "rm_work"
     RM_WORK_EXCLUDE += " \
         linux-renesas \
+        linux-edge-mainline \
+        linux-qcom \
         u-boot \
         trusted-firmware-a \
         optee-os \
@@ -131,7 +133,7 @@ local_conf_header:
 
     # ---- Bundle encryption (crypt format) ----------------------------------
     # On by default (edge-features.inc): the shipping target is crypt-format
-    # bundles, hardware-validated end to end on 2026-09-04. The payload is
+    # bundles. The payload is
     # AES-256 encrypted and the manifest is CMS-enveloped to the recipient
     # certs; the device decrypts with the matching private key — see
     # docs/dev/ota-updates.md.

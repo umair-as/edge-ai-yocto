@@ -32,10 +32,9 @@ PACKAGE_ARCH = "${MACHINE_ARCH}"
 
 inherit systemd
 
-# The .mount units are pulled into local-fs.target via their [Install] sections;
-# the oneshot identity-persist services are pulled in by sshd.service /
-# systemd-machine-id-commit.service indirectly. SYSTEMD_SERVICE lists them so
-# the systemd preset enables/disables them correctly.
+# The .mount units install into local-fs.target and the oneshot
+# identity-persist services into sysinit.target. SYSTEMD_SERVICE lists them
+# so the systemd preset enables/disables them correctly.
 SYSTEMD_SERVICE:${PN} = " \
     var-log.mount \
     var-lib-containers.mount \

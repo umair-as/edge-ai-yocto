@@ -1,6 +1,6 @@
-SUMMARY     = "Edge base runtime: brand, slot udev, U-Boot env, hardening"
+SUMMARY     = "Edge base runtime: brand, slot udev, persistence, hardening"
 DESCRIPTION = "Runtime packages in every edge image tier: brand assets, systemd presets, \
-sudo/sysctl/journald hardening, audit, slot udev rules, U-Boot env tooling. \
+sudo/sysctl/journald hardening, audit, slot udev rules. \
 OTA backend packages come from edge-ota-${EDGE_OTA_BACKEND}.inc."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "base"

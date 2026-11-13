@@ -43,7 +43,7 @@ EDGE_BOOT_CHAIN = "uboot-fit"
 SPDX_INCLUDE_COMPILED_SOURCES:pn-linux-edge-mainline = "1"
 
 # Mainline 6.18 builds one DTB for this board. rpi-base.inc lists the CM5
-# variants and ~70 vendor overlays, none of which the mainline tree has;
+# variants and the vendor overlays, none of which the mainline tree has;
 # plain `=` beats its ??=.
 KERNEL_DEVICETREE = "broadcom/bcm2712-rpi-5-b.dtb"
 
@@ -95,6 +95,8 @@ EDGE_FIT_PUBKEY_DTB ?= "bcm2712-rpi-5-b.dtb"
 # reaches the firmware over /dev/vcio from the VCIO backport in
 # linux-edge-mainline; vcgencmd also reads bootloader state for rpi-eeprom-update.
 EDGE_MACHINE_EXTRA_INSTALL ?= "linux-firmware-rpidistro-bcm43455 bluez-firmware-rpidistro-bcm4345c0-hcd wireless-regdb-static edge-io-udev raspi-utils raspi-gpio"
+# EEPROM and FAT boot-file updaters, installed with BOOTLOADER_UPDATE=1.
+EDGE_MACHINE_BOOTLOADER_UPDATE_INSTALL = "rpi-eeprom edge-rpi-eeprom edge-rpi-bootfiles-update"
 
 # devel joins the I/O groups the board's recipes create. i2c and spi are not
 # offered: mainline 6.18 exposes no RP1 header I2C/SPI controller for this

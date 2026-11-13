@@ -9,9 +9,8 @@
 # the SD/eMMC path). "off" removes the drop-ins and reapplies the baseline.
 #
 # --bootargs additionally sets nokaslr + maxcpus=1 in the U-Boot
-# EXTRA_KERNEL_ARGS env (needs a reboot to take effect). On a kernel built
-# with EDGE_ENABLE_JTAG_DEBUG=1, KASLR is already compiled out and lockup
-# detectors are absent, so --bootargs only contributes maxcpus=1.
+# EXTRA_KERNEL_ARGS env. Only the legacy (non-verity) slot boot path reads
+# that variable; verity slots and uefi-uki boards ignore it.
 set -eu
 
 WD_SRC=/usr/share/edge-debug-mode/20-edge-debug-watchdog.conf

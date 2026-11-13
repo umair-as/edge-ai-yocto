@@ -29,7 +29,7 @@
 #   alternates regardless of which entry point composes the stack.
 #   Autofetch is therefore safe even when the shared cache exists —
 #   kas just consults alternates first and falls back to the upstream
-#   URLs declared in kas/base.yml for anything missing.
+#   URLs declared in the composed kas files for anything missing.
 
 header:
   version: 19

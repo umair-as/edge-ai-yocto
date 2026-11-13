@@ -1,4 +1,4 @@
-# Kernel selection for edge-ai-yocto.
+# Kernel selection for the Renesas RZ/V2L.
 #
 # Recipe: linux-renesas_6.12 (provided by meta-renesas/meta-rz-bsp).
 #   Despite the recipe name, the kernel source is CIP base + Renesas

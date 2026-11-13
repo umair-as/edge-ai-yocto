@@ -7,10 +7,8 @@ SECTION = "bootloaders"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 
-# Runtime virtual provider — packagegroup-edge-base RDEPENDS on the
-# virtual, not on this PN directly, so a mender-uboot-env recipe (when
-# it ever lands) supplies the same shape via PREFERRED_RPROVIDER in
-# edge-ota-mender.inc. See ADR-0005.
+# Runtime virtual provider: edge-ota-${EDGE_OTA_BACKEND}.inc installs the
+# virtual and binds it with PREFERRED_RPROVIDER (ADR-0005).
 RPROVIDES:${PN} = "virtual-ota-uboot-env"
 
 # Installs the board's raw env offsets and slot root devices, so the output is
@@ -28,9 +26,9 @@ SRC_URI = " \
     file://rauc-uboot-env-init.sh \
 "
 
-# Dev-only netboot fragment, gated by edge.conf's EDGE_DEV_NETBOOT.
-# Appended to the deployed defaults at image-build time when "1";
-# otherwise no bytes from this file ship in the image at all.
+# Dev-only netboot fragment, gated by EDGE_DEV_NETBOOT (edge-features.inc,
+# NETBOOT=1). Appended in do_install when "1"; otherwise no bytes from this
+# file ship in the image.
 SRC_URI:append = "${@' file://rauc-uboot-env.dev-netboot' if d.getVar('EDGE_DEV_NETBOOT') == '1' else ''}"
 
 S = "${UNPACKDIR}"

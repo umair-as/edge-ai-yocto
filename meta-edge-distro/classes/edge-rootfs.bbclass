@@ -13,13 +13,10 @@
 #
 # What's deliberately NOT here:
 #   - host identity (BUILD_SYS) — leaks build-host info to the device.
-#     Gated by EDGE_BUILDINFO_INCLUDE_BUILD_SYS for dev images that
-#     want it for diagnostics.
-#   - signing key fingerprints — provenance, belongs in a separate
-#     /etc/provenance file once HSM signing lands.
+#     Gated by EDGE_BUILDINFO_INCLUDE_BUILD_SYS.
+#   - signing key fingerprints — provenance, not build identity.
 
-# Toggle: include BUILD_SYS line. Off by default (prod posture).
-# Dev images can set this to "1" in their .bb.
+# Toggle: include the BUILD_SYS line. Off by default; "1" adds it.
 EDGE_BUILDINFO_INCLUDE_BUILD_SYS ?= "0"
 
 edge_rootfs_buildinfo() {

@@ -11,5 +11,5 @@
 #   /usr/lib/tee-supplicant/plugins/    (sample supplicant plugins)
 #
 # DEPENDS chain pulls optee-os-tadevkit (TA headers + signing key), which
-# which optee-os produces.
+# optee-os produces.
 COMPATIBLE_MACHINE:smarc-rzv2l = "smarc-rzv2l"

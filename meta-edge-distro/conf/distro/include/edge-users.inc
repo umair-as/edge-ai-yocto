@@ -5,8 +5,9 @@
 #                    Same password hash as devel. Physical-serial recovery
 #                    only.
 #   devel (UID 1000, primary GID 1000, supplementary "wheel") — interactive
-#                    SSH user. wheel grants sudo (password required —
-#                    no NOPASSWD), per meta-edge-bsp/recipes-core/users/edge-sudoers/.
+#                    SSH user. wheel grants sudo: password required on
+#                    base/prod (edge-sudoers), NOPASSWD on dev
+#                    (edge-sudoers-nopasswd).
 #
 # Password hash + SSH key are supplied by the operator via kas/local.yml
 # (gitignored) — see kas/local.yml.example for the documented stub. The
@@ -96,7 +97,7 @@ EXTRA_USERS_PARAMS:append = "${@bb.utils.contains('EDGE_ENABLE_OPTEE', '1', ' us
 # EDGE_DEVEL_SSH_PUBKEY_FILE points at a host-side .pub file (path is
 # interpreted at image build time). If unset, the build still succeeds —
 # the user lands on a password-only SSH posture and can ssh-copy-id after
-# first login. With CRA hardening on, the gentler path is: set it.
+# first login.
 EDGE_DEVEL_SSH_PUBKEY_FILE ?= ""
 
 ROOTFS_POSTPROCESS_COMMAND:append = "${@' edge_devel_authorized_keys;' if d.getVar('EDGE_DEVEL_SSH_PUBKEY_FILE') else ''}"

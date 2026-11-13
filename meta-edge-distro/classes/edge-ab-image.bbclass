@@ -5,12 +5,11 @@
 #   - two interchangeable rootfs slots (selected by the OTA backend)
 #   - /data for persistent state
 #
-# This class is OTA-backend-agnostic — slot labels, env init, and confirm-
-# boot service all come from edge-ota-${EDGE_OTA_BACKEND}.inc via virtual
-# providers and EDGE_SLOT_*_LABEL variables (added in Phase 4 of ADR-0005).
-# See ADR-0005 for the full abstraction contract.
+# This class is OTA-backend-agnostic — slot labels and OTA bindings come
+# from edge-ota-${EDGE_OTA_BACKEND}.inc via virtual providers and
+# EDGE_SLOT_*_LABEL variables. See ADR-0005 for the abstraction contract.
 
-inherit edge-image edge-verity-image
+inherit edge-image
 
 # Fail clean at parse if no OTA backend was selected. edge-features.inc
 # defaults EDGE_OTA_BACKEND to "rauc"; a build that strips it (or sets it
@@ -57,9 +56,8 @@ do_image_wic[depends] += "${EDGE_BOOT_DEPLOY_DEPS}"
 # OTA backend include — rauc-tier values come from edge-ota-rauc.inc.
 # The __anonymous gate above guarantees that include has been pulled.
 
-# Slot + data partition sizes in MB. Per-machine overrides go in
-# kas/machines/<board>.yml — 128 GB SD variants set EDGE_DATA_SIZE_MB
-# to fill the card; a smaller carrier shrinks the slot size. WKS .wks.in
+# Slot + data partition sizes in MB. Per-machine overrides go in the board
+# include (edge-board-ventuno-q.inc sets an 8 GiB slot). WKS .wks.in
 # substitution is bitbake-time, so no WICVARS enrolment needed.
 EDGE_SLOT_SIZE_MB ?= "4096"
 EDGE_DATA_SIZE_MB ?= "1024"

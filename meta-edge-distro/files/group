@@ -1,7 +1,7 @@
 # Static GIDs for the edge distro.
 #
 # Consumed by useradd-staticids.bbclass via USERADD_GID_TABLES in
-# conf/distro/edge.conf. See files/passwd for the policy notes — the
+# conf/distro/include/edge-floor.inc. See files/passwd for the policy notes — the
 # same guarantees apply to groups.
 #
 # Format: groupname:password:gid:members

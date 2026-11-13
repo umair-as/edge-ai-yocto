@@ -76,7 +76,7 @@ DISTRO_FEATURES_DEFAULTS  = ""
 DISTRO_FEATURES_OPTED_OUT = "multiarch ptest vulkan sysvinit"
 
 # Always-on, non-negotiable feature set. Toggle-able features
-# (wayland/opengl, rauc, future swupdate) are appended below from
+# (wayland/opengl, rauc) are appended below from
 # EDGE_ENABLE_* / EDGE_OTA_BACKEND.
 DISTRO_FEATURES = "\
     systemd \
@@ -107,8 +107,8 @@ PREFERRED_PROVIDER_virtual/refpolicy = "refpolicy-mcs"
 # Refpolicy ships /etc/selinux/config with SELINUX=${DEFAULT_ENFORCING}.
 # Permissive is the floor: AVC denials log to audit, no domain transition
 # is blocked. Enforcing requires policy coverage validated against the
-# full image surface. Recovery escape remains the
-# selinux=0 kernel param via fw_setenv EXTRA_KERNEL_ARGS.
+# full image surface. The verity boot path has no mutable kernel
+# arguments: booting with selinux=0 needs a slot payload rebuilt with it.
 DEFAULT_ENFORCING = "permissive"
 
 # ----- Packaging ----------------------------------------------------------
@@ -130,8 +130,8 @@ RM_WORK_EXCLUDE += "edge-image-base edge-image-dev edge-image-prod"
 
 # Empty default: a recipe that needs a license flag fails noisily, not silently.
 # Capability-scoped accepts (e.g. `commercial` for the GPL/patent-encumbered
-# gstreamer decoder set) live in the include that ships the capability —
-# currently edge-profile-dev.inc.
+# gstreamer decoder set) live in the include or fragment that ships the
+# capability (edge-profile-dev.inc, kas/machines/raspberrypi5.yml).
 LICENSE_FLAGS_ACCEPTED ?= ""
 
 # ----- Container runtime (baseline; see ADR-0012) -------------------------
@@ -158,8 +158,8 @@ PODMAN_FEATURES:pn-podman            ?= ""
 # fragment's same line via OE_FRAGMENTS is unreliable in this wrynose
 # pin — addfragments does not parse a leading-space OE_FRAGMENTS value
 # (artefact of `+= " yocto/..."`). Explicit assignment here is the
-# load-bearing one; OE_FRAGMENTS is left in for the fragment's other
-# minor bits and as the documented hook for future operators.
+# load-bearing one; OE_FRAGMENTS is left in for the fragment's remaining
+# settings.
 INHERIT       += "create-spdx"
 OE_FRAGMENTS  += "yocto/sbom-cve-check"
 IMAGE_CLASSES:append = " sbom-cve-check"
@@ -190,8 +190,7 @@ PREFERRED_VERSION_kernel-hardening-checker-native = "0.6.17.1"
 # CVE_STATUS entries from the VEX export on the assumption the CVE DB's
 # version range clears those rows itself. When the range data is wrong
 # (NVD ranges lag point releases; git-hash recipes never version-match),
-# the disposition is silently lost and the row ships Unpatched — observed
-# on rsync, ffmpeg (15 rows), and glibc (3 rows). "all" exports every
+# the disposition is silently lost and the row ships Unpatched. "all" exports every
 # exportable disposition (unknown is skipped), so the report reflects
 # recipe CVE_STATUS verbatim.
 SPDX_INCLUDE_VEX = "all"
@@ -219,10 +218,8 @@ UBOOT_SIGN_KEYNAME     ?= "edge-fit-dev"
 FIT_HASH_ALG           ?= "sha256"
 # rsa4096: RSA_MAX_KEY_BITS is a 4096 compile-time ceiling in U-Boot's RSA
 # verify code (include/u-boot/rsa.h), not a Kconfig option, so it applies
-# identically on both boards -- confirmed against the actual pinned/built
-# sources (Renesas CIP u-boot 2024.07 and oe-core u-boot 2026.01), both of
-# which already carry CONFIG_FIT_SIGNATURE=y, CONFIG_RSA_VERIFY=y and
-# CONFIG_RSA_SOFTWARE_EXP=y in their resolved .config.
+# to both uboot-fit U-Boots (Renesas CIP 2024.07, oe-core 2026.01); both
+# build CONFIG_FIT_SIGNATURE, CONFIG_RSA_VERIFY and CONFIG_RSA_SOFTWARE_EXP.
 FIT_SIGN_ALG           ?= "rsa4096"
 # Pin the key size. kernel-signing-keys-native generates the dev key from
 # FIT_SIGN_NUMBITS; oe-core leaves it unset, so mkimage would otherwise
@@ -268,7 +265,7 @@ RAUC_DEVICE_KEYRING ?= "${RAUC_KEYRING_FILE}"
 # device decrypts with the matching private key. rauc-init-certs.sh emits all
 # three files; an empty *_SRC pair leaves the device key to a PKCS#11 token.
 #
-# Consumed by: edge-bundle-common.inc (recipients), ota-certs (device key
+# Consumed by: edge-bundle-crypt.inc (recipients), ota-certs (device key
 # and cert), rauc-conf-edge (the [encryption] stanza that names them).
 EDGE_RAUC_BUNDLE_ENCRYPT_RECIPIENTS ?= "${EDGE_KEYS_DIR}/dev/rauc/rauc-recipients.pem"
 EDGE_RAUC_DECRYPT_KEY_SRC           ?= "${EDGE_KEYS_DIR}/dev/rauc/rauc-recipient.key"
@@ -288,7 +285,7 @@ EDGE_BUILD_DATE[vardepsexclude] = "DATETIME EDGE_BUILD_ID"
 
 # ----- Fetcher policy ----------------------------------------------------
 
-# crates.io now returns 403 to wget's default "Wget/1.x" User-Agent and
+# crates.io returns 403 to wget's default "Wget/1.x" User-Agent and
 # 302s to static.crates.io for browser UAs. Override the default fetcher
 # command so https:// fetches present a real UA. The wget fetcher reads
 # the literal name `FETCHCMD_wget` (bb/fetch2/wget.py:86) — "wget" is not

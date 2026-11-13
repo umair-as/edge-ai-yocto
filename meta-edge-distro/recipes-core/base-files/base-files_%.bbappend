@@ -5,14 +5,11 @@
 # templates that live next to this bbappend. Build-baked substitutions:
 # @DISTRO_NAME@, @DISTRO_VERSION@, @EDGE_BUILD_DATE@.
 #
-# Rationale: see edge-banner_1.0.bb for the full design. Short form:
-# the previous edge-banner.service rebuilt these surfaces at every
-# boot from D-Bus + `rauc` forks, costing ~3.7 s on the boot critical
-# chain. Split: static (here, build-time, $0 runtime cost)
-# + dynamic appendix (/etc/profile.d/edge-motd-dynamic.sh, $50 ms at
-# login). This file is the static half.
+# This file is the static, build-time half of the login surfaces; the
+# dynamic appendix is edge-banner's /etc/profile.d/edge-motd-dynamic.sh,
+# run at login, which keeps D-Bus and rauc calls off the boot path.
 #
-# `BASEFILESISSUEINSTALL = ""` in edge.conf turns off base-files'
+# `BASEFILESISSUEINSTALL = ""` in edge-floor.inc turns off base-files'
 # built-in do_install_basefilesissue task that would otherwise re-render
 # /etc/issue and /etc/issue.net during do_install — prevents the edge
 # bbappend's templates from being clobbered.
@@ -28,7 +25,7 @@ SRC_URI += " \
 # Render build-time substitutions into the templates, then
 # move the rendered files into ${D}${sysconfdir} overwriting base-files'
 # placeholder motd (issue/issue.net are not rendered by base-files
-# because BASEFILESISSUEINSTALL is empty — see edge.conf).
+# because BASEFILESISSUEINSTALL is empty — see edge-floor.inc).
 do_install:append () {
     # Templates carry ANSI colour codes as plain "[N;Nm" so they stay
     # text-editable; sed prefixes each match with the literal ESC byte

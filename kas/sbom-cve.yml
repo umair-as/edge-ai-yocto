@@ -50,6 +50,9 @@ local_conf_header:
     #               (create-spdx-3.0.bbclass: SPDX_INCLUDE_VEX ??= "current").
     #   "none"    — no VEX annotations
     #
+    # edge-floor.inc sets "all": "current" drops fixed-version and
+    # cpe-stable-backport CVE_STATUS entries from the VEX export.
+    #
     # SPDX_INCLUDE_VEX = "current"
 
   spdx_timestamps: |

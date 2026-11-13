@@ -1,6 +1,6 @@
 # Provider-neutral kernel policy for the edge-ai distro.
 #
-# Every kernel provider bbappend requires this file. The fragments below
+# Every kernel provider recipe or bbappend requires this file. The fragments below
 # are platform floor, not board content: module signing, dm-verity, the
 # SELinux LSM stack and CONFIG_LSM ordering, lockdown, IMA/EVM, RAUC
 # verity, dm-crypt, container cgroups and storage/net, AI compute,
@@ -10,8 +10,8 @@
 # EDGE_ENABLE_JTAG_DEBUG) and the kernel -src packaging policy live here
 # too: they read the same fragment set and apply to every provider.
 #
-# do_kernel_configme resolves these into .config; the assertion at the
-# bottom of this file is what makes a dropped symbol a build failure
+# do_kernel_configme resolves these into .config; the assertion below
+# is what makes a dropped symbol a build failure
 # rather than a warning. kernel-yocto.bbclass reports a fragment naming
 # a symbol the target kernel does not have only when
 # KCONF_BSP_AUDIT_LEVEL is non-zero (it defaults to 0), and a requested

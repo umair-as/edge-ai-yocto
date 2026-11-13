@@ -6,8 +6,7 @@
 # Pulls in the Renesas-fork TF-A and U-Boot pins here, not in base.yml.
 # base.yml is board-neutral distro policy; this file is where RZ/V2L's
 # bootloader stack — TF-A + U-Boot + (via TF-A's bbappend) bptool — gets
-# wired. A second board (i.MX93, VF2, …) will ship its own machines/<b>.yml
-# including its own kas/{trusted-firmware-a,u-boot}/<flavor>.yml.
+# wired.
 
 header:
   version: 19

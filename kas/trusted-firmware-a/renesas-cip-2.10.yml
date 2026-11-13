@@ -21,12 +21,6 @@
 # expansion. The SRCREV that selects the specific Renesas-fork commit
 # is set in the recipe-side override at
 # meta-edge-bsp/recipes-bsp/trusted-firmware-a/trusted-firmware-a_%.bbappend.
-#
-# Future direction: sibling kas/trusted-firmware-a/<variant>.yml files
-# can add a version-selection family without changing kas/base.yml. A
-# future kas/trusted-firmware-a/mainline-X.Y.yml would point at
-# review.trustedfirmware.org/TF-A and require RZ/V2L upstream support
-# (does not exist as of this writing).
 
 header:
   version: 19

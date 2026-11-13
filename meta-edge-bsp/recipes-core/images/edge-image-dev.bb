@@ -24,10 +24,9 @@ python () {
             "requires EDGE_PROFILE=dev (got '%s'); build with 'make dev'" % p)
 }
 
-# Pull in the standard oe-core debug + profile feature buckets. They drag
-# in gdb/gdbserver/strace/ltrace/tcpdump (tools-debug) and perf/lttng-tools
-# (tools-profile). Cheaper than naming each package directly and tracks
-# upstream changes.
+# Pull in the standard oe-core debug + profile feature buckets: gdb,
+# gdbserver, strace (tools-debug) and perf, lttng-tools (tools-profile).
+# Tracks upstream changes to those sets.
 IMAGE_FEATURES:append = " \
     tools-debug \
     tools-profile \
@@ -35,23 +34,17 @@ IMAGE_FEATURES:append = " \
 
 # Dev tier — single packagegroup handle aggregating shell QoL,
 # observability, hwtools, netdiag, storage, and media. New dev userspace
-# is added by editing a packagegroup recipe in
-# meta-edge-bsp/recipes-core/packagegroups/, not this file. Ad-hoc tools:
-# Package metadata remains available for inspection; the authenticated local
-# root is read-only. NFS netboot is the writable development workflow.
+# goes into a packagegroup recipe in recipes-core/packagegroups/, not this
+# file. The verity root is read-only; NFS netboot is the writable
+# development workflow.
 IMAGE_INSTALL:append = " packagegroup-edge-dev edge-sudoers-nopasswd edge-debug-mode"
 # edge-sudoers-nopasswd is the bench-tier sub-package of edge-sudoers; it
 # ships 15-edge-wheel-nopasswd which lexically overrides 10-edge-wheel
-# and makes %wheel passwordless. edge-image-base intentionally omits it
-# so prod keeps the interactive password gate.
+# and makes %wheel passwordless. edge-image-base and edge-image-prod omit
+# it and keep the interactive password gate.
 
-# Machine-gated dev-only OP-TEE conformance suite. Cannot live in
-# packagegroup-edge-dev — that recipe is machine-portable; the test slice
-# is on packagegroup-edge-optee which is COMPATIBLE_MACHINE=smarc-rzv2l.
-# packagegroup-edge-optee-test is the ${PN}-test output package of the
-# packagegroup-edge-optee recipe. Follows EDGE_ENABLE_OPTEE: xtest against a
-# TEE that the image has no client stack for is dead weight.
-IMAGE_INSTALL:append:smarc-rzv2l = "${@bb.utils.contains('EDGE_ENABLE_OPTEE', '1', ' packagegroup-edge-optee-test', '', d)}"
+# Board-supplied dev-only packages, named by the board include.
+IMAGE_INSTALL:append = "${@' ' + d.getVar('EDGE_MACHINE_DEV_INSTALL') if d.getVar('EDGE_MACHINE_DEV_INSTALL') else ''}"
 
 # Accelerator test/measurement instruments, named by the accelerator
 # fragment so this recipe carries no board override.
@@ -64,8 +57,8 @@ EDGE_DEV_DBG_PKGS ?= "0"
 IMAGE_FEATURES:append = "${@' dbg-pkgs' if d.getVar('EDGE_DEV_DBG_PKGS') == '1' else ''}"
 
 # JTAG/OpenOCD source-level kernel debugging. Off by default. When "1":
-# linux-renesas adds jtag-debug.cfg (KASLR off, un-reduced DWARF, -Og, lockup
-# detectors out, kgdb in), and edge-debug-mode pre-places the watchdog-off
+# the kernel (edge-kernel-policy.inc) adds jtag-debug.cfg (KASLR off,
+# un-reduced DWARF, lockup detectors out, kgdb in), and edge-debug-mode pre-places the watchdog-off
 # + sysctl-relax drop-ins so the image boots debug-safe. Pairs with
 # EDGE_DEV_DBG_PKGS=1 for on-target -dbg symbols. Cheap on OTA size: the
 # debug DWARF lives in the build-tree vmlinux and is stripped from the image.
@@ -73,14 +66,13 @@ EDGE_ENABLE_JTAG_DEBUG ?= "0"
 
 # BPF/CO-RE labs. Off by default — this is the size-heavy toggle (kernel BTF
 # over un-reduced DWARF + per-module BTF in /lib/modules grow the OTA bundle).
-# When "1": linux-renesas adds btf-core-dev.cfg (/sys/kernel/btf/vmlinux) and
-# the image pulls packagegroup-edge-bpf (bpftool, ...). Leave off for
-# DRP-AI/edge-AI builds.
+# When "1": the kernel (edge-kernel-policy.inc) adds btf-core-dev.cfg
+# (/sys/kernel/btf/vmlinux) and the image pulls packagegroup-edge-bpf
+# (bpftool, ...).
 EDGE_ENABLE_BTF_CORE_DEV ?= "0"
 IMAGE_INSTALL:append = "${@' packagegroup-edge-bpf' if d.getVar('EDGE_ENABLE_BTF_CORE_DEV') == '1' else ''}"
 
-# Bootchain updaters, per machine (RZ/V2L BL2/FIP; Pi 5 EEPROM + FAT boot
-# files). Off by default: single-copy bootchain storage. BOOTLOADER_UPDATE=1.
+# Bootchain updaters, named by the board (EDGE_MACHINE_BOOTLOADER_UPDATE_INSTALL).
+# Off by default: single-copy bootchain storage. BOOTLOADER_UPDATE=1.
 EDGE_ENABLE_BOOTLOADER_UPDATE ?= "0"
-IMAGE_INSTALL:append:smarc-rzv2l = "${@bb.utils.contains('EDGE_ENABLE_BOOTLOADER_UPDATE', '1', ' rzv2l-bootloader-update', '', d)}"
-IMAGE_INSTALL:append:raspberrypi5 = "${@bb.utils.contains('EDGE_ENABLE_BOOTLOADER_UPDATE', '1', ' rpi-eeprom edge-rpi-eeprom edge-rpi-bootfiles-update', '', d)}"
+IMAGE_INSTALL:append = "${@bb.utils.contains('EDGE_ENABLE_BOOTLOADER_UPDATE', '1', ' ' + (d.getVar('EDGE_MACHINE_BOOTLOADER_UPDATE_INSTALL') or ''), '', d)}"

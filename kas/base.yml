@@ -1,21 +1,18 @@
 # Canonical, tracked KAS composition for edge-ai-yocto.
 #
-# Single source of truth for the layer set, pin policy, and base
-# local.conf. Self-contained — wrynose and kernel composition are
-# transcribed here so this repo owns and curates its own layer set.
+# Board-neutral layer set, pin policy and base local.conf. Vendor BSP
+# layers and the kernel provider are per board, in kas/bsp/*.yml.
 #
 # Pinning policy:
 #   - Upstream Yocto layers (openembedded-core, bitbake, meta-yocto,
-#     meta-arm, meta-openembedded) are SHA-pinned. The starting baseline
-#     mirrors the community BSP's wrynose.yml as of rz-community-bsp
-#     commit 24d43a0 (2026-06). Bump SHAs deliberately, not by drift.
-#   - Project-local layers (meta-edge-distro, meta-edge-bsp) live in-tree
-#     via `path:`.
+#     meta-arm, meta-openembedded) are SHA-pinned. Bump SHAs deliberately,
+#     not by drift.
+#   - Project-local layers (meta-edge-distro, meta-edge-bsp) live in-tree.
 #
-# Composition:
-#   kas build kas/base.yml:kas/machines/<board>.yml:kas/images/<tier>.yml
+# Composition (the image tier is the bitbake target, not a kas file):
+#   kas build kas/base.yml:kas/machines/<board>.yml
 # or via the wrapper:
-#   make base
+#   make base BOARD=<board>
 
 header:
   version: 19
@@ -41,7 +38,7 @@ repos:
   # --- Yocto upstream layers (SHA-pinned to the wrynose 6.0 baseline) ---
   openembedded-core:
     url: https://git.openembedded.org/openembedded-core
-    # wrynose branch tip, 2026-09-30 (stable-branch CVE backports and recipe
+    # wrynose, 2026-09-30 (stable-branch CVE backports and recipe
     # updates; carries sbom-cve-check 1.3.5)
     commit: 0f03c732a0a2d0506b41b1abe60b3f368b2300dc
     layers:
@@ -49,21 +46,21 @@ repos:
 
   bitbake:
     url: https://git.openembedded.org/bitbake
-    # 2.18 branch tip, 2026-07-09 (still 2.18.0; moves with the poky cluster)
+    # 2.18 branch, 2026-07-09 (still 2.18.0; moves with the poky cluster)
     commit: fae9db3168dbff1b8c76fe9c6726a9687ff97514
     layers:
       bitbake: disabled
 
   meta-yocto:
     url: https://git.yoctoproject.org/meta-yocto
-    # wrynose branch tip, 2026-07-30 (poky cluster: moves with oe-core/bitbake)
+    # wrynose, 2026-07-30 (poky cluster: moves with oe-core/bitbake)
     commit: 1b132647002eea43a2c7a7f857f63f42dacbc26c
     layers:
       meta-poky:
 
   meta-arm:
     url: https://git.yoctoproject.org/meta-arm
-    # wrynose HEAD at baseline
+    # wrynose, 2026-04-29
     commit: 052c2cf333ecf16fc2ded4c5d09749ebaff8c0c5
     layers:
       meta-arm-toolchain:
@@ -71,7 +68,7 @@ repos:
 
   meta-openembedded:
     url: https://git.openembedded.org/meta-openembedded
-    # wrynose branch tip, 2026-08-07 (moves in lockstep with the poky cluster;
+    # wrynose, 2026-08-07 (moves in lockstep with the poky cluster;
     # shares oe-core's class/python API, carries userland CVE backports)
     commit: 6bf0d8ad57b33950bab4c7f6c037e1ccb6f6e2eb
     # All meta-oe sublayers any edge image might need are activated here.
@@ -104,7 +101,7 @@ repos:
   # variants, packagegroup-core-selinux, and selinux-image.bbclass. Layer
   # deps (openembedded-core, meta-python) are already pulled above. The
   # systemd recipe in oe-core flips PACKAGECONFIG[selinux] automatically
-  # when DISTRO_FEATURES contains "selinux"; 25 other oe-core/meta-oe
+  # when DISTRO_FEATURES contains "selinux"; other oe-core/meta-oe
   # recipes link libselinux conditionally on the same bit. See
   # edge-floor.inc for the distro-features wiring and
   # security-hardening.cfg for the kernel-side LSM symbols.
@@ -137,18 +134,6 @@ repos:
     layers:
       meta-edge-bsp:
       meta-edge-distro:
-
-  # Slot reserved for a future meta-edge-ai sibling repo (model
-  # packaging, AI-SBOM, multi-board AI layers). DRP-AI runtime recipes
-  # landed in-tree under meta-edge-bsp; uncomment if a separate AI
-  # layer is introduced.
-  #
-  # meta-edge-ai:
-  #   url: https://github.com/umair-as/meta-edge-ai
-  #   branch: main
-  #   commit: <pin>
-  #   layers:
-  #     meta-edge-ai:
 
 # Base local.conf header. Disk-monitor thresholds halt the build when
 # TMPDIR / DL_DIR / SSTATE_DIR run low so partial-write artifacts don't
@@ -187,7 +172,6 @@ local_conf_header:
     PACKAGE_CLASSES ?= "package_rpm"
     BB_GENERATE_MIRROR_TARBALLS = "1"
 
-# No vendor BSP here. The Renesas repo pin, its layers, its kas patch and its
-# BBMASKs live in kas/bsp/renesas-rz.yml, composed by kas/machines/rzv2l.yml.
-# This file is board-neutral: adding a second machine must not require editing
-# it.
+# No vendor BSP here. Each board's vendor layers, pins, kas patches and
+# BBMASKs live in kas/bsp/<vendor>.yml, composed by its kas/machines/<board>.yml.
+# This file is board-neutral: adding a machine does not edit it.

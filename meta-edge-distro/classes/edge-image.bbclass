@@ -42,11 +42,11 @@ selinux_set_labels() {
     fi
 }
 
-# Custom WICVARS appends live per-machine in kas/machines/<board>.yml,
+# Custom WICVARS appends live in conf/machine/include/edge-board-<MACHINE>.inc,
 # alongside the variables they expose (e.g. RZ/V2L's FIP_WIC_OFFSET).
 # WIC only expands ${VAR} inside .wks files for variables listed in WICVARS;
 # the oe-core default list (image_types_wic.bbclass) covers the universal
-# set, anything board-specific gets added on the machine overlay.
+# set, anything board-specific is added in the board include.
 
 # Common IMAGE_FEATURES for every edge tier.
 #   splash             — psplash, branded via meta-edge-distro/recipes-core/psplash
@@ -60,10 +60,9 @@ IMAGE_FEATURES += " \
     package-management \
 "
 IMAGE_FEATURES += "${@bb.utils.contains('EDGE_ENABLE_DISPLAY', '1', 'weston', '', d)}"
-# Login policy lives elsewhere — see meta-edge-distro/recipes-core/users/
-# and the hardening fragments. Don't add IMAGE_FEATURES like
-# empty-root-password / allow-empty-password / allow-root-login /
-# serial-autologin-root here. They're CRA-incompatible defaults.
+# Login policy: edge-users.inc and edge-sudoers. empty-root-password,
+# allow-empty-password, allow-root-login and serial-autologin-root are not
+# set: CRA-incompatible defaults.
 
 IMAGE_LINGUAS = "en-us"
 
@@ -73,13 +72,13 @@ IMAGE_LINGUAS = "en-us"
 #
 # wic.zst over wic.bz2/wic.gz: zstd compresses ~3x faster than gzip and
 # ~6x faster than bzip2 at a better ratio than gzip; bmaptool reads it
-# natively. Build-time win every iteration.
+# natively.
 IMAGE_FSTYPES = "wic.zst wic.bmap ext4 tar.gz"
 
 # meta-renesas's rz-common.inc does
 #   IMAGE_FSTYPES:append = " tar.gz tar.bz2 ext4 wic.gz wic.bmap"
 # Late-binding :append wins over the = above; without this :remove
-# wic.gz and tar.bz2 are built unnecessarily (~1.5-2.5 min each).
+# wic.gz and tar.bz2 are built unnecessarily.
 IMAGE_FSTYPES:remove = "wic.gz tar.bz2"
 
 # WIC's imager-level update_fstab() appends one /dev/mmcblk0pN line per WKS
@@ -90,7 +89,7 @@ IMAGE_FSTYPES:remove = "wic.gz tar.bz2"
 WIC_CREATE_EXTRA_ARGS:append = " --no-fstab-update"
 
 # Common runtime — universal across every edge image tier. The full list
-# (edge-banner, edge-systemd-presets, slot udev, u-boot env tooling)
+# (edge-banner, edge-systemd-presets, slot udev, persistence, hardening)
 # lives in packagegroup-edge-base; the OTA backend's packages come from
 # the distro's edge-ota-${EDGE_OTA_BACKEND}.inc.
 CORE_IMAGE_EXTRA_INSTALL += " packagegroup-edge-base"

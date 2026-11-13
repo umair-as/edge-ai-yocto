@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MIT
 #
-# RZ/V2L RAUC bundle hook — pre-install and post-install
+# uboot-fit RAUC bundle hook — pre-install and post-install
 #
 # Post-install installs the signed FIT matching the written verity slot, then
 # atomically migrates managed boot variables and records the OTA audit trail.
@@ -62,9 +62,8 @@ BOOT_MP="/boot"
 case "${HOOK_TYPE}" in
   pre-install)
     log_info "pre-install: slot='${RAUC_SLOT_NAME:-unknown}'"
-    # Placeholder for future pre-install checks (signature pinning, rollback
-    # guard, free-space check, etc.).  Fail fast here to abort before RAUC
-    # writes anything to the target slot.
+    # No pre-install checks; a non-zero exit here aborts before RAUC writes
+    # the target slot.
     log_info "pre-install: checks passed"
     exit 0
     ;;

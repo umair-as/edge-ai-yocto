@@ -1,11 +1,10 @@
 # EDGE_PROFILE = "dev" — development tier defaults.
 #
 # Required by edge-ai.conf when EDGE_PROFILE = "dev". Single home for dev
-# tier defaults (edge-features.inc no longer pre-sets them).
+# tier defaults; edge-features.inc does not default these.
 
-# Observability on by default for dev. This ?= is the source of truth; it
-# fires because edge-features.inc no longer defaults the variable ahead of
-# this include. An explicit operator value (env / local.yml) still wins.
+# Observability on by default for dev. This ?= is the source of truth; a
+# kas/local.yml value wins.
 EDGE_ENABLE_OBSERVABILITY ?= "1"
 
 # Kernel observability and crash-debug fragments are on in the dev tier.

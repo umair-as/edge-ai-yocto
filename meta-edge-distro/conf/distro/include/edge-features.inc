@@ -46,6 +46,13 @@ EDGE_ACCEL_SUPPLEMENTARY_GROUPS ??= ""
 # accelerator fragment so image recipes stay board-neutral.
 EDGE_ACCEL_TEST_INSTALL ??= ""
 
+# Board-supplied image content beyond EDGE_MACHINE_EXTRA_INSTALL (all tiers):
+# packages for the dev tier only, and the board's bootchain updaters, which
+# dev and prod install when EDGE_ENABLE_BOOTLOADER_UPDATE is "1". Image
+# recipes stay board-neutral.
+EDGE_MACHINE_DEV_INSTALL ??= ""
+EDGE_MACHINE_BOOTLOADER_UPDATE_INSTALL ??= ""
+
 # Board-fact declarations use ??=, never ?=: this file is required before
 # the board include (edge-ai.conf), so a ?= default here would turn the
 # board's own ?= into a no-op.
@@ -104,8 +111,8 @@ EDGE_ENABLE_OPTEE_EXAMPLES ?= "0"
 # Profiling / observability tooling (htop, sysstat, trace-cmd, ...).
 # Tier default lives in edge-profile-{dev,prod}.inc (the correctly-selected
 # include). Not defaulted here: a ?= in this file is parsed before the profile
-# include, so it would pre-empt the profile inc's ?= and force the old strong
-# :dev override. Operator env/local.yml still wins over the profile default.
+# include, so it would pre-empt the profile include's ?=. A kas/local.yml value
+# wins over the profile default.
 
 # Dev-only netboot. When 1, rauc-uboot-env installs a `netboot` macro
 # in the managed U-Boot env defaults; bootcmd is unchanged.
@@ -118,22 +125,21 @@ EDGE_DEV_NETBOOT ?= "0"
 # own transition bundle) and gains an [encryption] stanza. Recipient key
 # paths default in edge-floor.inc. On by default: the
 # shipping target is crypt-format bundles. do_install in ota-certs and
-# do_bundle in edge-bundle-common.inc both bbfatal with a pointer to
+# do_bundle in edge-bundle-crypt.inc both bbfatal with a pointer to
 # scripts/rauc-init-certs.sh if the recipient key material under
 # keys/dev/rauc/ does not exist yet, so a fresh checkout's first build fails
 # fast and legibly rather than silently shipping an unencrypted image.
 #
-# Consequence of the default: every default image now carries the same
-# shared recipient private key at /etc/ota/bundle-decrypt.key. ADR-0009 is
-# explicit that this is a development/integration baseline, not a
-# per-device revocation design — offline image access or a root compromise
-# on any one device discloses the key for the whole fleet. Fine for the
-# current single-board tree; revisit before a real fleet rollout.
+# Consequence of the default: every default image carries the same shared
+# recipient private key at /etc/ota/bundle-decrypt.key. ADR-0009 is explicit
+# that this is a development/integration baseline, not a per-device
+# revocation design — offline image access or a root compromise on any one
+# device discloses the key for the whole fleet.
 EDGE_ENABLE_RAUC_BUNDLE_ENCRYPTION ?= "1"
 
-# Declared at this global scope, not just in edge-bundle-common.inc (which
-# also carries an identical, now-redundant ?= as a standalone-recipe
-# fallback), so that rauc-conf-edge -- a different recipe, with its own
+# Declared at this global scope, not just in edge-bundle-crypt.inc (which
+# carries an identical ?= as a standalone-recipe fallback), so that
+# rauc-conf-edge -- a different recipe, with its own
 # isolated datastore -- can also read it. rauc-conf-edge's system.conf
 # allowlist (EDGE_RAUC_BUNDLE_FORMATS) must include whatever format the
 # bundle recipe actually emits (EDGE_RAUC_BUNDLE_FORMAT), or every bundle
@@ -144,12 +150,15 @@ EDGE_RAUC_BUNDLE_FORMAT ?= "${@bb.utils.contains('EDGE_ENABLE_RAUC_BUNDLE_ENCRYP
 # ----- Toggles declared at recipe scope (listed here for visibility) -------
 
 # EDGE_DEV_DBG_PKGS         — edge-image-dev: dbg-pkgs IMAGE_FEATURE
-# EDGE_KERNEL_DEV_FRAGMENTS — linux-renesas: observability-dev.cfg fragment
-# EDGE_ENABLE_JTAG_DEBUG    — linux-renesas: jtag-debug.cfg fragment;
+# EDGE_KERNEL_DEV_FRAGMENTS — edge-kernel-policy.inc (every kernel):
+#                             observability-dev.cfg + crash-debug-dev.cfg;
+#                             default set per profile include
+# EDGE_ENABLE_JTAG_DEBUG    — edge-kernel-policy.inc: jtag-debug.cfg;
 #                             edge-image-dev: ships edge-debug-mode drop-ins
-# EDGE_ENABLE_BTF_CORE_DEV  — linux-renesas: btf-core-dev.cfg + pahole-native;
-#                             edge-image-dev: ships bpftool. OFF by default —
-#                             un-reduced DWARF + module BTF bloat the OTA bundle
+# EDGE_ENABLE_BTF_CORE_DEV  — edge-kernel-policy.inc: btf-core-dev.cfg +
+#                             pahole-native; edge-image-dev: packagegroup-edge-bpf.
+#                             OFF by default — un-reduced DWARF + module BTF
+#                             bloat the OTA bundle
 
 # No BB_ENV_PASSTHROUGH_ADDITIONS here: bitbake reads it from the environment
 # at startup, before any conf file is parsed, so an append in conf has no

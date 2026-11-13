@@ -6,9 +6,7 @@
 #   - WKS slot labels        → rootfsA / rootfsB (RAUC convention)
 #   - IMAGE_INSTALL          → rauc daemon + grow-data oneshot + conf
 #
-# See ADR-0005 for the virtual-provider contract; a future
-# edge-ota-mender.inc would bind the same virtuals to mender-* recipes
-# with rootfs1/rootfs2 slot labels.
+# See ADR-0005 for the virtual-provider contract.
 
 PREFERRED_RPROVIDER_virtual-ota-uboot-env = "rauc-uboot-env"
 
@@ -17,7 +15,7 @@ PREFERRED_RPROVIDER_virtual-ota-uboot-env = "rauc-uboot-env"
 # "Multiple providers are available" at parse.
 PREFERRED_RPROVIDER_virtual-rauc-conf = "rauc-conf-edge"
 
-# RAUC slot labels — consumed by edge-rzv2l.wks.in via bitbake-time
+# RAUC slot labels — consumed by the board .wks.in templates via bitbake-time
 # template expansion. WIC sets the partition ext4 label from --label,
 # and the WKS sets that to ${EDGE_SLOT_*_LABEL}.
 EDGE_SLOT_A_LABEL = "rootfsA"

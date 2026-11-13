@@ -25,6 +25,6 @@ do_install() {
 
 FILES:${PN} = "${sysconfdir}/audit/rules.d/10-edge.rules"
 
-# audit subsystem userspace comes from meta-security/recipes-security/audit.
+# audit subsystem userspace comes from meta-oe (recipes-security/audit).
 # The recipe also enables systemd's audit unit.
 RDEPENDS:${PN} = "audit auditd"
