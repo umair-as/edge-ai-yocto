@@ -23,4 +23,14 @@ RDEPENDS:${PN} = " \
     wget \
     tree \
     rsync \
+    gawk \
+    sed \
+    tar \
+    gzip \
+    zstd \
+    diffutils \
+    bc \
+    pv \
+    procps \
+    psmisc \
 "

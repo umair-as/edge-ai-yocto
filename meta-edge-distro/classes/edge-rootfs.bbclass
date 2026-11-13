@@ -31,6 +31,9 @@ edge_rootfs_buildinfo() {
         echo "TUNE_PKGARCH=${TUNE_PKGARCH}"
         echo "IMAGE_BASENAME=${IMAGE_BASENAME}"
         echo "IMAGE_NAME=${IMAGE_NAME}"
+        # Accelerator composition, read by edge-smoke-test.sh.
+        echo "EDGE_ACCEL=${@d.getVar('EDGE_ACCEL') or 'none'}"
+        echo "EDGE_ALLOW_NO_ACCEL=${@d.getVar('EDGE_ALLOW_NO_ACCEL') or '0'}"
         # EDGE_DEV_NETBOOT is set by kas/dev-netboot.yml — surfaces dev
         # vs prod compose in a single field operators can grep.
         echo "EDGE_DEV_NETBOOT=${EDGE_DEV_NETBOOT}"

@@ -15,4 +15,5 @@ RDEPENDS:${PN} = " \
     dosfstools \
     f2fs-tools \
     fio \
+    gptfdisk \
 "
