@@ -42,6 +42,11 @@ hits=""
 if [ -n "$hits" ]; then echo "$hits" | sed 's/^/    /'; bad "leaked agent path, host home path or key material"
 else ok "clean"; fi
 
+hdr "INVARIANT: no archives or prebuilt objects tracked"
+# Vendor SDK archives and prebuilt libraries are supplied at build time.
+hits=$(git ls-files | grep -E '\.(a|o|so(\.[0-9]+)*|ko|elf|zip|7z|rpm|deb|ipk|whl|tar|tgz|tar\.(gz|xz|bz2|zst))$')
+if [ -n "$hits" ]; then echo "$hits" | sed 's/^/    /'; bad "archive or prebuilt object tracked"; else ok "none"; fi
+
 hdr "INVARIANT: relative links in docs/ resolve"
 broken=0
 for f in $(git ls-files 'docs/*.md' '*.md'); do
