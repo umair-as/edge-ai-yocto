@@ -1,0 +1,8 @@
+# VENTUNO Q RGB LEDs: the STM32 loader emulates a PCA9635 at CCI1 0x22; the DT
+# groups its twelve channels into four multicolor devices labelled stm-led-1..4.
+# leds-pca963x prefixes the label with its name: the kernel name is
+# pca963x:stm-led-<N>. LED class devices have no device node, so the links are
+# made with ln, not SYMLINK. /dev/leds/builtin/led<N> is the LED's sysfs
+# directory (multi_intensity, brightness, trigger).
+SUBSYSTEM=="leds", KERNEL=="pca963x:stm-led-[1-4]", ACTION=="add", RUN+="/bin/mkdir -p /dev/leds/builtin", RUN+="/bin/ln -sfn /sys$devpath /dev/leds/builtin/led%n"
+SUBSYSTEM=="leds", KERNEL=="pca963x:stm-led-[1-4]", ACTION=="remove", RUN+="/bin/rm -f /dev/leds/builtin/led%n"

@@ -1,0 +1,2 @@
+# STM32H5 MCU CDC-ACM port (pid.codes 1209:ca01).
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1209", ATTRS{idProduct}=="ca01", SYMLINK+="ttySTM0"
