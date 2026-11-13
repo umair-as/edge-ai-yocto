@@ -31,8 +31,8 @@ do_install() {
     # .volume / .network files into systemd service units transparently.
     install -d ${D}${sysconfdir}/containers/systemd
 
-    # tmpfiles.d entry pre-creates ~/.config/containers/systemd/ for devel
-    # so the rootless Quadlet path exists before the first user session.
+    # tmpfiles.d entry pre-creates devel's rootless Quadlet path and the
+    # image-copy scratch dir under its container storage.
     install -d ${D}${nonarch_libdir}/tmpfiles.d
     install -m 0644 ${UNPACKDIR}/podman-quadlet-devel.conf \
         ${D}${nonarch_libdir}/tmpfiles.d/podman-quadlet-devel.conf

@@ -10,6 +10,7 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda
 SRC_URI = " \
     file://edge-ctr.tmpfiles \
     file://podman-user-wait-network-online-noop.conf \
+    file://user-608-delegate-cpuset.conf \
 "
 
 inherit useradd
@@ -51,6 +52,11 @@ do_install() {
     install -d ${D}${sysconfdir}/systemd/user/podman-user-wait-network-online.service.d
     install -m 0644 ${UNPACKDIR}/podman-user-wait-network-online-noop.conf \
         ${D}${sysconfdir}/systemd/user/podman-user-wait-network-online.service.d/10-edge-noop.conf
+
+    # cpuset delegation for edge-ctr's user manager (uid 608, static).
+    install -d ${D}${sysconfdir}/systemd/system/user@608.service.d
+    install -m 0644 ${UNPACKDIR}/user-608-delegate-cpuset.conf \
+        ${D}${sysconfdir}/systemd/system/user@608.service.d/10-edge-cpuset.conf
 }
 
 # Subordinate uid/gid ranges (edge-ctr 200000-265535) are provisioned at image
@@ -62,4 +68,5 @@ do_install() {
 FILES:${PN} = " \
     ${nonarch_libdir}/tmpfiles.d/edge-ctr.conf \
     ${sysconfdir}/systemd/user/podman-user-wait-network-online.service.d/10-edge-noop.conf \
+    ${sysconfdir}/systemd/system/user@608.service.d/10-edge-cpuset.conf \
 "

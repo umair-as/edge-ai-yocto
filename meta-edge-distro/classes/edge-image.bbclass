@@ -351,3 +351,14 @@ edge_mark_proprietary_image() {
             > ${IMGDEPLOYDIR}/${IMAGE_NAME}.NOT-REDISTRIBUTABLE
     fi
 }
+
+# The podman package postinst enables podman.service globally for user managers
+# with an explicit `systemctl --global enable`, which presets do not undo. Drop
+# that link; the user preset (edge-systemd-presets) keeps preset-all from
+# re-adding it, and podman.socket starts the service on demand.
+ROOTFS_POSTPROCESS_COMMAND += "edge_user_podman_api_on_demand;"
+edge_user_podman_api_on_demand() {
+    if [ -e ${IMAGE_ROOTFS}${systemd_user_unitdir}/podman.service ]; then
+        systemctl --root=${IMAGE_ROOTFS} --global disable podman.service
+    fi
+}
