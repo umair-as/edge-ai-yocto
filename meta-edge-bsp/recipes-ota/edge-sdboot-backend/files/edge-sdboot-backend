@@ -1,0 +1,193 @@
+#!/bin/bash
+# RAUC custom bootloader backend over systemd-boot boot counting (ADR-0016 §6,
+# variant custom). Slot state lives only in file names on the ESP; no EFI
+# variable is written.
+#
+# Each slot is one Type #2 UKI in EDGE_SDBOOT_DIR:
+#   edge-<gen>-<slot>[+<left>[-<done>]].efi   slot a|b, gen a positive integer
+# Every UKI carries the same .osrel sort key (ID) and the same version
+# (IMAGE_VERSION=0), so systemd-boot orders the entries by: no tries left last,
+# then file name, newest strverscmp first; with distinct generations that is
+# the generation, highest first. A higher generation makes a slot primary.
+#
+#   get-primary                 first slot in that order
+#   set-primary <A|B>           rename to the next generation with +TRIES
+#   get-state <A|B>             bad when no tries are left, else good
+#   set-state <A|B> good|bad    drop the counter / set +0
+#   get-current                 slot of LoaderEntrySelected
+#   install-uki <A|B> <file>    replace the slot's UKI, keeping its name
+set -euo pipefail
+
+readonly PROG=edge-sdboot-backend
+readonly DIR=${EDGE_SDBOOT_DIR:-/boot/EFI/Linux}
+readonly TRIES=${EDGE_SDBOOT_TRIES:-3}
+readonly EFIVARS=${EDGE_EFIVARS:-/sys/firmware/efi/efivars}
+readonly LOCK=${EDGE_SDBOOT_LOCK:-/run/lock/edge-sdboot-backend.lock}
+readonly LOADER_GUID=4a67b082-0a4c-41cf-b6c7-440b29bb8c4f
+readonly NAME_RE='^edge-([1-9][0-9]{0,8})-([ab])(\+([0-9]+)(-([0-9]+))?)?\.efi$'
+# Largest generation NAME_RE accepts; a name past it would make every later call fail.
+readonly GEN_MAX=999999999
+
+log() { printf '%s: %s\n' "$PROG" "$*" >&2; }
+die() { log "error: $*"; exit 1; }
+usage() { die "usage: $PROG get-primary | set-primary <A|B> | get-state <A|B> | set-state <A|B> good|bad | get-current | install-uki <A|B> <file>"; }
+
+[[ $TRIES =~ ^[1-9][0-9]?$ ]] || die "EDGE_SDBOOT_TRIES must be 1-99, got '$TRIES'"
+
+# Slot argument: RAUC bootname A|B -> file letter a|b.
+slot_letter() {
+    case "${1:-}" in
+        A) echo a ;;
+        B) echo b ;;
+        *) die "unknown bootname '${1:-}' (expected A or B)" ;;
+    esac
+}
+
+# Parsed entries, indexed by slot letter.
+declare -A FILE=() GEN=() LEFT=()
+
+scan() {
+    [[ -d $DIR ]] || die "$DIR does not exist (ESP not mounted?)"
+    local path name
+    shopt -s nullglob nocaseglob
+    for path in "$DIR"/*.efi; do
+        name=${path##*/}
+        [[ ${name,,} == edge-* ]] || continue
+        [[ $name =~ $NAME_RE ]] || die "unrecognised entry name '$name' in $DIR"
+        local gen=${BASH_REMATCH[1]} slot=${BASH_REMATCH[2]}
+        [[ -z ${FILE[$slot]:-} ]] || die "slot ${slot^^} has two entries: ${FILE[$slot]} and $name"
+        FILE[$slot]=$name
+        GEN[$slot]=$gen
+        # No counter: not subject to boot counting, never "no tries left".
+        LEFT[$slot]=${BASH_REMATCH[4]:-uncounted}
+    done
+    shopt -u nullglob nocaseglob
+}
+
+need() {
+    [[ -n ${FILE[$1]:-} ]] || die "no entry for slot ${1^^} in $DIR"
+}
+
+exhausted() { [[ ${LEFT[$1]} == 0 ]]; }
+
+max_gen() {
+    local s m=0
+    for s in "${!GEN[@]}"; do
+        (( GEN[$s] > m )) && m=${GEN[$s]}
+    done
+    echo "$m"
+}
+
+# Rename within DIR and flush, so the new name is on disk before RAUC goes on.
+rename_entry() {
+    local from=$1 to=$2
+    [[ $from == "$to" ]] && return 0
+    [[ ! -e $DIR/$to ]] || die "refusing to overwrite $DIR/$to"
+    mv -T -- "$DIR/$from" "$DIR/$to"
+    sync -f "$DIR"
+    log "$from -> $to"
+}
+
+# Sort rank in systemd-boot order, largest first: tries left, generation,
+# then slot letter (equal generations compare "edge-N-b" above "edge-N-a").
+rank() {
+    local s=$1 alive=1
+    exhausted "$s" && alive=0
+    printf '%d %010d %s\n' "$alive" "${GEN[$s]}" "$s"
+}
+
+cmd_get_primary() {
+    scan
+    local s ranks=()
+    for s in a b; do
+        [[ -n ${FILE[$s]:-} ]] && ranks+=("$(rank "$s")")
+    done
+    (( ${#ranks[@]} )) || die "no slot entries in $DIR"
+    s=$(printf '%s\n' "${ranks[@]}" | LC_ALL=C sort -r | head -n 1)
+    s=${s##* }
+    echo "${s^^}"
+}
+
+cmd_set_primary() {
+    local s
+    s=$(slot_letter "${1:-}")
+    scan
+    need "$s"
+    local next=$(( $(max_gen) + 1 ))
+    (( next <= GEN_MAX )) || die "generation limit $GEN_MAX reached; slot ${s^^} not activated"
+    rename_entry "${FILE[$s]}" "edge-$next-$s+$TRIES.efi"
+}
+
+cmd_get_state() {
+    local s
+    s=$(slot_letter "${1:-}")
+    scan
+    need "$s"
+    if exhausted "$s"; then echo bad; else echo good; fi
+}
+
+cmd_set_state() {
+    local s
+    s=$(slot_letter "${1:-}")
+    scan
+    need "$s"
+    case "${2:-}" in
+        good) rename_entry "${FILE[$s]}" "edge-${GEN[$s]}-$s.efi" ;;
+        bad)
+            exhausted "$s" && return 0
+            rename_entry "${FILE[$s]}" "edge-${GEN[$s]}-$s+0.efi"
+            ;;
+        *) die "unknown state '${2:-}' (expected good or bad)" ;;
+    esac
+}
+
+# LoaderEntrySelected: 4 attribute bytes, then the entry id in UTF-16LE.
+cmd_get_current() {
+    local var=$EFIVARS/LoaderEntrySelected-$LOADER_GUID id
+    [[ -r $var ]] || die "LoaderEntrySelected is not set (not booted through systemd-boot)"
+    id=$(tail -c +5 "$var" | tr -d '\000')
+    [[ $id =~ ^edge-[1-9][0-9]{0,8}-([ab])\.efi$ ]] || die "selected entry '$id' is not a slot entry"
+    echo "${BASH_REMATCH[1]^^}"
+}
+
+cmd_install_uki() {
+    local s src=${2:-} tmp size avail
+    s=$(slot_letter "${1:-}")
+    [[ -f $src ]] || die "UKI '$src' not found"
+    [[ $(head -c 2 -- "$src") == MZ ]] || die "'$src' is not a PE image"
+    scan
+    need "$s"
+    # No .efi suffix: systemd-boot never lists the partial copy.
+    tmp=$DIR/.edge-$s.install
+    rm -f -- "$tmp"
+    size=$(stat -c %s -- "$src")
+    avail=$(( $(stat -f -c '%a * %S' -- "$DIR") ))
+    (( avail > size + 1048576 )) || die "ESP has $avail bytes free, $size needed for slot ${s^^}"
+    cp -- "$src" "$tmp"
+    sync -f "$tmp"
+    [[ $(sha256sum < "$src") == "$(sha256sum < "$tmp")" ]] ||
+        { rm -f -- "$tmp"; die "copy of '$src' does not match after write"; }
+    mv -T -- "$tmp" "$DIR/${FILE[$s]}"
+    sync -f "$DIR"
+    log "installed $src as ${FILE[$s]}"
+}
+
+main() {
+    local cmd=${1:-}
+    [[ -n $cmd ]] || usage
+    shift
+    mkdir -p "${LOCK%/*}"
+    exec 9>"$LOCK"
+    flock -x 9
+    case "$cmd" in
+        get-primary) (( $# == 0 )) || usage; cmd_get_primary ;;
+        set-primary) (( $# == 1 )) || usage; cmd_set_primary "$@" ;;
+        get-state)   (( $# == 1 )) || usage; cmd_get_state "$@" ;;
+        set-state)   (( $# == 2 )) || usage; cmd_set_state "$@" ;;
+        get-current) (( $# == 0 )) || usage; cmd_get_current ;;
+        install-uki) (( $# == 2 )) || usage; cmd_install_uki "$@" ;;
+        *) usage ;;
+    esac
+}
+
+main "$@"

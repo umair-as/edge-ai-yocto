@@ -77,6 +77,21 @@ EDGE_RAUC_BUNDLE_FORMATS ?= "${@bb.utils.contains('EDGE_ENABLE_RAUC_BUNDLE_ENCRY
 EDGE_RAUC_ENCRYPTION_KEY  ?= "${@'/etc/ota/bundle-decrypt.key' if d.getVar('EDGE_RAUC_DECRYPT_KEY_SRC') else ''}"
 EDGE_RAUC_ENCRYPTION_CERT ?= "${@'/etc/ota/bundle-decrypt.cert.pem' if d.getVar('EDGE_RAUC_DECRYPT_CERT_SRC') else ''}"
 
+# ----- Boot-chain family ---------------------------------------------------
+# RAUC bootloader backend per EDGE_BOOT_CHAIN (ADR-0016). uboot-fit keeps the
+# boot-attempts counters in the U-Boot environment; uefi-uki uses the custom
+# systemd-boot backend, which keeps them in the UKI file names on the ESP.
+def edge_rauc_bootloader(d):
+    chain = (d.getVar("EDGE_BOOT_CHAIN") or "").strip()
+    if chain == "uboot-fit":
+        return "uboot"
+    if chain == "uefi-uki":
+        return "custom"
+    bb.fatal("rauc-conf-edge: no RAUC bootloader backend for EDGE_BOOT_CHAIN = '%s'" % chain)
+
+EDGE_RAUC_BOOTLOADER = "${@edge_rauc_bootloader(d)}"
+EDGE_RAUC_CUSTOM_BACKEND = "${libexecdir}/edge-sdboot-backend"
+
 # ----- Bootloader slot ----------------------------------------------------
 # A board overlay with a RAUC bootloader slot sets both: a boot-emmc slot on
 # the base eMMC device, and the pre-install handler that gates bootloader
@@ -109,7 +124,16 @@ do_install() {
     sed -e "s|@COMPATIBLE@|${RAUC_BUNDLE_COMPATIBLE}|g" \
         -e "s|@TLS_KEY@|${EDGE_RAUC_STREAMING_TLS_KEY}|g" \
         -e "s|@BUNDLE_FORMATS@|${EDGE_RAUC_BUNDLE_FORMATS}|g" \
+        -e "s|@RAUC_BOOTLOADER@|${EDGE_RAUC_BOOTLOADER}|g" \
         ${UNPACKDIR}/system.conf > ${D}${sysconfdir}/rauc/system.conf
+
+    # The U-Boot backend's attempt counters live here, not in the template.
+    if [ "${EDGE_RAUC_BOOTLOADER}" = "uboot" ]; then
+        sed -i "s|@RAUC_BOOT_ATTEMPTS_STANZA@|boot-attempts=3\nboot-attempts-primary=3|" \
+            ${D}${sysconfdir}/rauc/system.conf
+    else
+        sed -i "/@RAUC_BOOT_ATTEMPTS_STANZA@/d" ${D}${sysconfdir}/rauc/system.conf
+    fi
 
     # Keyring locator: directory mode (multi-cert + hashed dir) when
     # EDGE_RAUC_KEYRING_CERTS is set, else legacy single-cert path mode.
@@ -186,6 +210,17 @@ do_install() {
                 echo "cert=${EDGE_RAUC_ENCRYPTION_CERT}"
             fi
         } >> ${D}${sysconfdir}/rauc/system.conf
+    fi
+
+    if [ "${EDGE_RAUC_BOOTLOADER}" = "custom" ]; then
+        if [ -n "${EDGE_RAUC_BOOTLOADER_SLOT_DEVICE}${EDGE_RAUC_PREINSTALL_HANDLER}" ]; then
+            bbfatal "The custom bootloader backend renders its own [handlers] section; a bootloader slot or pre-install handler is not supported with it."
+        fi
+        printf '\n[handlers]\nbootloader-custom-backend=%s\n' "${EDGE_RAUC_CUSTOM_BACKEND}" >> ${D}${sysconfdir}/rauc/system.conf
+    fi
+
+    if grep -n '@[A-Z_]*@' ${D}${sysconfdir}/rauc/system.conf; then
+        bbfatal "system.conf has unrendered template placeholders (listed above)."
     fi
 
     # Device keyring deployment.

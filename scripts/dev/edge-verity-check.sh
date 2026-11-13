@@ -7,13 +7,18 @@
 #   - the dm-verity mapping is active, matches the booted slot's partition,
 #     and the rootfs is mounted read-only from it
 #   - no verity corruption events this boot
-#   - both slot FITs on /boot, managed U-Boot env seeded
+#   - U-Boot boards: both slot FITs on /boot, managed U-Boot env seeded
 #     (BOOT_ORDER/counters, EDGE_VERITY_A/B markers)
+#   - UEFI boards (RAUC bootloader=custom): booted through systemd-boot from
+#     the booted slot's ESP entry, both slot entries readable, no BootNext or
+#     loader default/one-shot variable, systemd-bless-boot masked, RAUC
+#     mark-good ran
 #   - RAUC agrees with the cmdline about the booted slot
 #
-# Board-neutral: slot devices come from the by-rauc-slot udev links the image
-# ships, the FIT trust anchor is checked where the board keeps it (RPi5: the
-# board DTB on /boot; RZ/V2L: inside the FIP, not a file). Runs on both.
+# Board-neutral: the boot chain is read from /etc/rauc/system.conf, slot
+# devices from the by-rauc-slot udev links the image ships, the FIT trust
+# anchor where the board keeps it (RPi5: the board DTB on /boot; RZ/V2L:
+# inside the FIP, not a file). Runs on RZ/V2L, RPi5 and VENTUNO Q.
 #
 # Complements edge-smoke-test.sh (persistence, containers, SELinux); run both.
 # Non-destructive: the only write attempted is a probe at / that must FAIL
@@ -28,6 +33,8 @@
 # EDGE_VERITY_*) exists only after rauc-uboot-env-init.service has run once.
 
 set -u
+# A serial login gives non-root users no sbin (oe-core /etc/profile); sshd does.
+PATH=$PATH:/usr/sbin:/sbin
 set -o pipefail
 
 if [ -t 1 ]; then
@@ -48,11 +55,13 @@ warn()    { printf "  ${C_YELLOW}WARN${C_RESET}  %s\n" "$*"; WARN_COUNT=$((WARN_
 info()    { printf "  ${C_DIM}%s${C_RESET}\n" "$*"; }
 
 EDGE_MACHINE=$(awk -F= '/^MACHINE=/{print $2; exit}' /etc/buildinfo 2>/dev/null)
-info "MACHINE=${EDGE_MACHINE:-?} kernel $(uname -r)"
+BOOT_CHAIN=uboot
+grep -q '^bootloader=custom' /etc/rauc/system.conf 2>/dev/null && BOOT_CHAIN=sdboot
+info "MACHINE=${EDGE_MACHINE:-?} kernel $(uname -r) boot chain ${BOOT_CHAIN}"
 
 # ---------------- 1. kernel cmdline (signed FIT contract) ----------------
 
-section "Kernel cmdline (signed slot FIT)"
+section "Kernel cmdline (slot payload)"
 
 cmdline=$(cat /proc/cmdline)
 
@@ -96,6 +105,15 @@ if [ -n "${dmc}" ]; then
         fi
     else
         fail "/dev/disk/by-rauc-slot/rootfs${slot} missing — edge-slot-udev rules not keyed for this layout"
+    fi
+    # Without dm-mod.waitfor, dm-init can run before the eMMC partition scan
+    # and the boot hangs at "Waiting for root device /dev/dm-0".
+    if [ "${BOOT_CHAIN}" != uboot ]; then
+        case " ${cmdline} " in
+            *" dm-mod.waitfor=${verity_dev} "*|*" dm-mod.waitfor=${verity_dev},"*)
+                pass "dm-mod.waitfor names ${verity_dev}" ;;
+            *) fail "dm-mod.waitfor does not name ${verity_dev:-the backing device} — dm-init races the partition scan" ;;
+        esac
     fi
 else
     fail "no dm-mod.create in cmdline — verity table not passed by FIT DTB"
@@ -177,6 +195,7 @@ else
     fi
 fi
 
+if [ "${BOOT_CHAIN}" = uboot ]; then
 # ---------------- 5. /boot slot FITs ----------------
 
 section "/boot slot FITs"
@@ -271,6 +290,76 @@ else
     fail "fw_printenv not installed"
 fi
 
+fi
+
+if [ "${BOOT_CHAIN}" = sdboot ]; then
+# ---------------- 5s. systemd-boot slot entries (ADR-0016 §6) ----------------
+
+section "systemd-boot slot entries"
+
+efivar() {  # value of a systemd loader variable, UTF-16 text without NULs
+    local f=/sys/firmware/efi/efivars/$1-4a67b082-0a4c-41cf-b6c7-440b29bb8c4f
+    [ -r "$f" ] && tail -c +5 "$f" | tr -d '\000'
+}
+backend=/usr/libexec/edge-sdboot-backend
+loader_info=$(efivar LoaderInfo)
+case "${loader_info}" in
+    systemd-boot*) pass "booted through ${loader_info}" ;;
+    *) fail "LoaderInfo '${loader_info:-unset}' — not booted through systemd-boot" ;;
+esac
+selected=$(efivar LoaderEntrySelected)
+case "${selected}" in
+    edge-*-"${slot,,}".efi) pass "LoaderEntrySelected ${selected} is slot ${slot}" ;;
+    *) fail "LoaderEntrySelected '${selected:-unset}' is not slot ${slot:-?}'s entry" ;;
+esac
+for v in LoaderEntryDefault LoaderEntryOneShot; do
+    if [ -e /sys/firmware/efi/efivars/${v}-4a67b082-0a4c-41cf-b6c7-440b29bb8c4f ]; then
+        fail "${v} is set: it overrides loader.conf and pins one slot"
+    else
+        pass "${v} unset"
+    fi
+done
+if ls /sys/firmware/efi/efivars/BootNext-* >/dev/null 2>&1; then
+    fail "BootNext is set — this firmware crashes on a BootNext boot (ADR-0016)"
+else
+    pass "BootNext unset"
+fi
+if primary=$(sudo -n "${backend}" get-primary 2>&1); then
+    pass "primary slot ${primary}"
+    for s in A B; do
+        if st=$(sudo -n "${backend}" get-state "${s}" 2>&1); then
+            info "slot ${s}: ${st}"
+        else
+            fail "slot ${s}: ${st}"
+        fi
+    done
+else
+    fail "${backend} get-primary: ${primary}"
+fi
+ls /boot/EFI/Linux 2>/dev/null | sed 's/^/        /'
+case "$(systemctl is-enabled systemd-bless-boot.service 2>/dev/null)" in
+    masked) pass "systemd-bless-boot masked (RAUC alone confirms a slot)" ;;
+    *) fail "systemd-bless-boot not masked: it would confirm a trial boot without RAUC" ;;
+esac
+case "$(systemctl is-enabled systemd-boot-update.service 2>/dev/null)" in
+    disabled|masked) pass "systemd-boot-update off (the ESP loader is not replaced in place)" ;;
+    *) fail "systemd-boot-update enabled: bootctl update would rewrite the ESP's only loader" ;;
+esac
+if [ -r /boot/EFI/BOOT/BOOTAA64.EFI ]; then
+    if [ "$(sha256sum < /boot/EFI/BOOT/BOOTAA64.EFI)" = "$(sha256sum < /usr/lib/systemd/boot/efi/systemd-bootaa64.efi)" ]; then
+        pass "ESP loader is this image's systemd-boot"
+    else
+        warn "ESP loader differs from this image's systemd-boot (an update does not replace the loader)"
+    fi
+else
+    fail "/boot/EFI/BOOT/BOOTAA64.EFI missing: no boot path"
+fi
+case "$(systemctl show -p Result --value rauc-mark-good.service 2>/dev/null)" in
+    success) pass "rauc-mark-good.service succeeded" ;;
+    *) fail "rauc-mark-good.service did not succeed — journalctl -b -u rauc-mark-good" ;;
+esac
+fi
+
 # ---------------- 7. RAUC slot agreement ----------------
 
 section "RAUC slot state"
@@ -294,7 +383,7 @@ section "Module signing"
 
 # MODULE_SIG_FORCE rejects unsigned modules; any loaded module proves the
 # in-image signing chain survived strip + sign + package.
-mod_count=$(lsmod | tail -n +2 | wc -l)
+mod_count=$(wc -l < /proc/modules)
 if [ "${mod_count}" -gt 0 ]; then
     pass "${mod_count} kernel modules loaded under MODULE_SIG_FORCE"
 else
