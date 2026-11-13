@@ -63,14 +63,15 @@ class LauncherTest(unittest.TestCase):
                 # One build per host: a bitbake target is refused while a
                 # bitbake process runs, whatever its board or build directory.
                 (root / "fake/bin").mkdir(parents=True)
-                (root / "fake/bin/bitbake").write_text("#!/bin/sh\nexec sleep 30\n")
+                # No exec: the process must keep its .../bin/bitbake command line.
+                (root / "fake/bin/bitbake").write_text("#!/bin/sh\nsleep 30\n")
                 (root / "fake/bin/bitbake").chmod(0o755)
                 fake = subprocess.Popen([str(root / "fake/bin/bitbake")])
                 time.sleep(0.2)
                 refused = start("busy", "dev")
                 self.assertNotEqual(refused.returncode, 0)
                 self.assertIn("one build at a time", refused.stderr)
-                fake.kill()
+                fake.terminate()
                 fake.wait()
                 fake = None
                 # Keep this first pane so the tmux server persists with an

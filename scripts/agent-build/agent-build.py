@@ -29,7 +29,7 @@ SELF = Path(__file__).resolve()
 SOCKET = "edge-builds"
 DEFAULT_BOARD = "rzv2l"  # the Makefile's BOARD default
 # Makefile targets that end up running bitbake; keep in step with the Makefile
-# and .claude/hooks/no-parallel-bitbake.py.
+# and the parallel-build hook's MAKE_BUILD_TARGETS.
 BUILD_TARGETS = {"base", "dev", "prod", "bundle", "parse", "layers", "shell", "ci",
                  "kernel-config-export", "kernel-hardening-check"}
 RUNNING = r"bin/(bitbake|bitbake-server|kas|kas-container)( |$)"
