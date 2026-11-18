@@ -13,9 +13,8 @@ EDGE_HOSTNAME ?= "edge-ventunoq"
 EDGE_KHC_BOARD ?= "ventuno-q"
 
 # --- Accelerator ---------------------------------------------------------
-# Hexagon NPU through FastRPC. No accelerator stack for it in this layer;
-# the allowlist is empty.
-EDGE_ACCEL_SUPPORTED = ""
+# Hexagon NPU (HTP v75) through QNN over FastRPC (kas/accel/qnn-htp-v75.yml).
+EDGE_ACCEL_SUPPORTED = "qnn-htp-v75"
 
 # --- Network interface roles --------------------------------------------
 # One wired interface (stmmac / dwmac-qcom-ethqos) and it is the uplink.
@@ -53,10 +52,6 @@ EDGE_DATA_IMAGE_SIZE_MB = "256"
 # the UKI that carries the dm-verity root hash (ADR-0016 §2).
 EDGE_BOOT_ANCHOR = "none"
 
-# --- Accelerator selection ----------------------------------------------
-# No accelerator stack is composed for this board.
-EDGE_ALLOW_NO_ACCEL = "1"
-
 # --- Slot payload -------------------------------------------------------
 # One UKI per slot embeds this DTB; the dm-verity slot holds the Qualcomm
 # DSP/NPU userspace, hence 8 GiB.
@@ -82,10 +77,11 @@ IMAGE_INSTALL:remove = "virtual-ota-uboot-env u-boot-fw-utils"
 # gated on the wifi and bluetooth DISTRO_FEATURES, which the distro does not
 # set, so it is listed here, with the udev rule naming the RGB LEDs.
 EDGE_MACHINE_EXTRA_INSTALL ?= "linux-firmware-ath11k-qca2066 linux-firmware-qca-qca2066 wireless-regdb-static edge-ventunoq-leds"
-# Dev tier: the MCU RPC router, the FastRPC DSP daemons, Wi-Fi and Bluetooth
-# userspace. BlueZ is dev-only here; Bluetooth as a product feature would be the
-# distro `bluetooth` feature instead.
-EDGE_MACHINE_DEV_INSTALL = "arduino-router fastrpc iw wpa-supplicant bluez5"
+# Dev tier: the MCU RPC router, Wi-Fi and Bluetooth userspace. BlueZ is
+# dev-only here; Bluetooth as a product feature would be the distro
+# `bluetooth` feature instead. The FastRPC DSP userspace comes with the
+# accelerator packagegroup on every tier.
+EDGE_MACHINE_DEV_INSTALL = "arduino-router iw wpa-supplicant bluez5"
 
 # --- Static IDs ---------------------------------------------------------
 # meta-qcom adds system groups the shared table does not list; a board

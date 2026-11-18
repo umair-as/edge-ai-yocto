@@ -1,0 +1,42 @@
+# Accelerator fragment: Qualcomm Hexagon NPU through QNN, HTP backend v75
+# (Arduino VENTUNO Q, QCS8275).
+#
+# Selects the accelerator; it adds no layer. meta-qcom (kas/bsp/qcom.yml)
+# carries the QAIRT SDK (qairt-sdk) and the FastRPC userspace (fastrpc), and
+# the project glue -- packagegroup, inference Quadlet -- lives in
+# meta-edge-bsp/dynamic-layers/qcom/, parsed only with meta-qcom composed.
+#
+#   make dev BOARD=ventuno-q              # the machine fragment composes this
+#
+# The name binds the HTP generation: the DSP-side skels are per Hexagon
+# version, so a v73 or v79 SoC is a different accelerator entry. EDGE_ACCEL is
+# checked against the machine's EDGE_ACCEL_SUPPORTED in edge-image.bbclass.
+#
+# QAIRT is under Qualcomm's qcom-ai-stack licence: the recipes and this
+# composition are publishable, an image or bundle carrying the SDK is not.
+#
+# Models are not part of the image. The inference Quadlet reads its payload
+# from /data/qnn-htp and skips cleanly when that path is absent.
+header:
+  version: 19
+
+local_conf_header:
+  accel_qnn_htp_v75: |
+    EDGE_ACCEL = "qnn-htp-v75"
+
+    # /dev/fastrpc-cdsp is root:fastrpc 0640 and libcdsprpc opens it
+    # read-only; /dev/dma_heap/system carries a g:fastrpc ACL (meta-qcom
+    # fastrpc udev rule). fastrpc alone gives edge-ctr both. Applied at image
+    # assembly by edge-users.inc.
+    EDGE_ACCEL_SUPPLEMENTARY_GROUPS = "fastrpc:edge-ctr"
+    # qairt-sdk ships its own instruments (qnn-net-run, qnn-platform-validator,
+    # qnn-profile-viewer).
+    EDGE_ACCEL_TEST_INSTALL = ""
+
+    # qairt-sdk recommends the skels for every Hexagon generation it supports;
+    # this SoC runs v75 only (the packagegroup installs that one).
+    BAD_RECOMMENDATIONS:append = " qairt-sdk-hexagon-v66 qairt-sdk-hexagon-v68 qairt-sdk-hexagon-v73"
+
+    # QAIRT is proprietary: images and bundles carrying it are not
+    # redistributable. Consumed by edge-image.bbclass.
+    EDGE_ACCEL_PROPRIETARY = "1"

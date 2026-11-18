@@ -731,11 +731,13 @@ fi
 
 # Every board carries one; which one is read from the image, not assumed.
 # DRP-AI (RZ/V2L): kernel-module-drpai + render-group nodes. DX-M1 (RPi5):
-# edge-dxm1-runtime's udev rule + dxrtd + the PCIe endpoint.
+# edge-dxm1-runtime's udev rule + dxrtd + the PCIe endpoint. Hexagon NPU
+# (VENTUNO Q): the QNN HTP host runtime + the FastRPC compute-DSP node.
 accel="none"
 drpai_ko=$(find "/lib/modules/$(uname -r)" -name 'drpai.ko*' 2>/dev/null | head -1)
 [ -n "${drpai_ko}" ] && accel="drpai-v2l"
 [ -f /etc/udev/rules.d/71-edge-dxm1.rules ] && accel="dxm1"
+[ -e /usr/lib/libQnnHtp.so ] && [ -e /dev/fastrpc-cdsp ] && accel="qnn-htp-v75"
 
 section "Accelerator (${accel})"
 
@@ -851,6 +853,46 @@ if [ "${accel}" = "dxm1" ]; then
         pass "podman-user-wait no-op drop-in present (no 90s inference delay)"
     else
         warn "podman-user-wait no-op drop-in missing — first inference likely delayed ~90s at boot"
+    fi
+elif [ "${accel}" = "qnn-htp-v75" ]; then
+    cdsp_state=""
+    for r in /sys/class/remoteproc/remoteproc*; do
+        [ "$(cat "${r}/name" 2>/dev/null)" = "cdsp" ] && cdsp_state=$(cat "${r}/state" 2>/dev/null)
+    done
+    [ "${cdsp_state}" = "running" ] \
+        && pass "compute DSP (cdsp) remoteproc running" \
+        || fail "cdsp remoteproc not running (state: ${cdsp_state:-absent})"
+    # libcdsprpc opens the node read-only, so group read is enough.
+    l=$(ls -l /dev/fastrpc-cdsp)
+    if printf '%s' "${l}" | grep -E '^crw-r[-w]----.* root fastrpc ' >/dev/null; then
+        pass "/dev/fastrpc-cdsp root:fastrpc ($(printf '%s' "${l}" | awk '{print $1}'))"
+    else
+        fail "/dev/fastrpc-cdsp not root:fastrpc group-readable: ${l}"
+    fi
+    if command -v getfacl >/dev/null 2>&1; then
+        getfacl -p /dev/dma_heap/system 2>/dev/null | grep -x 'group:fastrpc:rw-' >/dev/null \
+            && pass "/dev/dma_heap/system grants group fastrpc rw (ACL)" \
+            || fail "/dev/dma_heap/system lacks the g:fastrpc ACL — the DSP cannot map buffers"
+    else
+        warn "getfacl absent — dma_heap ACL not inspected"
+    fi
+    id -nG edge-ctr 2>/dev/null | tr ' ' '\n' | grep -x fastrpc >/dev/null \
+        && pass "edge-ctr is in fastrpc (rootless passthrough via keep-groups)" \
+        || fail "edge-ctr is not in the fastrpc group"
+    # The DSP runs a calculator skel shipped with QAIRT: proves FastRPC, the
+    # skel search path and the HTP v75 core, with no model.
+    if command -v qnn-platform-validator >/dev/null 2>&1; then
+        pv_dir=$(mktemp -d)
+        pv=$(cd "${pv_dir}" && timeout 60 qnn-platform-validator --backend dsp --testBackend --coreVersion \
+                 --targetPath "${pv_dir}" 2>&1 | tr -d '\r')
+        rm -rf "${pv_dir}"
+        if printf '%s' "${pv}" | grep -q 'Unit Test on the backend DSP: Passed'; then
+            pass "qnn-platform-validator: DSP unit test passed ($(printf '%s' "${pv}" | sed -n 's/^Core Version of the backend DSP: //p'))"
+        else
+            fail "qnn-platform-validator DSP unit test did not pass: $(printf '%s' "${pv}" | grep -m1 -iE 'error|fail' )"
+        fi
+    else
+        fail "qnn-platform-validator missing — qairt-sdk not installed"
     fi
 elif [ "${accel}" = "none" ]; then
     composed=$(sed -n 's/^EDGE_ACCEL=//p' /etc/buildinfo 2>/dev/null)
