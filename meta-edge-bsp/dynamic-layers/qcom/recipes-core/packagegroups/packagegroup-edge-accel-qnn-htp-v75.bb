@@ -1,7 +1,7 @@
 SUMMARY     = "Hexagon NPU inference enablement: QNN HTP v75 runtime + FastRPC"
 DESCRIPTION = "On-device Qualcomm QNN stack for the QCS8275 Hexagon NPU: the FastRPC \
-userspace, the QAIRT host runtime and tools, and the HTP v75 DSP skels. Models \
-are layered on top from /data."
+userspace, the QAIRT host runtime and tools, the HTP v75 DSP skels and the \
+rootless inference Quadlet. Models are layered on top from /data."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "libs"
 LICENSE     = "MIT"
@@ -18,4 +18,5 @@ RDEPENDS:${PN} = " \
     fastrpc \
     qairt-sdk \
     qairt-sdk-hexagon-v75 \
+    edge-qnn-htp-quadlet \
 "

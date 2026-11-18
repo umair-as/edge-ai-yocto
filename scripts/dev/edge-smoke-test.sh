@@ -894,6 +894,27 @@ elif [ "${accel}" = "qnn-htp-v75" ]; then
     else
         fail "qnn-platform-validator missing — qairt-sdk not installed"
     fi
+    if sudo -n test -f /data/qnn-htp/model/model.bin 2>/dev/null; then
+        pass "/data/qnn-htp inference payload present"
+        qn_unit=$(sudo -n -u edge-ctr env XDG_RUNTIME_DIR=/run/user/608 systemctl --user show qnn-htp-inference.service \
+                      -p ActiveState -p Result -p ExecMainStatus -p ConditionResult 2>/dev/null)
+        qn_prop() { printf '%s\n' "${qn_unit}" | sed -n "s/^$1=//p"; }
+        qn_ms=$(sudo -n journalctl _UID=608 -b --no-pager -o cat SYSLOG_IDENTIFIER=systemd-qnn-htp-inference 2>/dev/null \
+                    | sed -n 's/^ *NetRun: \([0-9]*\) us$/\1/p' | tail -1)
+        if [ -z "${qn_unit}" ]; then
+            fail "cannot read qnn-htp-inference.service state (edge-ctr user manager not reachable)"
+        elif [ "$(qn_prop ConditionResult)" != yes ]; then
+            fail "payload present but qnn-htp-inference.service did not start this boot (start condition unmet)"
+        else
+            case "$(qn_prop ActiveState)/$(qn_prop Result)" in
+                inactive/success) pass "QNN HTP inference completed this boot (NetRun average ${qn_ms:-?} us)" ;;
+                activating/* | active/*) warn "qnn-htp-inference.service still running" ;;
+                *) fail "qnn-htp-inference.service failed (ActiveState=$(qn_prop ActiveState) Result=$(qn_prop Result) ExecMainStatus=$(qn_prop ExecMainStatus))" ;;
+            esac
+        fi
+    else
+        info "no /data/qnn-htp payload — Quadlet skips (expected on a fresh flash; stage model/model.bin + inputs there to enable)"
+    fi
 elif [ "${accel}" = "none" ]; then
     composed=$(sed -n 's/^EDGE_ACCEL=//p' /etc/buildinfo 2>/dev/null)
     allowed=$(sed -n 's/^EDGE_ALLOW_NO_ACCEL=//p' /etc/buildinfo 2>/dev/null)
