@@ -10,5 +10,8 @@ header:
   version: 19
   includes:
     - kas/bsp/qcom.yml
+    # The Hexagon NPU is part of the QCS8275, so the machine composes it like
+    # the BSP rather than as a capability flag.
+    - kas/accel/qnn-htp-v75.yml
 
 machine: ventuno-q
