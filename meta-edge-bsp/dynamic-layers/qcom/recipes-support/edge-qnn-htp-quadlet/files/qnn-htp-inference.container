@@ -29,10 +29,11 @@ Volume=/usr:/host/usr:ro
 Volume=/usr/share/qcom:/usr/share/qcom:ro
 Volume=/data/qnn-htp:/qnn-htp:ro
 # Output tensors and the profiling log, readable on the host under edge-ctr's
-# state directory.
+# state directory. qnn-net-run numbers a new profiling log per run when older
+# ones exist; they are cleared first so _0 is this run's.
 Volume=%S/qnn-htp-inference:/out
 WorkingDir=/qnn-htp
-Exec=/bin/sh -c 'ld=/host/usr/lib/ld-linux-aarch64.so.1; \
+Exec=/bin/sh -c 'ld=/host/usr/lib/ld-linux-aarch64.so.1; rm -f /out/qnn-profiling-data*.log; \
     "$$ld" --library-path /host/usr/lib /host/usr/bin/qnn-net-run --backend libQnnHtp.so \
         --retrieve_context model/model.bin --input_list input_list.txt --output_dir /out \
         --profiling_level basic --perf_profile burst && \
