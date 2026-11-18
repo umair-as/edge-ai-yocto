@@ -21,17 +21,17 @@ through a shipped Quadlet. The model is compiled on the host from ONNX.
 
 ## Architecture
 
-```
-kas/machines/ventuno-q.yml ─includes─▶ kas/accel/qnn-htp-v75.yml
-                                          │ EDGE_ACCEL=qnn-htp-v75, EDGE_ACCEL_PROPRIETARY=1,
-                                          │ EDGE_ACCEL_SUPPLEMENTARY_GROUPS=fastrpc:edge-ctr
-                                          ▼
-edge-image.bbclass ─▶ packagegroup-edge-accel-qnn-htp-v75
-                        ├─ fastrpc                (meta-qcom: libcdsprpc.so.1, cdsprpcd, udev rules)
-                        ├─ qairt-sdk              (meta-qcom: libQnnHtp.so, libQnnHtpV75Stub.so, qnn-net-run, ...)
-                        ├─ qairt-sdk-hexagon-v75  (meta-qcom: libQnnHtpV75Skel.so, ... under /usr/share/qcom)
-                        └─ edge-qnn-htp-quadlet   (/etc/containers/systemd/users/608/qnn-htp-inference.container)
-```
+`kas/machines/ventuno-q.yml` includes `kas/accel/qnn-htp-v75.yml`, which sets
+`EDGE_ACCEL=qnn-htp-v75`, `EDGE_ACCEL_PROPRIETARY=1` and
+`EDGE_ACCEL_SUPPLEMENTARY_GROUPS=fastrpc:edge-ctr`. `edge-image.bbclass` then
+installs `packagegroup-edge-accel-qnn-htp-v75`:
+
+| Package | Source | Carries |
+|---|---|---|
+| `fastrpc` | meta-qcom | `libcdsprpc.so.1`, `cdsprpcd`, udev rules |
+| `qairt-sdk` | meta-qcom | `libQnnHtp.so`, `libQnnHtpV75Stub.so`, `qnn-net-run` and the other `qnn-*` tools |
+| `qairt-sdk-hexagon-v75` | meta-qcom | `libQnnHtpV75Skel.so` and the other DSP-side libraries under `/usr/share/qcom` |
+| `edge-qnn-htp-quadlet` | meta-edge-bsp | `/etc/containers/systemd/users/608/qnn-htp-inference.container` |
 
 At run time `libQnnHtp.so` loads the v75 stub, the stub opens
 `/dev/fastrpc-cdsp`, and libcdsprpc serves the skel files to the DSP from the
@@ -80,12 +80,12 @@ change in the image needs the binary regenerated.
 
 The reference model is `resnet18-v1-7.onnx` from the ONNX model zoo, the
 model the DRP-AI path compiles. Host tooling is the QAIRT SDK of the same
-release as the image (2.50.0.260828, the archive meta-qcom fetches), on
-Ubuntu 24.04 with Python 3.12 in a virtual environment holding the
+release as the image (2.50.0.260828, the archive meta-qcom fetches), on a
+host the SDK supports, with Python 3.12 in a virtual environment holding the
 dependency versions the SDK's `bin/check-python-dependency` and
 `docs/QAIRT-Docs/QNN/general/setup/linux_setup.html` list (including
 `onnx` 1.19.1 and `onnxruntime` 1.23.2). The converter's Python extension
-links `libc++.so.1` (Ubuntu `libc++1-18`), and its ONNX frontend imports
+links `libc++.so.1` (LLVM libc++), and its ONNX frontend imports
 `distutils`, which Python 3.12 provides only through `setuptools`.
 
 1. Preprocess inputs: resize the short side to 256, centre-crop 224, RGB,
@@ -149,5 +149,5 @@ Failure behaviour, same images:
 - The calibration set for the reference model is crops of the two evaluation
   images; it shows the quantised graph matches fp32, not quantisation quality
   over a dataset.
-- `qairt-sdk` is one package of about 530 MiB installed; the image carries
-  its GPU, LPAI, SNPE and Genie libraries alongside the HTP runtime.
+- `qairt-sdk` is one package: the image carries its GPU, LPAI, SNPE and Genie
+  libraries alongside the HTP runtime.

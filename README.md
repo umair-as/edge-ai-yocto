@@ -17,7 +17,7 @@
 
 ## What makes it notable
 
-- 🧠 **Container-native NPU inference.** On every board, the board's neural accelerator runs inside a rootless Podman container under a dedicated system principal — no root, no capability widening, a per-principal subuid namespace. Validated on hardware: RZ/V2L DRP-AI at 27 ms/frame (ResNet18); Raspberry Pi 5 DX-M1 at 271.88 FPS (YOLOv5S 640×640, benchmark mode) through a rootless Quadlet reaching the host's accelerator daemon over a bind-mounted IPC socket; VENTUNO Q Hexagon NPU at 2.97 ms/inference (ResNet18 int8, QNN HTP context binary) with the same rootless Quadlet pattern.
+- 🧠 **Container-native NPU inference.** On every board, the board's neural accelerator runs inside a rootless Podman container under a dedicated system principal — no root, no capability widening, a per-principal subuid namespace. Validated on hardware: RZ/V2L DRP-AI at 27 ms/frame (ResNet18); Raspberry Pi 5 DX-M1 at 271.88 FPS (YOLOv5S 640×640, benchmark mode) through a rootless Quadlet reaching the host's accelerator daemon over a bind-mounted IPC socket; VENTUNO Q Hexagon NPU at 2.97 ms/inference (ResNet18 int8, QNN HTP context binary, burst profile, mean of 200) with the same rootless Quadlet pattern.
 
 - 🔒 **Signed boot chain.** On RZ/V2L and the Pi, U-Boot verifies an RSA-2048-signed FIT image against a key in its control DTB (on RZ/V2L after TF-A from the Renesas CIP fork and OP-TEE as BL32). A file key covers the dev profile; the signing slot is designed for HSM/YubiKey-ROT in production. Every board mounts its rootfs through dm-verity; the VENTUNO Q has no secure boot, so there verity detects corruption but does not authenticate the image.
 
