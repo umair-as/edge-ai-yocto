@@ -4,8 +4,8 @@ How to validate the RAUC A/B update *failure* paths on RZ/V2L hardware: not
 that an update installs, but that a **bad** update, an interrupted install, or
 a power loss leaves the board on a known-good slot.
 
-This backs the CRA availability control (`docs/security/CRA-CONTROLS.md`, 8.a —
-"A/B rootfs with rollback"). The success path (install → boot new slot →
+This backs the availability control 8.a, "A/B rootfs with rollback", of
+[`security-baseline.md`](../security/security-baseline.md). The success path (install → boot new slot →
 mark-good) is exercised by every OTA smoke test; this plan covers the paths a
 smoke test never triggers.
 
@@ -252,7 +252,7 @@ crash never persisted to journal/pstore.
 ## References
 
 - [`ota-updates.md`](ota-updates.md) — the OTA + rollback reference this plan backs.
-- `docs/security/CRA-CONTROLS.md` — 8.a availability control this validates.
+- [`docs/security/security-baseline.md`](../security/security-baseline.md) — 8.a availability control this validates.
 - `docs/adr/0005-image-class-ota-backend.md` — `virtual-ota-confirm-boot` (health-gated mark-good) deferral.
 - `docs/security/uboot-hardening.md` — U-Boot env layout, bootcount variables.
 - `meta-edge-bsp/recipes-bsp/u-boot/files/rauc-uboot-env.defaults.in` — the slot-selection state machine.

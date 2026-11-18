@@ -389,7 +389,7 @@ The total CVE count is context. It is not an acceptance criterion.
   as not affected without a check for each CVE
   ([`kernel-cve-triage.md`](kernel-cve-triage.md)).
 - The process has no response-time commitment, no report intake and no coordinated
-  disclosure procedure ([`CRA-CONTROLS.md`](CRA-CONTROLS.md), Part II).
+  disclosure procedure ([`security-baseline.md`](security-baseline.md#vulnerability-handling-process)).
 
 ## References
 

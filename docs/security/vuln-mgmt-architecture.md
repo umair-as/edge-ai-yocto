@@ -1,22 +1,20 @@
 # Vulnerability-management architecture
 
-Decision record for the CRA vulnerability-management workstream on this
+Decision record for the vulnerability-management workstream on this
 distro (Yocto wrynose 6.0). SBOM generation and the CVE check are wired at
 distro level and apply to every board; the measurements below were taken
 on `smarc-rzv2l` and are labelled as such, the Raspberry Pi 5
 (`raspberrypi5`, mainline 6.18 kernel) has no measured baseline. It
 states the decisions in force,
-the measured baseline they rest on, and the questions still open. Vulnerability
-handling here maps to CRA Annex I §2 (no known exploitable vulnerabilities) and
-the Part II vulnerability-handling requirements; the draft horizontal standard
-for the latter is prEN 40000-1-3. [`CRA-CONTROLS.md`](CRA-CONTROLS.md) holds the
-requirements view.
+the measured baseline they rest on, and the questions still open.
+[`security-baseline.md`](security-baseline.md) §2 and its "Vulnerability
+handling process" section hold the control status.
 
 Companions: [`cve-triage.md`](cve-triage.md) (the CVE workflow and
 disposition policy), [`vex-and-cve-status.md`](vex-and-cve-status.md) (what
 dispositions assert publicly via VEX), [`sbom-analysis.md`](sbom-analysis.md)
 (the SBOM workflow), and
-[`foss-cra-tooling-survey.md`](foss-cra-tooling-survey.md) (the tooling
+[`vuln-tooling-survey.md`](vuln-tooling-survey.md) (the tooling
 landscape the stack is drawn from).
 
 ## Pipeline
@@ -73,7 +71,7 @@ a principle that held even while, under the since-resolved propagation gap
 (historical section below), the report did not reflect that status. A
 status is never swapped for a different, tool-honoured value just to make a
 finding disappear — that would put a false statement into the audit record the
-CRA vulnerability-handling process depends on.
+vulnerability-handling process depends on.
 
 ### D4 — No unreviewed automated suppression lands
 Tools may propose dispositions, and some can technically write `CVE_STATUS`

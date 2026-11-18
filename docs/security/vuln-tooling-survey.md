@@ -1,27 +1,14 @@
-# FOSS CRA vulnerability-management tooling — landscape
+# Vulnerability-management tooling — landscape
 
-A factual survey of the FOSS tools relevant to CRA vulnerability management on a
+A factual survey of the FOSS tools relevant to vulnerability management on a
 Yocto distro, and the one constraint that shapes the pipeline: SPDX 3.0.1
 ingestion. Tools and format support are verified against upstream docs as of
 2026-07; the ecosystem moves fast, so re-check version-pinned claims before
 relying on them.
 
 Companion to [`cve-triage.md`](cve-triage.md), [`sbom-analysis.md`](sbom-analysis.md),
-and [`CRA-CONTROLS.md`](CRA-CONTROLS.md). The pipeline this repo actually runs is
-in [`vuln-mgmt-architecture.md`](vuln-mgmt-architecture.md).
-
-## CRA context
-
-| Date | Obligation |
-|---|---|
-| **11 Sep 2026** | Vulnerability/incident reporting applies (Art. 14): 24 h early warning / 72 h notification / 14-day final report, via the ENISA Single Reporting Platform (Art. 16). |
-| **11 Dec 2027** | Full obligations, including Annex I essential requirements and the machine-readable SBOM duty. |
-
-The CRA requires an SBOM in a "commonly used, machine-readable format" (Annex I
-Part II §1) but does not pin SPDX or CycloneDX; the Commission may specify a
-format later via delegated acts. Vulnerability handling maps to Annex I Part II,
-whose horizontal standard is the draft **prEN 40000-1-3** (public enquiry closed
-9 Feb 2026, harmonised-EN targeted late 2026, not yet OJEU-cited).
+and [`security-baseline.md`](security-baseline.md). The pipeline this repo actually
+runs is in [`vuln-mgmt-architecture.md`](vuln-mgmt-architecture.md).
 
 ## SPDX 3.0.1 ingestion — the constraint that shapes the pipeline
 
@@ -95,9 +82,6 @@ SPDX 3.0.1.
 
 ## Sources
 
-- **CRA / regulatory** — `digital-strategy.ec.europa.eu/en/policies/{cra-reporting,cra-summary,cra-standardisation}`;
-  Regulation (EU) 2024/2847 (Annex I/II); ENISA Single Reporting Platform;
-  Agoria prEN 40000-1-3 public enquiry.
 - **Formats & scanners** — `trivy.dev/docs`; `oss.anchore.com` (Grype, syft);
   `github.com/anchore/syft` (PR #4269); `github.com/protobom/protobom`;
   `github.com/CycloneDX/cyclonedx-cli` (#424); `pypi.org/project/lib4sbom`;

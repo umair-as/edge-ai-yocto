@@ -28,7 +28,7 @@ keys/
 # Never commit them; treat as ephemeral dev material.
 /keys/dev/
 
-# === Security tooling (CRA spike) ===
+# === Vulnerability scanners ===
 # Pinned scanner binaries: installed by scripts/install-scanners.sh, never
 # committed. The script is the version manifest; the binaries are ephemeral.
 .tooling/

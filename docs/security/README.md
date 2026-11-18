@@ -1,6 +1,6 @@
 # EDGE AI OS — Security Posture
 
-EDGE AI OS is designed to satisfy the essential cybersecurity requirements of EU Cyber Resilience Act (CRA) Annex I on real hardware: the Renesas RZ/V2L SMARC EVK (the first board, where every control below was first validated) and the Raspberry Pi 5 with the DEEPX DX-M1 accelerator (the second board, on a mainline kernel). Controls are distro-level unless a document says otherwise; the U-Boot hardening and OP-TEE documents are RZ/V2L-specific (the Pi runs oe-core U-Boot with its own Kconfig fragments and has no OP-TEE), and measurements quoted from a board are labelled with it. The design goals are:
+EDGE AI OS applies an embedded Linux security baseline, extended to the edge AI surface (model delivery, accelerator isolation, inference containers), on real hardware: the Renesas RZ/V2L SMARC EVK (the first board, where every control below was first validated) and the Raspberry Pi 5 with the DEEPX DX-M1 accelerator (the second board, on a mainline kernel). Controls are distro-level unless a document says otherwise; the U-Boot hardening and OP-TEE documents are RZ/V2L-specific (the Pi runs oe-core U-Boot with its own Kconfig fragments and has no OP-TEE), and measurements quoted from a board are labelled with it. The design goals are:
 
 - Every credential is **operator-supplied**, not committed.
 - The normal boot path verifies a signed kernel, DTB, and root hash at U-Boot,
@@ -8,12 +8,14 @@ EDGE AI OS is designed to satisfy the essential cybersecurity requirements of EU
   measured: on RZ/V2L, TF-A is built with `TRUSTED_BOARD_BOOT=0` and
   `MEASURED_BOOT=0`; on the Pi, the firmware loads U-Boot unauthenticated.
 - The runtime is **CIS Level 1-aligned by default**, with additional hardening controls on the prod-tier roadmap.
-- Every control is **documented and verifiable on-board**, so the implementation can be mapped to CRA Annex I requirements.
+- Every control is **documented and verifiable on-board**, with its status in one table.
 
 Documents here:
 
 - [`README.md`](README.md) — this orientation page.
-- [`CRA-CONTROLS.md`](CRA-CONTROLS.md) — per-requirement status table.
+- [`security-baseline.md`](security-baseline.md) — the security baseline:
+  model delivery, accelerator isolation, the reach of a compromised inference
+  container, and the per-control status of the platform.
 - [`uboot-hardening.md`](uboot-hardening.md) — U-Boot surface-reduction
   architecture, feature tokens, and per-symbol rationale.
 - [`selinux-101.md`](selinux-101.md) — SELinux mental model + the
@@ -45,7 +47,7 @@ Documents here:
   license inventory and supply-chain gaps (`scripts/sbom-report.py`).
 - [`vuln-mgmt-architecture.md`](vuln-mgmt-architecture.md) — the
   vulnerability-management decisions, measured baseline, and open questions.
-- [`foss-cra-tooling-survey.md`](foss-cra-tooling-survey.md) — the FOSS
+- [`vuln-tooling-survey.md`](vuln-tooling-survey.md) — the FOSS
   vuln-management tooling landscape and the SPDX 3.0.1 ingestion constraint that
   shapes the pipeline.
 
@@ -108,7 +110,7 @@ auditctl -l | head                                               # rules loaded
 ausearch -k identity | tail                                      # try editing /etc/sudoers
 ```
 
-## Audit / compliance notes
+## Scope notes
 
 This is a public reference implementation. The password hash, SSH keys, and signing keys in your operator-private `kas/local.yml` are the only credentials that should exist for a given build. Do not share or commit `local.yml`.
 

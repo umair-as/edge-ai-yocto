@@ -62,7 +62,7 @@ IMAGE_FEATURES += " \
 IMAGE_FEATURES += "${@bb.utils.contains('EDGE_ENABLE_DISPLAY', '1', 'weston', '', d)}"
 # Login policy: edge-users.inc and edge-sudoers. empty-root-password,
 # allow-empty-password, allow-root-login and serial-autologin-root are not
-# set: CRA-incompatible defaults.
+# set: each one gives an unauthenticated root path on a shipped device.
 
 IMAGE_LINGUAS = "en-us"
 
