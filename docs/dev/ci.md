@@ -15,7 +15,7 @@ keys and non-conventional commit subjects at commit time.
 
 ## `make check`
 
-`scripts/ci/check.sh`, against `main` (`CHECK_BASE=` to change it):
+`scripts/ci/check.sh`, against `origin/main` (`CHECK_BASE=` to change it):
 
 - repository invariants (`scripts/ci/repo-lint.sh`): wrynose override syntax,
   `Upstream-Status` on every patch, no agent paths, host home paths or key
