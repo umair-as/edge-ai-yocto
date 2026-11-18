@@ -4,14 +4,20 @@
 # RESULT line quoted in the PR body.
 #
 # Selftests that take tens of seconds run only when the tool they cover, or
-# the selftest itself, differs from CHECK_BASE (default main), including
-# uncommitted changes. CHECK_ALL=1 runs them unconditionally.
+# the selftest itself, differs from CHECK_BASE (default origin/main, else
+# main), including uncommitted changes. CHECK_ALL=1 runs them unconditionally.
 set -u
 
 ROOT=$(git rev-parse --show-toplevel) || exit 1
 cd "$ROOT" || exit 1
 
-BASE="${CHECK_BASE:-main}"
+if [ -n "${CHECK_BASE:-}" ]; then
+    BASE=$CHECK_BASE
+elif git rev-parse --quiet --verify origin/main >/dev/null; then
+    BASE=origin/main
+else
+    BASE=main
+fi
 failed=()
 passed=0
 skipped=()
