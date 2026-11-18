@@ -1,7 +1,7 @@
 [project]
-name = "edge-cra-tooling"
+name = "edge-vuln-tooling"
 version = "0.1.0"
-description = "CRA vulnerability-management analysis tooling for the edge-ai distro (SBOM/CVE triage, multi-scanner reconciliation, VEX)."
+description = "Vulnerability-management analysis tooling for the edge-ai distro (SBOM/CVE triage, multi-scanner reconciliation, VEX)."
 requires-python = ">=3.12"
 # Intentionally dependency-free: the analysis scripts in scripts/
 # (cve-report, sbom-report, cve-reconcile, cve-triage-funnel) are stdlib-only

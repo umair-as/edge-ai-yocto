@@ -43,7 +43,7 @@ local_conf_header:
   edge_credentials: |
     # REQUIRED. Build fails noisily if EDGE_DEFAULT_PASSWORD_HASH is unset
     # OR if it doesn't parse as a valid sha512crypt digest. Sets the
-    # password for root + devel (same hash; CRA "one of each device").
+    # password for root + devel (same hash).
     # Generate the hash with:
     #     openssl passwd -6 'your-password'
     # or:

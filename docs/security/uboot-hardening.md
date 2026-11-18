@@ -1,9 +1,9 @@
 # U-Boot hardening
 
 Architecture, design decisions, and implementation reference for
-U-Boot surface reduction on the EDGE AI OS distro. Maps to CRA Annex I
-Part I §1 (minimum attack surface, hardened build flags) — see
-[CRA-CONTROLS.md](CRA-CONTROLS.md) for the requirements view.
+U-Boot surface reduction on the EDGE AI OS distro: the minimum attack
+surface and hardened build flags controls (§1) of
+[security-baseline.md](security-baseline.md).
 
 ---
 
@@ -465,18 +465,18 @@ remains future work; visible as part of the SBOM track.
 
 ---
 
-## CRA Annex I mapping
+## Security baseline mapping
 
-| Sub-requirement | Mechanism in this layer |
+| Control | Mechanism in this layer |
 |---|---|
-| §1.a — Minimum attack surface | `surface_reduce` + `net_off` remove unused U-Boot commands (usb, storage, loadb/loads, all net commands) and the USB host-controller drivers. Retained: the USB gadget side (`ums` eMMC flashing) and the net core — see the fragment sections above. |
-| §1.b — Hardened build flags | Deferred — `CONFIG_STACKPROTECTOR` is off pending a proof build (see "Explicit deferrals"). |
-| §1.c — Kernel hardening | The signed slot DTB activates SELinux and carries the dm-verity table. |
-| §1.d — Sysctl baseline | Out of scope here (kernel/runtime layer). See `CRA-CONTROLS.md` §1.d. |
-| §2.b — CVE scanning | U-Boot is in the SBOM (CPE `u-boot:u-boot`). `sbom-cve-check` runs at build. |
-| §5.b — Signed updates | Managed `bootm` verifies the slot FIT; legacy uImage format is off. Interactive-shell bypass remains. |
+| 1.a — Minimum attack surface | `surface_reduce` + `net_off` remove unused U-Boot commands (usb, storage, loadb/loads, all net commands) and the USB host-controller drivers. Retained: the USB gadget side (`ums` eMMC flashing) and the net core — see the fragment sections above. |
+| 1.b — Hardened build flags | Deferred — `CONFIG_STACKPROTECTOR` is off pending a proof build (see "Explicit deferrals"). |
+| 1.c — Kernel hardening | The signed slot DTB activates SELinux and carries the dm-verity table. |
+| 1.d — Sysctl baseline | Out of scope here (kernel/runtime layer). See `security-baseline.md` 1.d. |
+| 2.b — CVE scanning at build | U-Boot is in the SBOM (CPE `u-boot:u-boot`). `sbom-cve-check` runs at build. |
+| 6.b — Signed FIT image | Managed `bootm` verifies the slot FIT; legacy uImage format is off. Interactive-shell bypass remains. |
 
-See [CRA-CONTROLS.md](CRA-CONTROLS.md) for the full table.
+See [security-baseline.md](security-baseline.md) for the full table.
 
 ---
 
@@ -535,5 +535,5 @@ cat /proc/cmdline | grep -o 'security=selinux'
   managed env defaults (BOOT_ORDER, bootcmd, EXTRA_KERNEL_ARGS); the RPi5
   variant under `files/raspberrypi5/` has no legacy path and no
   `EXTRA_KERNEL_ARGS`.
-- [CRA-CONTROLS.md](CRA-CONTROLS.md) — CRA Annex I requirement table.
+- [security-baseline.md](security-baseline.md) — security baseline and control status.
 - [README.md](README.md) — security-posture orientation.

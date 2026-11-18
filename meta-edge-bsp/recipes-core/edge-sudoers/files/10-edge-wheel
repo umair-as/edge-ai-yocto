@@ -1,9 +1,9 @@
 # EDGE AI OS sudo policy — base/prod tier.
 #
 # Members of the wheel group can run any command as any user.
-# Password authentication is REQUIRED — no NOPASSWD: rule. Matches
-# CRA's "no default authorization escalation" intent and the project
-# rule that interactive admin work prompts.
+# Password authentication is REQUIRED — no NOPASSWD: rule. A stolen or
+# hijacked devel session does not escalate to root without the password,
+# and interactive admin work prompts.
 #
 # devel is added to wheel by edge-users.inc at image build time. To
 # onboard another admin, add them to wheel, never to this file.

@@ -1,9 +1,8 @@
 # OP-TEE userspace — what ships, and how to select it
 
 Design decisions and implementation reference for the normal-world OP-TEE
-stack on the EDGE AI OS distro. Maps to CRA Annex I Part I §1 (minimum
-attack surface) — see [CRA-CONTROLS.md](CRA-CONTROLS.md) for the
-requirements view.
+stack on the EDGE AI OS distro: the minimum attack surface control (1.a) of
+[security-baseline.md](security-baseline.md).
 
 This covers the **normal-world** half only: the client library, the
 supplicant, and the Trusted Applications installed into the image. The

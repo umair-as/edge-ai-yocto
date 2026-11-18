@@ -2,7 +2,7 @@
 # Install pinned FOSS vulnerability scanners into a repo-local .tooling/bin.
 #
 # Binaries are gitignored; this script is the committed, re-runnable source
-# of truth for which versions the CRA spike used. Re-run to reproduce the
+# of truth for which scanner versions are in use. Re-run to reproduce the
 # toolset on a fresh checkout. Idempotent: re-running re-installs the pins.
 #
 #   scripts/install-scanners.sh            # install everything pinned below
