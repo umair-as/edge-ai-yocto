@@ -15,9 +15,9 @@
 #                         to the snapshot under docs/security/kernel-config/
 #                         (--khc only; needs kernel-hardening-checker on PATH)
 #
-# Nothing runs unless the operator runs this. Hosted CI stays text-only
-# (.github/workflows/lint.yml); this is the Yocto half, on a host that has
-# the layer and sstate caches.
+# Nothing runs unless the operator runs this. The text-only checks are
+# `make check` (scripts/ci/check.sh); this is the Yocto half, on a host that
+# has the layer and sstate caches.
 #
 #   scripts/ci/local-check.sh                       # origin/main, quick matrix, post statuses
 #   scripts/ci/local-check.sh --ref pr/16           # a PR head; status lands in the PR checks

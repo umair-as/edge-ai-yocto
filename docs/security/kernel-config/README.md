@@ -30,11 +30,8 @@ The prod tier is the one under claim: the dev tier adds debug fragments
   kernel must carry (module signature enforcement, dm-verity, the LSM stack)
   are asserted independently by `do_edge_kernel_policy_assert`; a baseline
   entry cannot waive them.
-- **Hosted, on every change to this directory, the gate or a baseline**
-  (`.github/workflows/kernel-hardening.yml`): the same gate on the committed
-  snapshot, seconds, no build host.
-- **`khc` stage of the Yocto check** (`make ci CI_ARGS=--khc`, or the `khc`
-  input of the dispatched workflow — `docs/dev/ci.md`): re-derives the
+- **`khc` stage of the Yocto check** (`make ci CI_ARGS=--khc`,
+  [docs/dev/ci.md](../../dev/ci.md)): re-derives the
   `.config` on the build host, runs the gate, and fails if the snapshot here
   differs from the build. Snapshot freshness and hardening policy are
   different checks: an unrelated config change stales the snapshot without

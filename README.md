@@ -8,9 +8,6 @@
 [![Raspberry Pi 5](https://img.shields.io/badge/board-Raspberry%20Pi%205-blue.svg)](https://www.raspberrypi.com/products/raspberry-pi-5/)
 [![VENTUNO Q](https://img.shields.io/badge/board-Arduino%20VENTUNO%20Q-blue.svg)](docs/dev/emmc/ventuno-q.md)
 [![RAUC](https://img.shields.io/badge/OTA-RAUC-green.svg)](https://rauc.io/)
-[![Repo lint](https://github.com/umair-as/edge-ai-yocto/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/umair-as/edge-ai-yocto/actions/workflows/lint.yml)
-[![Kernel hardening](https://github.com/umair-as/edge-ai-yocto/actions/workflows/kernel-hardening.yml/badge.svg?branch=main)](https://github.com/umair-as/edge-ai-yocto/actions/workflows/kernel-hardening.yml)
-[![Yocto check](https://github.com/umair-as/edge-ai-yocto/actions/workflows/yocto.yml/badge.svg)](https://github.com/umair-as/edge-ai-yocto/actions/workflows/yocto.yml)
 
 </div>
 

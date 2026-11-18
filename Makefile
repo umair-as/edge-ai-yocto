@@ -1,4 +1,4 @@
-.PHONY: help base dev prod bundle bootchain-bundle bootloader-package parse layers shell info clean-lock netboot-sync lock verify-pins purge hooks ci kernel-config-export kernel-hardening-check cve
+.PHONY: help base dev prod bundle bootchain-bundle bootloader-package parse layers shell info clean-lock netboot-sync lock verify-pins purge hooks check ci kernel-config-export kernel-hardening-check cve
 
 KAS ?= kas
 
@@ -175,6 +175,9 @@ bootloader-package: | $(KAS_DIRS) ## RZ/V2L host package: BL2/FIP + manifest + u
 
 parse: | $(KAS_DIRS) ## bitbake -p (parse-only check; EDGE_PROFILE=, LAYOUT= apply)
 	$(call kas_run,EDGE_PROFILE=$(EDGE_PROFILE),bitbake -p)
+
+check: ## pre-PR gate: repo invariants, shellcheck, host selftests (no kas; scripts/ci/check.sh)
+	scripts/ci/check.sh
 
 ci: ## parse-check origin/main in a worktree, post commit statuses (CI_ARGS=…, docs/dev/ci.md)
 	scripts/ci/local-check.sh $(CI_ARGS)
