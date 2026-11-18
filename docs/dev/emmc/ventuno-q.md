@@ -154,18 +154,14 @@ other unit partitions) has not been run on this board.
   trust-anchor gate by design; the board builds dev images.
 - The image does not configure `wlan0` for the M.2 Wi-Fi card (QCA2066); a
   network unit and a `wpa_supplicant` configuration are supplied at runtime.
-- NPU inference is not integrated: the image builds without an accelerator
-  stack (`EDGE_ALLOW_NO_ACCEL`). The Hexagon DSPs run and their FastRPC device
-  nodes and daemons are present, but no inference runtime is installed.
 - A slot that hangs before userspace without resetting is not caught: no
   watchdog runs before Linux.
 
 ## Roadmap
 
-- NPU inference on the Hexagon NPU: an inference runtime (QNN, ONNX Runtime
-  with the QNN execution provider) in an accelerator stack composed by the
-  board, inference proven to run on the NPU, then the same workload rootless as
-  `edge-ctr`; `EDGE_ALLOW_NO_ACCEL` is then dropped.
+- ONNX Runtime with the QNN execution provider beside the native QNN path
+  ([docs/qnn-htp/](../../qnn-htp/README.md)), so ONNX models run on the NPU
+  without a host-side conversion.
 - Programming the STM32H5 co-processor from the image (the vendor uses
   `arduino-cli`).
 - A prod tier: a trust anchor for the UKIs and a KSPP kernel-config baseline.
