@@ -737,7 +737,7 @@ accel="none"
 drpai_ko=$(find "/lib/modules/$(uname -r)" -name 'drpai.ko*' 2>/dev/null | head -1)
 [ -n "${drpai_ko}" ] && accel="drpai-v2l"
 [ -f /etc/udev/rules.d/71-edge-dxm1.rules ] && accel="dxm1"
-[ -e /usr/lib/libQnnHtp.so ] && [ -e /dev/fastrpc-cdsp ] && accel="qnn-htp-v75"
+[ -e /usr/lib/libQnnHtp.so ] && accel="qnn-htp-v75"
 
 section "Accelerator (${accel})"
 
@@ -863,11 +863,15 @@ elif [ "${accel}" = "qnn-htp-v75" ]; then
         && pass "compute DSP (cdsp) remoteproc running" \
         || fail "cdsp remoteproc not running (state: ${cdsp_state:-absent})"
     # libcdsprpc opens the node read-only, so group read is enough.
-    l=$(ls -l /dev/fastrpc-cdsp)
-    if printf '%s' "${l}" | grep -E '^crw-r[-w]----.* root fastrpc ' >/dev/null; then
-        pass "/dev/fastrpc-cdsp root:fastrpc ($(printf '%s' "${l}" | awk '{print $1}'))"
+    if [ -e /dev/fastrpc-cdsp ]; then
+        l=$(ls -l /dev/fastrpc-cdsp)
+        if printf '%s' "${l}" | grep -E '^crw-r-----.* root fastrpc ' >/dev/null; then
+            pass "/dev/fastrpc-cdsp root:fastrpc 0640"
+        else
+            fail "/dev/fastrpc-cdsp not root:fastrpc 0640: ${l}"
+        fi
     else
-        fail "/dev/fastrpc-cdsp not root:fastrpc group-readable: ${l}"
+        fail "/dev/fastrpc-cdsp missing — the fastrpc driver did not bind the compute DSP"
     fi
     if command -v getfacl >/dev/null 2>&1; then
         getfacl -p /dev/dma_heap/system 2>/dev/null | grep -x 'group:fastrpc:rw-' >/dev/null \
