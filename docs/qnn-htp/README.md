@@ -51,6 +51,9 @@ boot when the payload is present:
   DSP skels, so `qnn-net-run` runs from the host's `/usr` (mounted read-only at
   `/host/usr`) through the host's loader:
   `/host/usr/lib/ld-linux-aarch64.so.1 --library-path /host/usr/lib`.
+  This host-loader path is interim (host glibc 2.43 vs trixie 2.41); it is
+  replaced by Yocto-built app containers under the container-base ADR (see
+  Roadmap).
 - `AddDevice=` passes `/dev/fastrpc-cdsp` and `/dev/dma_heap/system`;
   `GroupAdd=keep-groups` carries `edge-ctr`'s `fastrpc` membership in.
 - `Unmask=/sys/firmware`: libcdsprpc reads
@@ -151,3 +154,13 @@ Failure behaviour, same images:
   over a dataset.
 - `qairt-sdk` is one package: the image carries its GPU, LPAI, SNPE and Genie
   libraries alongside the HTP runtime.
+
+## Roadmap
+
+- Yocto-built app containers replace `debian:trixie-slim` and the host-loader
+  path: a container-base ADR (OCI images built with the platform, image
+  references pinned by build ID or digest, native systemd sandboxing as the
+  fallback option).
+- `qairt-sdk` split so the image carries only the HTP runtime.
+- An SELinux policy module for the container's `ioctl` on `fastrpc_device_t`
+  and `dma_device_t`.

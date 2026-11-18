@@ -8,7 +8,9 @@ ConditionPathExists=/data/qnn-htp/input_list.txt
 [Container]
 # Supplies only the namespaces: the QNN runtime runs from the host's /usr
 # through the host's loader, so its glibc (newer than trixie's) and the
-# FastRPC stub match the DSP skels from the same QAIRT build.
+# FastRPC stub match the DSP skels from the same QAIRT build. Interim: host
+# glibc 2.43 vs trixie 2.41; replaced by Yocto-built app containers
+# (container-base ADR).
 Image=docker.io/library/debian:trixie-slim
 Pull=missing
 Network=none
