@@ -1,0 +1,50 @@
+[Unit]
+Description=Hexagon NPU inference over QNN HTP (rootless, edge-ctr)
+# Model (QNN context binary) and inputs live on /data.
+After=data.mount
+ConditionPathExists=/data/qnn-htp/model/model.bin
+ConditionPathExists=/data/qnn-htp/input_list.txt
+
+[Container]
+# Supplies only the namespaces: the QNN runtime runs from the host's /usr
+# through the host's loader, so its glibc (newer than trixie's) and the
+# FastRPC stub match the DSP skels from the same QAIRT build.
+Image=docker.io/library/debian:trixie-slim
+Pull=missing
+Network=none
+
+# FastRPC compute-DSP node (root:fastrpc 0640, opened read-only) and the DMA
+# heap the DSP maps buffers from (g:fastrpc ACL). keep-groups carries
+# edge-ctr's fastrpc membership into the container.
+AddDevice=/dev/fastrpc-cdsp
+AddDevice=/dev/dma_heap/system
+GroupAdd=keep-groups
+# libcdsprpc reads /sys/firmware/devicetree/base/model to pick its
+# /usr/share/qcom/conf.d entry and fails device creation without it; podman
+# masks /sys/firmware, and a bind mount does not override the mask. /sys stays
+# read-only and efivarfs is not mounted inside.
+Unmask=/sys/firmware
+
+Volume=/usr:/host/usr:ro
+Volume=/usr/share/qcom:/usr/share/qcom:ro
+Volume=/data/qnn-htp:/qnn-htp:ro
+# Output tensors and the profiling log, readable on the host under edge-ctr's
+# state directory.
+Volume=%S/qnn-htp-inference:/out
+WorkingDir=/qnn-htp
+Exec=/bin/sh -c 'ld=/host/usr/lib/ld-linux-aarch64.so.1; \
+    "$$ld" --library-path /host/usr/lib /host/usr/bin/qnn-net-run --backend libQnnHtp.so \
+        --retrieve_context model/model.bin --input_list input_list.txt --output_dir /out \
+        --profiling_level basic --perf_profile burst && \
+    "$$ld" --library-path /host/usr/lib /host/usr/bin/qnn-profile-viewer \
+        --input_log /out/qnn-profiling-data_0.log | grep -A12 "Execute Stats (Average)"'
+
+# Run-once inference; no sd_notify from the runner.
+Notify=false
+
+[Service]
+Type=oneshot
+StateDirectory=qnn-htp-inference
+
+[Install]
+WantedBy=default.target
