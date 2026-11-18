@@ -880,12 +880,12 @@ elif [ "${accel}" = "qnn-htp-v75" ]; then
         && pass "edge-ctr is in fastrpc (rootless passthrough via keep-groups)" \
         || fail "edge-ctr is not in the fastrpc group"
     # The DSP runs a calculator skel shipped with QAIRT: proves FastRPC, the
-    # skel search path and the HTP v75 core, with no model.
+    # skel search path and the HTP v75 core, with no model. Run as edge-ctr:
+    # the login user is not in fastrpc and fails device creation by design.
     if command -v qnn-platform-validator >/dev/null 2>&1; then
-        pv_dir=$(mktemp -d)
-        pv=$(cd "${pv_dir}" && timeout 60 qnn-platform-validator --backend dsp --testBackend --coreVersion \
-                 --targetPath "${pv_dir}" 2>&1 | tr -d '\r')
-        rm -rf "${pv_dir}"
+        pv=$(sudo -n -u edge-ctr sh -c 'd=$(mktemp -d) && cd "$d" && timeout 60 qnn-platform-validator \
+                 --backend dsp --testBackend --coreVersion --targetPath "$d"; rc=$?; cd / && rm -rf "$d"; exit $rc' \
+                 2>&1 | tr -d '\r')
         if printf '%s' "${pv}" | grep -q 'Unit Test on the backend DSP: Passed'; then
             pass "qnn-platform-validator: DSP unit test passed ($(printf '%s' "${pv}" | sed -n 's/^Core Version of the backend DSP: //p'))"
         else
