@@ -30,6 +30,7 @@ make base BOARD=raspberrypi5   # same for the second board; builds in build/rasp
 make dev | prod           # dev / hardened-prod image tiers
 make bundle               # RAUC .raucb for OTA install
 make parse                # bitbake -p (parse-only sanity — cheapest validation)
+make check                # pre-PR gate: repo invariants, shellcheck, host selftests (no kas)
 make ci                   # parse-check the committed origin/main in a worktree and
                           #   post GitHub commit statuses (docs/dev/ci.md)
 make kernel-hardening-check  # export the prod kernel .config (configure only) and run
@@ -122,9 +123,8 @@ AGENTS.md                              # this file
 CLAUDE.md                              # Claude-Code-specific extras
 Makefile                               # build wrapper around kas
 kas/                                   # KAS composition
-.github/workflows/                     # hosted lint + kernel-hardening checks;
-                                       #   dispatch-only Yocto check (docs/dev/ci.md)
-scripts/ci/                            # repo-lint.sh, local-check.sh (`make ci`),
+.github/workflows/                     # release notes on tag push (docs/dev/ci.md)
+scripts/ci/                            # check.sh + repo-lint.sh (`make check`), local-check.sh (`make ci`),
                                        #   kernel-config-export.sh
 scripts/agent-build/                   # build launcher: make in a logged tmux session
                                        #   (docs/dev/agent-builds.md)
@@ -373,7 +373,12 @@ What makes it actually work:
 ## Branch strategy
 
 Work lands on short-lived branches off a protected, linear `main`,
-merged via PR — the PR is the review and CI gate.
+merged via PR — the PR is the review gate.
+
+**Before opening a PR, run `make check`** and paste its final `RESULT:` line into
+the PR body. A failing check is fixed before the PR opens, not after. Changes that
+can break parsing or a build also get `make ci` on the build host
+([docs/dev/ci.md](docs/dev/ci.md)).
 
 Branch naming: `<scope>/<topic>` for single-scope work (scope from the
 §"Commit style" set, e.g. `bsp/init/persistence-refactor`), or
@@ -403,7 +408,7 @@ deferred until the first release needs them.
 | Settled architecture decisions | `docs/adr/README.md` (index) |
 | Vulnerability handling — reachability ladder, fix choice, release gate | `docs/security/VULN-HANDLING.md`, ADR-0013 |
 | Security docs — SBOM/CVE triage, SELinux, U-Boot hardening, kernel-config gate, vuln mgmt | `docs/security/README.md` (index) |
-| CI — hosted lint, operator-run Yocto check (`make ci`), kernel-hardening gate | `docs/dev/ci.md` |
+| CI — `make check` before every PR, `make ci` on the build host, release notes | `docs/dev/ci.md` |
 | Launching and watching long builds (agent-build launcher) | `docs/dev/agent-builds.md` |
 | OTA updates + rollback testing | `docs/dev/ota-updates.md`, `docs/dev/ota-rollback-test-plan.md` |
 | Bootchain update (per board) | `docs/dev/bootchain/README.md`, ADR-0014 |

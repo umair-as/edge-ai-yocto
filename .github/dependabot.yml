@@ -21,7 +21,7 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     commit-message:
       # `^chore` is skip = true in cliff.toml, so dependency bumps stay out
       # of the generated release notes. Also satisfies the commit-msg hook.
