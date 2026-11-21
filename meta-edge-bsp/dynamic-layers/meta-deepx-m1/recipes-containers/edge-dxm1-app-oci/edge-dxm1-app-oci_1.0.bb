@@ -37,6 +37,13 @@ do_install() {
     install -d ${D}${sysconfdir}/containers/systemd/users/${EDGE_CTR_UID}
     install -m 0644 ${UNPACKDIR}/dxm1-app.container \
         ${D}${sysconfdir}/containers/systemd/users/${EDGE_CTR_UID}/dxm1-app.container
+
+    # Both Quadlets are wanted by default.target; with both payloads staged
+    # the boot transaction holds two conflicting start jobs and systemd drops
+    # an arbitrary one. Installing this package selects it: the legacy unit is
+    # masked (/etc/systemd/user outranks the Quadlet generator's output).
+    install -d ${D}${sysconfdir}/systemd/user
+    ln -sf /dev/null ${D}${sysconfdir}/systemd/user/dxm1-inference.service
 }
 
 RDEPENDS:${PN} = "edge-ctr-user edge-dxm1-runtime"
@@ -44,4 +51,5 @@ RDEPENDS:${PN} = "edge-ctr-user edge-dxm1-runtime"
 FILES:${PN} = " \
     ${datadir}/edge-oci/dxm1-app.tar \
     ${sysconfdir}/containers/systemd/users/${EDGE_CTR_UID}/dxm1-app.container \
+    ${sysconfdir}/systemd/user/dxm1-inference.service \
 "

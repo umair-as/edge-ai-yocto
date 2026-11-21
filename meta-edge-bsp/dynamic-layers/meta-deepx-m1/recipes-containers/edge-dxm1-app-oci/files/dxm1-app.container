@@ -4,7 +4,10 @@ Description=DX-M1 inference from the bundled app image (rootless, edge-ctr)
 After=data.mount
 ConditionPathExists=/data/dxm1/model/model.dxnn
 # One owner of the NPU at a time; dxm1-inference runs the /data payload.
+# Conflicts= alone does not order the stop before the start; After= does,
+# in either switching direction. Covers systemd-managed starts only.
 Conflicts=dxm1-inference.service
+After=dxm1-inference.service
 StartLimitIntervalSec=600
 StartLimitBurst=3
 
