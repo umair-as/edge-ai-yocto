@@ -360,10 +360,11 @@ What makes it actually work:
   It runs make in its own tmux session, records the command, board and
   source commit in `build/agent-runs/<run-id>/run.json` and make's exit
   code in `result.json`, and gives the operator a read-only `tmux
-  attach` view. Report the attach command right away, then watch with a
-  **separate** poller that only reads the log or `status` — decouple the
-  watcher from the work, so a killed poller is just re-armed while the
-  build survives. For builds that matter, prefer handing the operator
+  attach` view. Report the attach command right away, then follow it with
+  `agent-build.py status` or `agent-build.py wait --timeout N` (exit 0
+  succeeded, 1 failed, 2 interrupted/unknown, 3 still running), never with
+  plain `tmux`, which talks to another server and makes a running build
+  look finished. A killed `wait` is just rerun; the build survives. For builds that matter, prefer handing the operator
   the same command to run in their own shell. `setsid nohup make …` is
   the fallback where tmux is missing. A killed build is recoverable
   either way (bitbake resumes from sstate).
