@@ -37,7 +37,8 @@ trailer and leak check at commit time.
 
 ## `make preflight`
 
-`scripts/ci/preflight.py` maps the changed paths (working tree against `HEAD`,
+`scripts/ci/preflight.py` maps the changed paths (everything since the merge base
+with `origin/main`: commits, uncommitted and untracked files;
 or `--base REF`, or `--paths`) to the cheapest check that exercises them, for
 one board:
 
