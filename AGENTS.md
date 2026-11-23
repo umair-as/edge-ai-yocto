@@ -144,7 +144,7 @@ docs/
 .claude/
   context/bsp-workflow.md              # layer ownership + workflow contract
   references/board-catalogue.md        # boards wired vs. slot-available
-  rules/yocto-patterns.md              # wrynose syntax + SBOM/CVE wiring
+  rules/yocto-patterns.md              # wrynose features, SBOM/CVE wiring, pin moves
   rules/recipe-metadata.md             # recipe header layout — read before a new .bb
   rules/comment-style.md               # comment rules — read before a recipe/config comment
   rules/cross-compilation.md           # aarch64-edgeai-linux SDK notes
@@ -170,9 +170,6 @@ build/                                 # bitbake output (gitignored)
 
 ## Conventions
 
-- **Wrynose 6.0 override syntax** — `RDEPENDS:${PN}`, `do_install:append()`,
-  `SRC_URI:append:rzv2l`. Never the deprecated underscore form. See
-  `.claude/rules/yocto-patterns.md`.
 - **Public-repo discipline** — committed files (recipes, kas, scripts)
   reference only repo-relative build paths or public `docs/`; never
   `.claude/` or agent-tooling paths, absolute `/home/<user>/...` paths,
@@ -400,7 +397,7 @@ deferred until the first release needs them.
 
 | Task | Read |
 |---|---|
-| Yocto syntax, failure triage, patch headers, sstate traps | `.claude/rules/yocto-patterns.md` |
+| Wrynose features, failure triage, patch headers, sstate traps, pin moves | `.claude/rules/yocto-patterns.md` |
 | Authoring a new recipe (header layout, metadata) | `.claude/rules/recipe-metadata.md` |
 | Comments in recipes / kas / scripts | `.claude/rules/comment-style.md` |
 | Prose in `docs/` and `README.md` (what may and may not be written) | `.claude/rules/docs-style.md` |
