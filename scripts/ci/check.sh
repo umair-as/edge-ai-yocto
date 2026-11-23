@@ -60,6 +60,7 @@ step "shellcheck" run_shellcheck
 step "eMMC provisioning guard selftest" bash scripts/ci/emmc-provision-guard-selftest.sh
 step "device-cert staging guard selftest" bash scripts/ci/stage-device-certs-selftest.sh
 step "commit trailer check selftest" sh scripts/ci/commit-trailers-selftest.sh
+step "preflight mapping selftest" python3 scripts/ci/preflight-selftest.py
 step "ModelPack host tests" python3 -m unittest -q scripts/modelpack/tests/test_modelpack.py
 step "systemd-boot RAUC backend selftest" bash scripts/ci/edge-sdboot-backend-selftest.sh
 slow "serial console tee selftest" \

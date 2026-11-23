@@ -30,6 +30,8 @@ make base BOARD=raspberrypi5   # same for the second board; builds in build/rasp
 make dev | prod           # dev / hardened-prod image tiers
 make bundle               # RAUC .raucb for OTA install
 make parse                # bitbake -p (parse-only sanity — cheapest validation)
+make preflight            # cheapest checks for the changed paths before a build;
+                          #   PREFLIGHT_ARGS=--bitbake runs targeted tasks (docs/dev/ci.md)
 make check                # pre-PR gate: repo invariants, shellcheck, host selftests (no kas)
 make ci                   # parse-check the committed origin/main in a worktree and
                           #   post GitHub commit statuses (docs/dev/ci.md)
@@ -125,7 +127,7 @@ Makefile                               # build wrapper around kas
 kas/                                   # KAS composition
 .github/workflows/                     # release notes on tag push (docs/dev/ci.md)
 scripts/ci/                            # check.sh + repo-lint.sh (`make check`), local-check.sh (`make ci`),
-                                       #   kernel-config-export.sh
+                                       #   preflight.py (`make preflight`), kernel-config-export.sh
 scripts/agent-build/                   # build launcher: make in a logged tmux session
                                        #   (docs/dev/agent-builds.md)
 docs/
@@ -143,6 +145,7 @@ docs/
   settings.json                        # registers the hook below (Claude Code only)
   hooks/no-parallel-bitbake.py         # refuses a second bitbake/kas/make build or parse
   agents/build-watcher.md              # read-only build-run reporter (Claude Code only)
+  agents/yocto-rules-reviewer.md       # read-only diff review against rules/ (Claude Code only)
 meta-edge-distro/                      # brand identity + DISTRO=edge-ai
   conf/distro/edge-ai.conf
   recipes-core/psplash/                # EDGE AI OS brand splash

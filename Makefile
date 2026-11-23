@@ -1,4 +1,4 @@
-.PHONY: help base dev prod bundle bootchain-bundle bootloader-package parse layers shell info clean-lock netboot-sync lock verify-pins purge hooks check ci kernel-config-export kernel-hardening-check cve
+.PHONY: help base dev prod bundle bootchain-bundle bootloader-package parse bitbake-task preflight layers shell info clean-lock netboot-sync lock verify-pins purge hooks check ci kernel-config-export kernel-hardening-check cve
 
 KAS ?= kas
 
@@ -175,6 +175,17 @@ bootloader-package: | $(KAS_DIRS) ## RZ/V2L host package: BL2/FIP + manifest + u
 
 parse: | $(KAS_DIRS) ## bitbake -p (parse-only check; EDGE_PROFILE=, LAYOUT= apply)
 	$(call kas_run,EDGE_PROFILE=$(EDGE_PROFILE),bitbake -p)
+
+# BB_TASK is passed inside a single-quoted kas shell -c string; it is read from
+# the environment for the check so no value reaches the recipe shell unvetted.
+bitbake-task: export BB_TASK := $(BB_TASK)
+bitbake-task: | $(KAS_DIRS) ## one BitBake task: BB_TASK="<recipe…> -c <task>" (EDGE_PROFILE= applies)
+	@printf '%s' "$$BB_TASK" | grep -qE '^[A-Za-z0-9._/+ -]+ -c [a-z_]+$$' || { \
+		echo 'bitbake-task: set BB_TASK="<recipe…> -c <task>"'; exit 2; }
+	$(call kas_run,EDGE_PROFILE=$(EDGE_PROFILE),bitbake $(BB_TASK))
+
+preflight: ## cheapest checks for the changed paths (PREFLIGHT_ARGS=--plan|--bitbake|--base REF)
+	python3 scripts/ci/preflight.py --board $(BOARD) $(PREFLIGHT_ARGS)
 
 check: ## pre-PR gate: repo invariants, shellcheck, host selftests (no kas; scripts/ci/check.sh)
 	scripts/ci/check.sh
