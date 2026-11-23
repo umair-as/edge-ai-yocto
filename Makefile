@@ -180,7 +180,8 @@ parse: | $(KAS_DIRS) ## bitbake -p (parse-only check; EDGE_PROFILE=, LAYOUT= app
 # the environment for the check so no value reaches the recipe shell unvetted.
 bitbake-task: export BB_TASK := $(BB_TASK)
 bitbake-task: | $(KAS_DIRS) ## one BitBake task: BB_TASK="<recipe…> -c <task>" (EDGE_PROFILE= applies)
-	@printf '%s' "$$BB_TASK" | grep -qE '^[A-Za-z0-9._/+ -]+ -c [a-z_]+$$' || { \
+	@[ "$$(printf '%s' "$$BB_TASK" | wc -l)" -eq 0 ] && \
+	 printf '%s' "$$BB_TASK" | grep -qE '^[A-Za-z0-9._/+ -]+ -c [a-z_]+$$' || { \
 		echo 'bitbake-task: set BB_TASK="<recipe…> -c <task>"'; exit 2; }
 	$(call kas_run,EDGE_PROFILE=$(EDGE_PROFILE),bitbake $(BB_TASK))
 

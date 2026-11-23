@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Integration checks with a temporary Makefile; no Yocto build is invoked."""
+import contextlib
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -28,6 +30,12 @@ def fake_run(tmp, **files):
 
 class StateTest(unittest.TestCase):
     """run_state, progress and wait without tmux or a build."""
+
+    def setUp(self):
+        # wait() prints its JSON; keep it out of the test report.
+        self._quiet = contextlib.redirect_stdout(io.StringIO())
+        self._quiet.__enter__()
+        self.addCleanup(self._quiet.__exit__, None, None, None)
 
     def test_progress_from_a_coloured_log(self):
         log = ("\x1b[1mNOTE\x1b[0m: Executing Tasks\r"

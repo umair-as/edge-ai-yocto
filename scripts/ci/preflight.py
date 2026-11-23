@@ -21,8 +21,9 @@ flag, a shared files/ directory applied by another board's recipe. A recipe
 whose COMPATIBLE_MACHINE lists only other boards' machines is left out with a
 note; image and bundle recipes get a parse only.
 
-Changed paths default to the working tree against HEAD, untracked files
-included. --base REF compares against REF instead; --paths takes a list.
+Changed paths default to everything since the merge base with origin/main
+(else main): the branch's commits, uncommitted changes and untracked files.
+--base REF compares against REF instead; --paths takes a list.
 
   scripts/ci/preflight.py [--plan] [--bitbake] [--board B] [--allow-cold]
                           [--no-host] [--base REF | --paths P ...]
@@ -464,9 +465,18 @@ def changed_paths(base):
         ).stdout
         return [line for line in out.splitlines() if line]
 
-    paths = git("diff", "--name-only", "--no-renames", base or "HEAD")
     if not base:
-        paths += git("ls-files", "--others", "--exclude-standard")
+        base = "HEAD"
+        for ref in ("origin/main", "main"):
+            probe = subprocess.run(("git", "rev-parse", "--quiet", "--verify", ref),
+                                   cwd=REPO, capture_output=True, check=False)
+            if probe.returncode == 0:
+                base = git("merge-base", ref, "HEAD")[0]
+                break
+    # git diff <commit> compares that commit with the working tree: committed
+    # and uncommitted changes alike.
+    paths = git("diff", "--name-only", "--no-renames", base)
+    paths += git("ls-files", "--others", "--exclude-standard")
     return sorted(set(paths))
 
 
