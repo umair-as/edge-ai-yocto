@@ -13,7 +13,7 @@ apply to other agents.
 
 ## Skills available
 
-`.claude/skills/` holds two repo-local skills:
+`.claude/skills/` holds four repo-local skills:
 
 - `devtool-workflow` — iterating on recipe source (U-Boot,
   `linux-renesas`, app) via `devtool` instead of hand-editing patches.
@@ -23,12 +23,21 @@ apply to other agents.
   `kas/local.yml` seeding, shared-cache verification, branch naming
   before PR, locked-worktree cleanup. Companion to §"Parallel sessions"
   below.
+- `prebuild-gate` — when to run `make preflight` before an image or bundle
+  build and how to read it (host tier, BitBake tier, uncovered paths).
+- `pr-ready` — operator-invoked (`/pr-ready`): hardware gate, `make check`
+  / `make ci`, diff and commit hygiene, independent review, PR body.
 
 `.claude/agents/build-watcher.md` is a read-only subagent that reports
 one `scripts/agent-build/agent-build.py` run in five lines and, on a
 failure, the first causal error from the task log. Use it after starting a
 build with the launcher, so the terminal log stays out of the main
 context.
+
+`.claude/agents/yocto-rules-reviewer.md` is a read-only subagent (Sonnet)
+that reviews a recipe/patch/kas diff against `.claude/rules/` and reports
+only rule violations with file:line. `pr-ready` uses it; run it directly
+before committing a recipe or patch change.
 
 Where a skill and `.claude/rules/` ever disagree, **the rules win** —
 they are repo-specific and wrynose-current.

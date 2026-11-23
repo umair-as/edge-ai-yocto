@@ -14,7 +14,8 @@ import sys
 
 # Makefile targets that end up running bitbake; keep in step with the Makefile.
 MAKE_BUILD_TARGETS = {"base", "dev", "prod", "bundle", "parse", "layers", "shell", "ci",
-                      "kernel-config-export", "kernel-hardening-check"}
+                      "kernel-config-export", "kernel-hardening-check", "bitbake-task",
+                      "bootchain-bundle", "bootloader-package"}
 KAS_BUILD_SUBCOMMANDS = {"build", "shell"}
 # Words that only wrap the real command.
 WRAPPERS = {"nice", "ionice", "nohup", "time", "exec", "setsid", "env", "stdbuf",
@@ -60,6 +61,12 @@ def starts_build(command, depth=0):
         if word in ("kas", "kas-container") and KAS_BUILD_SUBCOMMANDS & set(args):
             return True
         if word == "make" and MAKE_BUILD_TARGETS & set(args):
+            return True
+        # make preflight PREFLIGHT_ARGS=--bitbake, or preflight.py --bitbake.
+        if word.startswith("python") and args and args[0].endswith("preflight.py"):
+            word, args = "preflight.py", args[1:]
+        if (word == "preflight.py" or (word == "make" and "preflight" in args)) \
+                and any("--bitbake" in a for a in args):
             return True
         # scripts/agent-build/agent-build.py start <topic> -- <make targets>,
         # run directly or through python3.
