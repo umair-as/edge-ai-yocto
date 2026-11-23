@@ -10,9 +10,13 @@
 # uninterrupted.
 #
 # Usage:
-#   ./scripts/dev/setup-tftp-nfs.sh
-#   SUBNET=192.168.20.0/24 ./scripts/dev/setup-tftp-nfs.sh
-#   TFTP_DIR=/srv/tftp NFS_ROOT=/srv/nfs/edge-image-dev ./scripts/dev/setup-tftp-nfs.sh
+#   CLIENT=<board-ip> ./scripts/dev/setup-tftp-nfs.sh
+#   CLIENT=<bench-subnet>/24 ./scripts/dev/setup-tftp-nfs.sh   # isolated bench network only
+#   CLIENT=<board-ip> TFTP_DIR=/srv/tftp NFS_ROOT=/srv/nfs/edge-image-dev ./scripts/dev/setup-tftp-nfs.sh
+#
+# The export is rw + no_root_squash (an NFS root needs it): every host
+# CLIENT admits can read and rewrite the served rootfs as root. CLIENT has
+# no default for that reason.
 #
 # After running:
 #   - Build a netboot-enabled image:   make dev NETBOOT=1
@@ -27,7 +31,8 @@ set -Eeuo pipefail
 TFTP_DIR="${TFTP_DIR:-/srv/tftp}"
 TFTP_SUBDIR="${TFTP_SUBDIR:-edge-fit-dev}"
 NFS_ROOT="${NFS_ROOT:-/srv/nfs/edge-image-dev}"
-SUBNET="${SUBNET:-192.168.0.0/24}"
+NFS_ROOT="${NFS_ROOT%/}"
+CLIENT="${CLIENT:-${SUBNET:-}}"
 
 # Detect the host's primary wired IP (default-route source) for the
 # "host IP" hint at the end. Not used to configure anything — purely
@@ -39,10 +44,20 @@ HOST_IF="$(ip -4 route get 1.1.1.1 2>/dev/null | awk 'match($0,/dev ([^ ]+)/,m){
 note() { printf '[setup] %s\n' "$*"; }
 die()  { printf '[setup] ERROR: %s\n' "$*" >&2; exit 1; }
 
+[ -n "$CLIENT" ] || die "set CLIENT=<board-ip> (or a bench-only subnet): the export grants root over the served rootfs"
+# A host address, or a subnet of /24 or narrower; wider needs ALLOW_WIDE=1.
+octet='(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])'
+printf '%s' "$CLIENT" | grep -qE "^($octet\.){3}$octet(/([0-9]|[12][0-9]|3[0-2]))?$" \
+    || die "CLIENT must be an IPv4 address or CIDR subnet: $CLIENT"
+case "$CLIENT" in
+    */*) [ "${CLIENT#*/}" -ge 24 ] || [ "${ALLOW_WIDE:-0}" = 1 ] \
+            || die "CLIENT=$CLIENT is wider than /24; set ALLOW_WIDE=1 on an isolated bench network" ;;
+esac
+
 # Privilege check: re-exec under sudo if not already root. Single
 # password prompt, then the rest runs uninterrupted.
 if [ "${EUID:-$(id -u)}" -ne 0 ]; then
-    exec sudo --preserve-env=TFTP_DIR,TFTP_SUBDIR,NFS_ROOT,SUBNET -- "$0" "$@"
+    exec sudo --preserve-env=TFTP_DIR,TFTP_SUBDIR,NFS_ROOT,SUBNET,CLIENT,ALLOW_WIDE -- "$0" "$@"
 fi
 
 # -------- Step 1: TFTP --------
@@ -98,25 +113,38 @@ mkdir -p "$NFS_ROOT"
 chown root:root "$NFS_ROOT"
 chmod 0755 "$NFS_ROOT"
 
-# Idempotent /etc/exports edit. Match the FULL line including options
-# so a re-run with different SUBNET adds a new entry rather than silently
-# leaving a stale one. Operator can hand-prune for a single canonical entry.
+# Idempotent /etc/exports edit. Any earlier line for ${NFS_ROOT} is
+# replaced, not kept beside the new one: a rerun with a narrower CLIENT
+# must revoke the broader grant. /etc/exports.edge-bak keeps the old file.
 # Intentional: NO fsid=root. fsid=root makes the export the NFSv4
 # pseudo-root, which means v4 clients see it as `/` and the path
 # `${NFS_ROOT}` passed in `nfsroot=…` hangs the kernel-mode v4 mount
 # silently. Without fsid=root the export is reachable at its real path
 # from both v3 and v4. The kernel-mode root-NFS client uses v3 by
 # default (see the `vers=3` in rauc-uboot-env.dev-netboot's bootargs).
-EXPORT_LINE="${NFS_ROOT}  ${SUBNET}(rw,sync,no_subtree_check,no_root_squash,no_acl)"
-if grep -qxF "$EXPORT_LINE" /etc/exports 2>/dev/null; then
+EXPORT_LINE="${NFS_ROOT}  ${CLIENT}(rw,sync,no_subtree_check,no_root_squash,no_acl)"
+touch /etc/exports
+# Matches the export path with quotes and trailing slashes stripped.
+same_path='{ q = $1; gsub(/"/, "", q); sub(/\/+$/, "", q) } q == p'
+grep -q '\\$' /etc/exports && die "/etc/exports has continued (\\) lines; join them by hand, then rerun"
+if grep -qxF "$EXPORT_LINE" /etc/exports && \
+   [ "$(awk -v p="$NFS_ROOT" "$same_path" /etc/exports | wc -l)" -eq 1 ]; then
     note "/etc/exports already has the expected line — skipping"
 else
-    printf '\n# edge-ai-yocto dev NFS-root (%s)\n%s\n' \
-        "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$EXPORT_LINE" >> /etc/exports
-    note "appended export line: $EXPORT_LINE"
+    stale="$(awk -v p="$NFS_ROOT" "$same_path" /etc/exports)"
+    [ -n "$stale" ] && printf '[setup] revoking earlier export(s):\n%s\n' "$stale"
+    cp -p /etc/exports /etc/exports.edge-bak
+    awk -v p="$NFS_ROOT" "$same_path { next } index(\$0, \"# edge-ai-yocto dev NFS-root\") == 1 { next } { print }" \
+        /etc/exports.edge-bak > /etc/exports.edge-new
+    printf '# edge-ai-yocto dev NFS-root\n%s\n' "$EXPORT_LINE" >> /etc/exports.edge-new
+    mv /etc/exports.edge-new /etc/exports
+    note "export line: $EXPORT_LINE"
 fi
 
 exportfs -ra
+# Other grants for the path (exports.d, a parent export) are not edited here.
+others="$(exportfs -v 2>/dev/null | grep -F "$NFS_ROOT" | grep -vF "$CLIENT(" || true)"
+[ -z "$others" ] || printf '[setup] WARNING: other active grants cover %s:\n%s\n' "$NFS_ROOT" "$others"
 systemctl enable --now nfs-kernel-server.service >/dev/null
 
 if systemctl is-active --quiet nfs-kernel-server.service; then

@@ -47,25 +47,35 @@ A release build never composes `kas/dev-netboot.yml` or sets `NETBOOT=1`.
 ## Host setup (once)
 
 ```sh
-./scripts/dev/setup-tftp-nfs.sh       # idempotent; prompts for sudo once
-SUBNET=<subnet> NFS_ROOT=<nfs-export-path> ./scripts/dev/setup-tftp-nfs.sh   # other layouts
+CLIENT=<board-ip> ./scripts/dev/setup-tftp-nfs.sh        # idempotent; prompts for sudo once
+CLIENT=<board-ip> NFS_ROOT=<nfs-export-path> ./scripts/dev/setup-tftp-nfs.sh   # other layouts
 ```
 
 The script installs both services, creates the TFTP root (FIT under
-`/srv/tftp/edge-fit-dev/`) and the NFS export root, writes a subnet-scoped
-`/etc/exports` entry:
+`/srv/tftp/edge-fit-dev/`) and the NFS export root, and writes one
+`/etc/exports` entry for the export path:
 
 ```
-<nfs-export-path>  <subnet>(rw,sync,no_subtree_check,no_root_squash,no_acl)
+<nfs-export-path>  <client>(rw,sync,no_subtree_check,no_root_squash,no_acl)
 ```
+
+An NFS root needs `rw` and `no_root_squash`, so every host the entry admits can
+read and rewrite the served rootfs as root. `CLIENT` has no default: give the
+board's address, or a subnet only on an isolated bench network. A subnet wider
+than /24 needs `ALLOW_WIDE=1`. A rerun replaces every earlier `/etc/exports`
+entry for the same path, however quoted or slash-terminated (the previous file
+is kept as `/etc/exports.edge-bak`), so narrowing `CLIENT` revokes the broader
+grant. Grants under `/etc/exports.d/` or on a parent directory are not edited;
+the script warns when `exportfs -v` still shows one.
 
 reloads the exports, checks both services bound their ports, and prints the host IP
 to set as `serverip` on the board. The export has **no `fsid=root`**: that flag
 makes it the NFSv4 pseudo-root, and a v4 client given the full path in `nfsroot=`
 then hangs silently.
 
-Smoke test from the host, against its LAN IP (`127.0.0.1` is outside the subnet
-rule, so mountd rejects `localhost`):
+Smoke test from the host, against its LAN IP. It passes only when `CLIENT` also
+admits the host; with `CLIENT=<board-ip>` mountd refuses it, which is the intended
+scope:
 
 ```sh
 sudo timeout 5 mount -t nfs -o vers=3,nolock <host-ip>:<nfs-export-path> /mnt \
@@ -87,6 +97,10 @@ newest `edge-image-dev-<machine>.rootfs-*.tar.gz` from the board's deploy direct
 tarball with `--numeric-owner --xattrs` so ownership and capabilities survive,
 atomically replaces `/srv/tftp/edge-fit-dev/fitImage`, and re-exports
 (`exportfs -ra`) so mountd's handle cache sees the new inodes. About 5 seconds.
+The OTA client key and the bundle decryption key (`/etc/ota/device.key`,
+`/etc/ota/bundle-decrypt.key`) are left out of the export, so a netbooted board
+has no OTA identity; `make netboot-sync KEEP_SECRETS=1` keeps them. The keys are
+excluded at extraction, so they are never on the export, even during a sync.
 
 On the board:
 
