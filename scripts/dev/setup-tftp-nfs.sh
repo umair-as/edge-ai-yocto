@@ -46,6 +46,9 @@ die()  { printf '[setup] ERROR: %s\n' "$*" >&2; exit 1; }
 
 [ -n "$CLIENT" ] || die "set CLIENT=<board-ip> (or a bench-only subnet): the export grants root over the served rootfs"
 # A host address, or a subnet of /24 or narrower; wider needs ALLOW_WIDE=1.
+case "$CLIENT" in
+    *[!0-9./]*) die "CLIENT must be an IPv4 address or CIDR subnet: $CLIENT" ;;
+esac
 octet='(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])'
 printf '%s' "$CLIENT" | grep -qE "^($octet\.){3}$octet(/([0-9]|[12][0-9]|3[0-2]))?$" \
     || die "CLIENT must be an IPv4 address or CIDR subnet: $CLIENT"
@@ -115,7 +118,8 @@ chmod 0755 "$NFS_ROOT"
 
 # Idempotent /etc/exports edit. Any earlier line for ${NFS_ROOT} is
 # replaced, not kept beside the new one: a rerun with a narrower CLIENT
-# must revoke the broader grant. /etc/exports.edge-bak keeps the old file.
+# must revoke the broader grant. /etc/exports.edge-bak.<UTC time> keeps
+# each previous file.
 # Intentional: NO fsid=root. fsid=root makes the export the NFSv4
 # pseudo-root, which means v4 clients see it as `/` and the path
 # `${NFS_ROOT}` passed in `nfsroot=…` hangs the kernel-mode v4 mount
@@ -133,17 +137,21 @@ if grep -qxF "$EXPORT_LINE" /etc/exports && \
 else
     stale="$(awk -v p="$NFS_ROOT" "$same_path" /etc/exports)"
     [ -n "$stale" ] && printf '[setup] revoking earlier export(s):\n%s\n' "$stale"
-    cp -p /etc/exports /etc/exports.edge-bak
+    bak="/etc/exports.edge-bak.$(date -u '+%Y%m%dT%H%M%SZ')"
+    cp -p /etc/exports "$bak"
     awk -v p="$NFS_ROOT" "$same_path { next } index(\$0, \"# edge-ai-yocto dev NFS-root\") == 1 { next } { print }" \
-        /etc/exports.edge-bak > /etc/exports.edge-new
+        "$bak" > /etc/exports.edge-new
     printf '# edge-ai-yocto dev NFS-root\n%s\n' "$EXPORT_LINE" >> /etc/exports.edge-new
     mv /etc/exports.edge-new /etc/exports
     note "export line: $EXPORT_LINE"
 fi
 
 exportfs -ra
-# Other grants for the path (exports.d, a parent export) are not edited here.
-others="$(exportfs -v 2>/dev/null | grep -F "$NFS_ROOT" | grep -vF "$CLIENT(" || true)"
+# Other grants for the path (exports.d) are not edited here. etab holds one
+# "<path>\t<client>(<options>)" line per active grant; exportfs -v wraps long
+# paths onto their own line.
+others="$(awk -F '\t' -v p="$NFS_ROOT" -v c="$CLIENT(" \
+    '$1 == p && index($2, c) != 1' /var/lib/nfs/etab 2>/dev/null || true)"
 [ -z "$others" ] || printf '[setup] WARNING: other active grants cover %s:\n%s\n' "$NFS_ROOT" "$others"
 systemctl enable --now nfs-kernel-server.service >/dev/null
 

@@ -92,7 +92,9 @@ lsblk -o NAME,SIZE,TYPE,MOUNTPOINT
 
 The script verifies GPT and refuses a target that backs any mounted filesystem,
 the running root included (resolved through dm-verity and other device-mapper
-layers), a partition given as the target, and a root it cannot resolve. It needs
+layers), a partition given as the target, and a root it cannot resolve. A mounted
+filesystem it cannot trace to a disk (btrfs, ZFS, CIFS, virtiofs) also stops it.
+It needs
 `zstd`/`bmaptool` for a `.wic.zst`:
 
 ```
