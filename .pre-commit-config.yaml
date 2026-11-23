@@ -9,9 +9,12 @@
 #                     release-notes pipeline (cliff.toml +
 #                     .github/workflows/release-notes.yml) has parseable
 #                     input. Changelog quality is only as good as commit
-#                     hygiene.
+#                     hygiene. Also refuse an AI Co-Authored-By trailer, a
+#                     missing Assisted-by trailer and local working paths
+#                     (AGENTS.md "AI attribution"); `make check` runs the
+#                     same checker over the branch's commits.
 #
-# One of these is a commit-MSG hook, so a plain `pre-commit install` is not
+# Two of these are commit-MSG hooks, so a plain `pre-commit install` is not
 # enough — it would leave the key guard active and the subject check off.
 # Enable both once per clone (or run `make hooks`):
 #
@@ -30,6 +33,12 @@ repos:
         stages: [pre-commit]
         # No files/types filter and no exclude: a key can land under any
         # name, so every staged path gets looked at.
+
+      - id: commit-trailers
+        name: AI attribution trailers, no local paths in the message
+        entry: scripts/hooks/check-commit-trailers.sh
+        language: script
+        stages: [commit-msg]
 
 
   - repo: https://github.com/compilerla/conventional-pre-commit

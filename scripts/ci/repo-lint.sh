@@ -25,13 +25,17 @@ done
 
 hdr "INVARIANT: no agent paths, host home paths or key material in shipped files"
 # Excludes *.patch (payload belongs to upstream; rewriting it breaks context)
-# and this script (it necessarily contains the patterns it searches for).
+# and the scripts that necessarily contain the patterns they search for.
 # /home/devel is the device's own user and is legitimate in target config.
 files=$(git ls-files -- meta-edge-bsp meta-edge-distro kas scripts \
-        | grep -vE '\.patch$|^scripts/ci/repo-lint\.sh$')
+        | grep -vE '\.patch$|^scripts/ci/(repo-lint\.sh|commit-trailers-selftest\.sh)$|^scripts/hooks/check-commit-trailers\.sh$')
 hits=""
-[ -n "$files" ] && hits=$(grep -nE '\.claude/|scratch/|/home/[a-z]+/|BEGIN [A-Z ]*PRIVATE KEY' \
-                          $files 2>/dev/null | grep -v '/home/devel/')
+LEAK_RE='\.claude/|scratch/|/home/[a-z]+/|BEGIN [A-Z ]*PRIVATE KEY'
+# /home/devel/ is stripped per occurrence, not per line, so a second path on
+# the same line (or ../ out of it) is still caught.
+# shellcheck disable=SC2086
+[ -n "$files" ] && hits=$(grep -nE "$LEAK_RE" $files 2>/dev/null \
+                          | sed -E 's#/home/devel/([^.]|\.[^.])#\1#g' | grep -E "$LEAK_RE")
 if [ -n "$hits" ]; then echo "$hits" | sed 's/^/    /'; bad "leaked agent path, host home path or key material"
 else ok "clean"; fi
 
@@ -51,37 +55,66 @@ for f in $(git ls-files 'docs/*.md' '*.md'); do
 done
 [ "$broken" -eq 1 ] && bad "broken relative link" || ok "all resolve"
 
-hdr "INVARIANT: no AI Co-Authored-By trailer on new commits"
+hdr "INVARIANT: recipe headers carry the required metadata"
+# Recipe header rules (AGENTS.md task table): SUMMARY (<=80 chars), DESCRIPTION (<=3 lines), HOMEPAGE,
+# SECTION, LICENSE, and LIC_FILES_CHKSUM unless LICENSE is CLOSED or the recipe
+# is an image or bundle. A same-directory require/include counts. No
+# BUGTRACKER pointing at this repository.
+bad_rec=0
+for f in $(git ls-files 'meta-edge-bsp/*.bb' 'meta-edge-distro/*.bb'); do
+    d=$(dirname "$f")
+    src="$f"
+    for inc in $(sed -nE 's/^(require|include)[ \t]+([^ $]+)[ \t]*$/\2/p' "$f"); do
+        [ -f "$d/$inc" ] && src="$src $d/$inc"
+    done
+    # shellcheck disable=SC2086
+    m=$(cat $src | awk '
+        /^(SUMMARY|DESCRIPTION|HOMEPAGE|SECTION|LICENSE|LIC_FILES_CHKSUM)[ \t]*[?:+.]*=/ {
+            v = $1; sub(/[ \t?:+.=].*/, "", v); have[v] = 1 }
+        /^SUMMARY[ \t]*=/ { s = $0
+            while (s ~ /\\$/ && (getline nx) > 0) { sub(/\\$/, "", s); s = s nx }
+            sub(/^[^"]*"/, "", s); sub(/"[^"]*$/, "", s)
+            if (length(s) > 80) out = out " SUMMARY>80" }
+        /^DESCRIPTION[ \t]*=/ { n = 1; while ($0 ~ /\\$/ && (getline) > 0) n++
+            if (n > 3) out = out " DESCRIPTION>3-lines" }
+        /^LICENSE[ \t]*=[ \t]*"CLOSED"/ { closed = 1 }
+        $1 == "inherit" { for (i = 2; i <= NF; i++)
+            if ($i ~ /^(image|core-image|edge-ab-image|bundle)$/) imgbundle = 1 }
+        /^BUGTRACKER[ \t]*=.*umair-as\/edge-ai-yocto/ { out = out " internal-BUGTRACKER" }
+        END {
+            split("SUMMARY DESCRIPTION HOMEPAGE SECTION LICENSE", req, " ")
+            for (i in req) if (!(req[i] in have)) out = out " no-" req[i]
+            if (!("LIC_FILES_CHKSUM" in have) && !closed && !imgbundle) out = out " no-LIC_FILES_CHKSUM"
+            print out }')
+    [ -n "$m" ] && { printf '    %s:%s\n' "$f" "$m"; bad_rec=1; }
+done
+[ "$bad_rec" -eq 1 ] && bad "recipe header metadata (see the recipe header rules in AGENTS.md)" || ok "all recipes"
+
+hdr "INVARIANT: new commit messages pass the trailer and leak check"
 # Scope: commits this branch adds, not all history. AGENTS.md grandfathers
 # everything before 2026-08-12, and a rebase-merge rewrites committer dates,
-# so a date filter on history is unreliable — the range is the honest scope.
+# so a date filter on history is unreliable -- the range is the honest scope.
+# Same checker as the commit-msg hook. Bot-authored commits ("[bot]" suffix)
+# have no AI participation to attest and are skipped.
 RANGE="${LINT_RANGE:-main..HEAD}"
 if git rev-parse --quiet --verify "${RANGE%%..*}" >/dev/null 2>&1; then
-    hits=$(git log --no-merges "$RANGE" --format='%h %s%n%b' 2>/dev/null \
-           | grep -iE '^Co-Authored-By:.*(claude|codex|copilot|kiro|bot)' || true)
-    if [ -n "$hits" ]; then echo "$hits" | sed 's/^/    /'; bad "AI Co-Authored-By trailer in $RANGE"
-    else ok "none in $RANGE"; fi
-else
-    ok "skipped (no base ref for $RANGE)"
-fi
-
-hdr "INVARIANT: new commits carry an Assisted-by trailer"
-# Bot-authored commits (Dependabot, and any future [bot]-suffixed GitHub
-# automation) have no AI participation to attest -- Assisted-by records AI
-# tool involvement, not automated tooling. GitHub's own convention suffixes
-# every bot account's name with "[bot]"; skip those.
-if git rev-parse --quiet --verify "${RANGE%%..*}" >/dev/null 2>&1; then
-    missing=0
+    msgf=$(mktemp)
+    bad_msg=0
     for c in $(git log --no-merges "$RANGE" --format='%H' 2>/dev/null); do
         case "$(git log -1 --format=%an "$c")" in
             *'[bot]') continue ;;
         esac
-        git log -1 --format='%(trailers:key=Assisted-by,valueonly)' "$c" | grep -q . \
-            || { printf '    %s %s\n' "$(git log -1 --format=%h "$c")" "$(git log -1 --format=%s "$c")"; missing=1; }
+        git log -1 --format=%B "$c" > "$msgf"
+        if ! why=$(scripts/hooks/check-commit-trailers.sh "$msgf" 2>&1); then
+            printf '    %s %s\n' "$(git log -1 --format=%h "$c")" "$(git log -1 --format=%s "$c")"
+            printf '%s\n' "$why" | sed 's/^/      /'
+            bad_msg=1
+        fi
     done
-    [ "$missing" -eq 1 ] && bad "commit without Assisted-by" || ok "all present"
+    rm -f "$msgf"
+    [ "$bad_msg" -eq 1 ] && bad "commit message check in $RANGE" || ok "all pass in $RANGE"
 else
-    ok "skipped (no base ref)"
+    ok "skipped (no base ref for $RANGE)"
 fi
 
 hdr "RESULT"
