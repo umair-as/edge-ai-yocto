@@ -468,8 +468,12 @@ def changed_paths(base):
     if not base:
         base = "HEAD"
         for ref in ("origin/main", "main"):
-            probe = subprocess.run(("git", "rev-parse", "--quiet", "--verify", ref),
-                                   cwd=REPO, capture_output=True, check=False)
+            probe = subprocess.run(
+                ("git", "rev-parse", "--quiet", "--verify", ref),
+                cwd=REPO,
+                capture_output=True,
+                check=False,
+            )
             if probe.returncode == 0:
                 base = git("merge-base", ref, "HEAD")[0]
                 break
@@ -526,6 +530,10 @@ def run(argv):
 def report(plan, paths, ran_bitbake):
     docs = f", {plan.docs} doc-only skipped" if plan.docs else ""
     print(f"preflight: {len(paths)} changed path(s){docs}, board {plan.board}")
+    if not paths:
+        print(
+            "  WARNING: no changed paths, so nothing is checked; give --base REF or --paths"
+        )
     for name, argv in plan.bitbake_checks():
         ev = plan.evidence.get(name) or plan.evidence.get("parse", "")
         print(f"  [bitbake] {name:24} {' '.join(argv[1:])}  (e.g. {ev})")

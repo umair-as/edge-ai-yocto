@@ -42,6 +42,16 @@ case_ fail "comment line with a local path (kept by commit -m)" "docs: x
 
 $OK
 # see scratch/notes.md"
+case_ pass "git's editor template naming a scratch branch and path" "docs: x
+
+$OK
+# Please enter the commit message for your changes. Lines starting
+# with '#' will be ignored, and an empty message aborts the commit.
+#
+# On branch fix/scratch/thing
+# Changes to be committed:
+#	new file:   scripts/scratch/x
+#"
 case_ pass "comment lines without leaks are ignored" "docs: x
 
 $OK

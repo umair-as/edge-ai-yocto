@@ -11,8 +11,10 @@ bitbake-tier refusals (held locks, missing kas/local.yml). Runs no BitBake.
 import fcntl
 import importlib.util
 import pathlib
+import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 HERE = pathlib.Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location("preflight", HERE / "preflight.py")
@@ -269,6 +271,45 @@ class SecondReview(unittest.TestCase):
         self.assertEqual(
             plan(["meta-edge-bsp/README.md", "kas/local.yml.example"]).docs, 2
         )
+
+
+class ChangedPaths(unittest.TestCase):
+    """Default diff base: the merge base with main, not HEAD."""
+
+    def test_committed_branch_work_is_seen(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = pathlib.Path(tmp)
+
+            def git(*args):
+                subprocess.run(
+                    [
+                        "git",
+                        "-C",
+                        tmp,
+                        "-c",
+                        "user.name=t",
+                        "-c",
+                        "user.email=t@t",
+                        *args,
+                    ],
+                    check=True,
+                    capture_output=True,
+                )
+
+            git("init", "-q", "-b", "main")
+            (repo / "a").write_text("a")
+            git("add", "a")
+            git("commit", "-q", "-m", "base")
+            git("checkout", "-q", "-b", "topic")
+            (repo / "committed").write_text("c")
+            git("add", "committed")
+            git("commit", "-q", "-m", "topic")
+            (repo / "a").write_text("changed")
+            (repo / "untracked").write_text("u")
+            with mock.patch.object(pf, "REPO", repo):
+                self.assertEqual(
+                    pf.changed_paths(None), ["a", "committed", "untracked"]
+                )
 
 
 class Refusal(unittest.TestCase):
