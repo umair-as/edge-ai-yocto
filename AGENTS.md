@@ -231,8 +231,9 @@ make hooks     # run once after cloning; idempotent
 - **commit-msg stage** — Conventional Commit subject, per §"Commit
   style" above, and `scripts/hooks/check-commit-trailers.sh`: an
   `Assisted-by:` trailer, no AI `Co-Authored-By:`, no `scratch/` or
-  `/home/<user>/` paths in the message (§"AI attribution"). `make check`
-  runs the same checker over the branch's commits.
+  `/home/<user>/` paths in the message (§"AI attribution"). It requires
+  the trailer on every commit, as `make check` does over the branch's
+  commits; a commit with no AI involvement needs `--no-verify`.
 
 pre-commit installs into `.git/hooks`, which is per-clone and untracked:
 a fresh clone has **both gates silently disabled** until `make hooks`

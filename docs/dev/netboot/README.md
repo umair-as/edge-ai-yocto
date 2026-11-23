@@ -63,10 +63,10 @@ An NFS root needs `rw` and `no_root_squash`, so every host the entry admits can
 read and rewrite the served rootfs as root. `CLIENT` has no default: give the
 board's address, or a subnet only on an isolated bench network. A subnet wider
 than /24 needs `ALLOW_WIDE=1`. A rerun replaces every earlier `/etc/exports`
-entry for the same path, however quoted or slash-terminated (the previous file
-is kept as `/etc/exports.edge-bak`), so narrowing `CLIENT` revokes the broader
-grant. Grants under `/etc/exports.d/` or on a parent directory are not edited;
-the script warns when `exportfs -v` still shows one.
+entry for the same path, however quoted or slash-terminated (each previous file
+is kept as `/etc/exports.edge-bak.<UTC time>`), so narrowing `CLIENT` revokes the
+broader grant. Grants under `/etc/exports.d/` are not edited; the script warns
+when the active export table still lists another client for the path.
 
 reloads the exports, checks both services bound their ports, and prints the host IP
 to set as `serverip` on the board. The export has **no `fsid=root`**: that flag

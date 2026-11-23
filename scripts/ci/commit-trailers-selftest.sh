@@ -38,11 +38,14 @@ case_ pass "human Co-Authored-By is fine" "docs: x
 
 Co-Authored-By: Jane Doe <jane@example.invalid>
 $OK"
-case_ pass "comment lines are ignored" "docs: x
+case_ fail "comment line with a local path (kept by commit -m)" "docs: x
 
 $OK
-# Please enter the commit message. scratch/notes.md
-# Co-Authored-By: Claude <noreply@anthropic.com>"
+# see scratch/notes.md"
+case_ pass "comment lines without leaks are ignored" "docs: x
+
+$OK
+# Please enter the commit message for your changes."
 case_ pass "diff below the scissors line is ignored" "docs: x
 
 $OK
@@ -73,10 +76,14 @@ case_ fail "AI Co-Authored-By, lower case" "docs: x
 
 $OK
 co-authored-by: codex <codex@openai.com>"
-case_ fail "bot Co-Authored-By" "docs: x
+case_ pass "Dependabot co-author is not an AI tool" "docs: x
 
 $OK
-Co-Authored-By: some-tool[bot] <x@example.invalid>"
+Co-authored-by: dependabot[bot] <x@example.invalid>"
+case_ fail "Copilot agent co-author" "docs: x
+
+$OK
+Co-authored-by: copilot-swe-agent[bot] <x@example.invalid>"
 case_ fail "AI Co-Authored-By on a fixup" "fixup! docs: x
 
 Co-Authored-By: Claude <noreply@anthropic.com>"

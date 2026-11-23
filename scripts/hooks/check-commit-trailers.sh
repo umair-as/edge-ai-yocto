@@ -13,19 +13,21 @@
 set -u
 
 msg=${1:?usage: check-commit-trailers.sh <message-file>}
-AI_COAUTHOR='^co-authored-by:.*(claude|anthropic|codex|openai|copilot|kiro|gemini|cursor|\[bot\])'
+AI_COAUTHOR='^co-authored-by:.*(claude|anthropic|codex|openai|copilot|kiro|gemini|cursor)'
 ASSISTED='^Assisted-by: *[a-z][a-z0-9-]*:[A-Za-z0-9][A-Za-z0-9._@/-]*(\[[A-Za-z0-9]+\])?$'
 
-# A commit -v message carries the diff below the scissors line; comment lines
-# are dropped by git after the hook runs. Check only what git will record.
-body=$(sed '/^. -\{24\} >8 -\{24\}$/,$d' "$msg" | git stripspace --strip-comments)
+# A commit -v message carries the diff below the scissors line, which git
+# drops. '#' lines are kept by `git commit -m/-F` (cleanup=whitespace), so the
+# leak and co-author checks read them too; only trailer parsing ignores them.
+raw=$(sed '/^. -\{24\} >8 -\{24\}$/,$d' "$msg")
+body=$(printf '%s\n' "$raw" | git stripspace --strip-comments)
 
 rc=0
-if printf '%s\n' "$body" | grep -iqE "$AI_COAUTHOR"; then
+if printf '%s\n' "$raw" | grep -iqE "$AI_COAUTHOR"; then
     echo "commit-msg: AI Co-Authored-By trailer; use Assisted-by: <tool>:<model-id> instead" >&2
     rc=1
 fi
-leak=$(printf '%s\n' "$body" | sed -E 's#/home/devel/([^.]|\.[^.])#\1#g' \
+leak=$(printf '%s\n' "$raw" | sed -E 's#/home/devel/([^.]|\.[^.])#\1#g' \
        | grep -nE '(^|[^A-Za-z0-9_.-])scratch/|/home/[a-z][a-z0-9_-]*/' || true)
 if [ -n "$leak" ]; then
     printf 'commit-msg: local working path in the message:\n%s\n' "$leak" >&2
