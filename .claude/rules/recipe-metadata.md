@@ -239,18 +239,6 @@ SRC_URI:append = " \
 
 Note the leading space inside the quotes — required, easy to forget.
 
-## Override syntax reminder
-
-Wrynose uses `:` (see `yocto-patterns.md`). For metadata variables:
-
-```bitbake
-SUMMARY:smarc-rzv2l = "...board-specific summary..."   # rare; usually no
-RDEPENDS:${PN}      = "foo bar"
-SRC_URI:append:smarc-rzv2l = " file://board-patch.patch"
-```
-
-Don't write `RDEPENDS_${PN}` — parser rejects it on wrynose.
-
 ## Audit (state at the time this rule was written)
 
 Run from repo root to recheck:

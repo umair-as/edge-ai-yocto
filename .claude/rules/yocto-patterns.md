@@ -51,22 +51,6 @@ bitbake <recipe> -c <task> -f
 | Filesystems silently not built | `IMAGE_FSTYPES ?=` loses to oe-core's weak default — use `=` or `:append` |
 | Taskhash / sstate mismatch | Usually a patch-header edit (see "Patch + sstate cascade") |
 
-## Override syntax (colons, not underscores)
-
-Wrynose uses the colon-based override syntax. The deprecated underscore
-form was removed.
-
-```bitbake
-# Correct
-RDEPENDS:${PN}        = "foo bar"
-SRC_URI:append:rzv2l  = " file://board-fixup.patch"
-do_install:append()   { ... }
-
-# Wrong (rejected by the parser)
-RDEPENDS_${PN}     = "..."
-SRC_URI_append_rzv2l = " ..."
-```
-
 ## DISTRO_FEATURES — wrynose split
 
 `DISTRO_FEATURES_BACKFILL` and `DISTRO_FEATURES_BACKFILL_CONSIDERED`
@@ -78,24 +62,36 @@ are gone. Use:
 Same split for `MACHINE_FEATURES_*`.
 
 Five features became auto-enabled in 6.0 (`multiarch`, `opengl`,
-`ptest`, `vulkan`, `wayland`). For the `edge` distro we keep `opengl`
-and `wayland`; we opt out of the others (see `conf/distro/edge.conf`).
+`ptest`, `vulkan`, `wayland`). The `edge` distro sets
+`DISTRO_FEATURES_DEFAULTS = ""` and lists every feature itself
+(`conf/distro/include/edge-floor.inc`); `wayland opengl` come only with
+`EDGE_ENABLE_DISPLAY=1`.
+
+`_OPTED_OUT` only filters what `_DEFAULTS` supplies. With empty defaults it
+removes nothing; it does not remove a feature appended explicitly. Use
+`DISTRO_FEATURES:remove` for a hard floor.
 
 ## SBOM + CVE
 
 - SPDX 2.2 is gone. `INHERIT += "create-spdx"` auto-inherits the latest
   stable (3.0.1 at the wrynose pin).
-- `cve-check.bbclass` is gone. Use `OE_FRAGMENTS += "yocto/sbom-cve-check"`.
-- Fragment auto-adds `IMAGE_CLASSES:append = " sbom-cve-check"` and the
-  `create-spdx` inherit. The explicit inherit in `edge.conf` is for
-  visibility, not for function.
-- The CVE-DB recipes (`sbom-cve-check-update-nvd-native`,
-  `sbom-cve-check-update-cvelist-native`) are set to AUTOREV **by the
-  fragment** (`conf/fragments/yocto/sbom-cve-check.conf`), not by their
-  `.bb` files, which carry their own older SRCREVs. **`edge-cve-db.inc`
-  (required by `edge-floor.inc`) pins both back to a dated revision** as
-  weak defaults (`?=`) — that pin, not the fragment and not the `.bb`, is
-  what a build actually fetches. Change the CVE DB date there, or override
+- `cve-check.bbclass` is gone; its replacement is `sbom-cve-check`. This
+  distro enables it directly in `edge-floor.inc`
+  (`IMAGE_CLASSES:append = " sbom-cve-check"` and `INHERIT += "create-spdx"`).
+  Those two lines are what turn the scanner on.
+- The upstream fragment (`core/yocto/sbom-cve-check`) is **not** used. An
+  `OE_FRAGMENTS` line in a distro include sets the variable but loads no
+  fragment: `addfragments` runs in `bitbake.conf` after `local.conf` and
+  before the machine and distro confs. Fragments must be set in `local.conf`
+  or a file it includes (kas `local_conf_header`),
+  with the collection prefix (`core/...`); an unknown name is fatal once
+  evaluated.
+- Do not enable that fragment. Normal assignment rules apply to fragments,
+  and it hard-assigns the CVE-DB recipes
+  (`sbom-cve-check-update-nvd-native`, `sbom-cve-check-update-cvelist-native`)
+  to `AUTOREV`, which overrides the weak (`?=`) dated pin in `edge-cve-db.inc`
+  (required by `edge-floor.inc`). That pin, not the recipes' own older
+  SRCREVs, is what a build fetches. Change the CVE DB date there, or override
   it per host in the `cve_db_pin` block of `kas/sbom-cve.yml`. After a scan,
   check that each database clone's `HEAD` equals the pinned SRCREV:
   sbom-cve-check before 1.3.4 reset it to the newest revision. The build
@@ -380,3 +376,18 @@ complaining `can't find file to patch` or `Hunk #N FAILED`.
   legacy `kernel-fitimage.bbclass` is removed; customize via the declarative
   `oe.fitimage` inputs (`FIT_*`, `KERNEL_DEVICETREE`, signing keys).
 
+## Moving layer pins
+
+- **Dangling appends are fatal** since 5.2 (`BB_DANGLINGAPPENDS_WARNONLY` is
+  gone). Each version-pinned `foo_1.2.bbappend` needs renaming or dropping
+  when upstream moves to 1.3; expect parse failures, not warnings.
+- **A same-named CVE patch upstream is not proof of the same fix.** Diff it
+  against ours and read the CVE record before dropping ours; upstream has
+  shipped a patch tagged with a CVE ID that fixes different code.
+- Prefer a `.bbappend` to copying an upstream recipe. A copy needs its reason
+  and removal condition in its header. At each pin move, compare it and its
+  files with upstream (`bitbake-layers show-overlayed` lists copies); a
+  matching version alone does not make it redundant.
+- `${SRCPV}` in `PV` is a no-op since 4.3 (packaging appends the revision
+  when `PKGV` contains a `+`, so keep `+git`); leave it out of new recipes and
+  never populate `SRCPV`.
