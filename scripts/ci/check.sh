@@ -58,6 +58,7 @@ step "repository invariants" env LINT_RANGE="${LINT_RANGE:-$BASE..HEAD}" scripts
 step "private-key guard (all files)" pre-commit run forbid-private-keys --all-files
 step "shellcheck" run_shellcheck
 step "eMMC provisioning guard selftest" bash scripts/ci/emmc-provision-guard-selftest.sh
+step "device-cert staging guard selftest" bash scripts/ci/stage-device-certs-selftest.sh
 step "ModelPack host tests" python3 -m unittest -q scripts/modelpack/tests/test_modelpack.py
 step "systemd-boot RAUC backend selftest" bash scripts/ci/edge-sdboot-backend-selftest.sh
 slow "serial console tee selftest" \
