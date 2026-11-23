@@ -90,8 +90,10 @@ ls /sys/block/*/boot0
 lsblk -o NAME,SIZE,TYPE,MOUNTPOINT
 ```
 
-The script verifies GPT, refuses the running-root device, and needs `zstd`/`bmaptool`
-for a `.wic.zst`:
+The script verifies GPT and refuses a target that backs any mounted filesystem,
+the running root included (resolved through dm-verity and other device-mapper
+layers), a partition given as the target, and a root it cannot resolve. It needs
+`zstd`/`bmaptool` for a `.wic.zst`:
 
 ```
 sudo ./edge-emmc-provision.sh \

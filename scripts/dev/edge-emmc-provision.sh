@@ -71,17 +71,108 @@ if [ -n "$BL2" ] || [ -n "$FIP" ]; then
     PROGRAM_BOOT0=1
 fi
 
+# A /dev/disk/by-* alias resolves to the kernel name the guards compare.
+TARGET="$(readlink -f "$TARGET")"
 BASE="$(basename "$TARGET")"
 BOOT0="/dev/${BASE}boot0"
+SYSFS="${EDGE_SYSFS:-/sys}"
+
+# Whole-disk names backing block device MAJ:MIN, through device-mapper
+# (dm-verity, dm-crypt, LVM) slaves, loop backing files and partition
+# parents. Non-zero if unresolvable.
+backing_disks() {
+    local node s mm bf
+    [ -n "${1:-}" ] || return 1
+    node="$(readlink -f "$SYSFS/dev/block/$1" 2>/dev/null)" || return 1
+    [ -d "$node" ] || return 1
+    case "$(basename "$node")" in
+    loop*)
+        bf="$(cat "$node/loop/backing_file" 2>/dev/null)" || return 1
+        [ -n "$bf" ] || return 1
+        if [ -b "$bf" ]; then
+            mm="$(cat "$SYSFS/class/block/$(basename "$(readlink -f "$bf")")/dev")" || return 1
+        else
+            mm="$(stat -c '%Hd:%Ld' "$bf" 2>/dev/null)" || return 1
+        fi
+        backing_disks "$mm"
+        return
+        ;;
+    esac
+    if [ -d "$node/slaves" ] && [ -n "$(ls -A "$node/slaves")" ]; then
+        for s in "$node"/slaves/*; do
+            mm="$(cat "$s/dev")" || return 1
+            backing_disks "$mm" || return 1
+        done
+    elif [ -f "$node/partition" ]; then
+        basename "$(dirname "$node")"
+    else
+        basename "$node"
+    fi
+}
 BOOT0_FORCE_RO="/sys/block/${BASE}boot0/force_ro"
 
 # Safety 1: target must expose a hardware boot partition (i.e. be eMMC).
 [ -b "$BOOT0" ] || die "$TARGET has no ${BASE}boot0 — not an eMMC, refusing"
-# Safety 2: target must not carry the running rootfs.
+[ -f "$SYSFS/class/block/$BASE/partition" ] && die "$TARGET is a partition; give the whole eMMC (e.g. /dev/mmcblk0)"
+[ -d "$SYSFS/class/block/$BASE" ] || die "$TARGET is not in $SYSFS/class/block; refusing"
+
+# Safety 2: target must be in use by nothing. Under dm-verity the root is
+# /dev/dm-0, so the device name alone does not say which disk it lives on.
+#  a) no device-mapper, md or other holder on the disk or a partition
+#  b) every mounted filesystem resolved to its disks; an anonymous device
+#     (major 0) is accepted only for filesystems with no block device
+#  c) every active swap area resolved the same way
 ROOT_SRC="$(findmnt -n -o SOURCE / 2>/dev/null || true)"
-case "$ROOT_SRC" in
-    "/dev/${BASE}"p*|"/dev/${BASE}") die "refusing: $TARGET carries the running rootfs ($ROOT_SRC)" ;;
-esac
+ROOT_MM="$(findmnt -n -o MAJ:MIN / 2>/dev/null | tr -d "[:space:]" || true)"
+[ -n "$ROOT_MM" ] || die "cannot determine the device behind /; refusing"
+
+DISK_DIR="$(readlink -f "$SYSFS/class/block/$BASE")"
+for d in "$DISK_DIR" "$DISK_DIR"/"$BASE"p*; do
+    [ -d "$d/holders" ] || continue
+    held="$(ls -A "$d/holders")"
+    [ -z "$held" ] || die "refusing: $(basename "$d") is held by $(echo $held) (device-mapper or md in use)"
+done
+
+in_target() { # in_target <maj:min> <what>
+    local disks d
+    disks="$(backing_disks "$1")" || die "cannot resolve the disk behind $2 ($1); refusing"
+    for d in $disks; do
+        [ "$d" = "$BASE" ] && die "refusing: $TARGET backs $2 ($1)"
+    done
+    return 0
+}
+
+MOUNTS="$(findmnt -rn -o MAJ:MIN,FSTYPE,TARGET 2>/dev/null)" || die "cannot list mounts; refusing"
+while read -r mm fstype mnt; do
+    [ -n "$mm" ] || continue
+    case "$mm" in
+    0:*)
+        case "$fstype" in
+            tmpfs|devtmpfs|ramfs|proc|sysfs|cgroup|cgroup2|overlay|nfs|nfs4|autofs|\
+            mqueue|debugfs|tracefs|securityfs|pstore|bpf|configfs|fusectl|devpts|\
+            hugetlbfs|efivarfs|binfmt_misc|rpc_pipefs|selinuxfs|nsfs|fuse.*) continue ;;
+            *) die "cannot resolve the disk behind $mnt ($fstype on an anonymous device); refusing" ;;
+        esac ;;
+    esac
+    in_target "$mm" "the mounted filesystem $mnt"
+done <<MOUNTS_EOF
+$MOUNTS
+MOUNTS_EOF
+
+PROCFS="${EDGE_PROC:-/proc}"
+[ -r "$PROCFS/swaps" ] || die "cannot read $PROCFS/swaps; refusing"
+while read -r name _; do
+    [ -n "$name" ] || continue
+    if [ -b "$name" ]; then
+        mm="$(cat "$SYSFS/class/block/$(basename "$(readlink -f "$name")")/dev" 2>/dev/null)" \
+            || die "cannot resolve swap $name; refusing"
+    else
+        mm="$(stat -c '%Hd:%Ld' "$name" 2>/dev/null)" || die "cannot resolve swap $name; refusing"
+    fi
+    in_target "$mm" "the active swap $name"
+done <<SWAPS_EOF
+$(tail -n +2 "$PROCFS/swaps")
+SWAPS_EOF
 
 log "Target eMMC:  $TARGET  (boot partition: $BOOT0)"
 log "GPT image:    $WIC"
