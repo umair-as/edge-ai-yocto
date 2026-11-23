@@ -226,7 +226,10 @@ make hooks     # run once after cloning; idempotent
   content check matches the PEM armor line, not the bare words, so
   security docs that discuss key handling commit normally.
 - **commit-msg stage** — Conventional Commit subject, per §"Commit
-  style" above.
+  style" above, and `scripts/hooks/check-commit-trailers.sh`: an
+  `Assisted-by:` trailer, no AI `Co-Authored-By:`, no `scratch/` or
+  `/home/<user>/` paths in the message (§"AI attribution"). `make check`
+  runs the same checker over the branch's commits.
 
 pre-commit installs into `.git/hooks`, which is per-clone and untracked:
 a fresh clone has **both gates silently disabled** until `make hooks`

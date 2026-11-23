@@ -11,7 +11,8 @@ only GitHub workflow publishes release notes.
 
 Action versions are SHA-pinned and bumped monthly by Dependabot
 (`.github/dependabot.yml`). Pre-commit (`make hooks`) refuses staged private
-keys and non-conventional commit subjects at commit time.
+keys, non-conventional commit subjects and commit messages that fail the
+trailer and leak check at commit time.
 
 ## `make check`
 
@@ -20,11 +21,16 @@ keys and non-conventional commit subjects at commit time.
 - repository invariants (`scripts/ci/repo-lint.sh`): wrynose override syntax,
   `Upstream-Status` on every patch, no agent paths, host home paths or key
   material in shipped files, no tracked archives or prebuilt objects, relative
-  doc links resolve, `Assisted-by:` on every new commit and no AI
-  `Co-Authored-By:`
+  doc links resolve, required recipe header fields (SUMMARY of at most 80
+  characters, DESCRIPTION of at most 3 lines, HOMEPAGE, SECTION, LICENSE,
+  LIC_FILES_CHKSUM except for CLOSED, image and bundle recipes, no BUGTRACKER
+  pointing at this repository), and every new commit message passing
+  `scripts/hooks/check-commit-trailers.sh`: an `Assisted-by: <tool>:<model-id>`
+  trailer, no AI `Co-Authored-By:`, no `scratch/` or `/home/<user>/` paths
 - the private-key guard over all tracked files
 - shellcheck at warning level on every shell script
-- the ModelPack unit tests and the systemd-boot RAUC backend selftest
+- the ModelPack unit tests, the systemd-boot RAUC backend selftest, and the
+  commit trailer check selftest
 - the serial-console tee and VENTUNO Q flash tool selftests, only when the tool
   or its selftest changed (tens of seconds each; `CHECK_ALL=1` forces them)
 
