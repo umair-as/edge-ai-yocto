@@ -19,7 +19,10 @@ ASSISTED='^Assisted-by: *[a-z][a-z0-9-]*:[A-Za-z0-9][A-Za-z0-9._@/-]*(\[[A-Za-z0
 # A commit -v message carries the diff below the scissors line, which git
 # drops. '#' lines are kept by `git commit -m/-F` (cleanup=whitespace), so the
 # leak and co-author checks read them too; only trailer parsing ignores them.
-raw=$(sed '/^. -\{24\} >8 -\{24\}$/,$d' "$msg")
+# git's own editor template (branch, status, file lists) is dropped first: it
+# names branches and staged paths and is never recorded.
+TEMPLATE='^#(	|$| (Please enter|Lines starting|with .#. will|On branch|Your branch|HEAD detached|Changes (to be|not staged)|Untracked files|You are|Author:|Date:|interactive rebase|Last command|Next command|No commands|It looks like|and try again|Explicit paths))'
+raw=$(sed '/^. -\{24\} >8 -\{24\}$/,$d' "$msg" | grep -vE "$TEMPLATE" || true)
 body=$(printf '%s\n' "$raw" | git stripspace --strip-comments)
 
 rc=0

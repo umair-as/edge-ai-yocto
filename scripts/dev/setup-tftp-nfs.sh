@@ -137,7 +137,7 @@ if grep -qxF "$EXPORT_LINE" /etc/exports && \
 else
     stale="$(awk -v p="$NFS_ROOT" "$same_path" /etc/exports)"
     [ -n "$stale" ] && printf '[setup] revoking earlier export(s):\n%s\n' "$stale"
-    bak="/etc/exports.edge-bak.$(date -u '+%Y%m%dT%H%M%SZ')"
+    bak="/etc/exports.edge-bak.$(date -u '+%Y%m%dT%H%M%SZ').$$"
     cp -p /etc/exports "$bak"
     awk -v p="$NFS_ROOT" "$same_path { next } index(\$0, \"# edge-ai-yocto dev NFS-root\") == 1 { next } { print }" \
         "$bak" > /etc/exports.edge-new
