@@ -31,7 +31,7 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && cd .. && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && cd .. && pwd -P)"
 
 log()  { printf '==> %s\n' "$*"; }
 warn() { printf '[WARN] %s\n' "$*" >&2; }
@@ -102,7 +102,9 @@ CN="$(openssl x509 -in "$CERT" -noout -subject 2>/dev/null \
 # Destination. Never inside the repo: the staged key is unencrypted material.
 # ---------------------------------------------------------------------------
 [ -n "$OUT" ] || OUT="${HOME}/.edge-ota/${CN}"
-OUT_ABS="$(mkdir -p "$OUT" && cd "$OUT" && pwd)"
+# Physical paths (pwd -P) on both sides: a symlink outside the repo that
+# points into it must not pass the prefix check.
+OUT_ABS="$(mkdir -p "$OUT" && cd "$OUT" && pwd -P)"
 
 case "$OUT_ABS/" in
     "$REPO_ROOT"/*)
