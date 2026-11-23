@@ -238,4 +238,4 @@ purge: ## wipe .kas/ and build/ (every board's TMPDIR); CONFIRM=1 required
 	rm -rf $(KAS_WORK_DIR) $(CURDIR)/build
 
 netboot-sync: ## copy the last rootfs + fitImage to the NFS/TFTP export (docs/dev/netboot/)
-	sudo ./scripts/dev/sync-nfs-rootfs.sh
+	sudo KEEP_SECRETS=$(or $(KEEP_SECRETS),0) ./scripts/dev/sync-nfs-rootfs.sh

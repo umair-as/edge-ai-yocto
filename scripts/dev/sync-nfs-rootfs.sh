@@ -60,10 +60,30 @@ install -d -m 0755 "$NFS_ROOT"
 note "wiping existing NFS root contents"
 find "$NFS_ROOT" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
 note "extracting rootfs (numeric-owner + xattrs)"
+# The export is readable as root by every admitted client: the OTA client key
+# and the bundle decryption key are not extracted onto it unless KEEP_SECRETS=1
+# (sudo KEEP_SECRETS=1 ..., or make netboot-sync KEEP_SECRETS=1).
+SECRETS=(etc/ota/device.key etc/ota/bundle-decrypt.key)
+EXCLUDES=()
+if [ "${KEEP_SECRETS:-0}" != 1 ]; then
+    for k in "${SECRETS[@]}"; do EXCLUDES+=("--exclude=$k"); done
+fi
 tar xpf "$ROOTFS_TAR" -C "$NFS_ROOT" \
     --numeric-owner \
     --xattrs \
-    --xattrs-include='*'
+    --xattrs-include='*' \
+    "${EXCLUDES[@]}"
+
+# Backstop for a tarball whose member names the excludes did not match.
+# find -type f inside the export only: an /etc/ota symlink is not followed.
+if [ "${KEEP_SECRETS:-0}" != 1 ]; then
+    if [ -d "$NFS_ROOT/etc/ota" ] && [ ! -L "$NFS_ROOT/etc/ota" ] && [ ! -L "$NFS_ROOT/etc" ]; then
+        find "$NFS_ROOT/etc/ota" -maxdepth 1 -type f \
+            \( -name device.key -o -name bundle-decrypt.key \) -print -delete \
+            | sed 's/^/[sync-nfs-rootfs] removed from the export: /'
+    fi
+    note "OTA private keys not exported (KEEP_SECRETS=1 keeps them)"
+fi
 
 # TFTP: replace the fitImage atomically (rename is atomic on the same FS).
 install -d -m 0755 "$TFTP_DIR"
