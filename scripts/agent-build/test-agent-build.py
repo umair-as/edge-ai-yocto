@@ -86,7 +86,9 @@ class StateTest(unittest.TestCase):
             self.assertEqual(ab.wait(Path(tmp), timeout=0), 2)
 
     def test_wait_exit_codes(self):
-        cases = [({"exit_code": 0}, 0), ({"exit_code": 2}, 1), ({"exit_code": -2}, 2)]
+        cases = [({"exit_code": 0}, 0), ({"exit_code": 2}, 1), ({"exit_code": -2}, 2),
+                 ({"exit_code": 2, "interrupted": True}, 2),
+                 ({"exit_code": 0, "interrupted": True}, 0)]
         for result, code in cases:
             with self.subTest(result=result), tempfile.TemporaryDirectory() as tmp:
                 run = fake_run(tmp, result_json=json.dumps({"finished": "t", **result}))
@@ -208,7 +210,9 @@ class LauncherTest(unittest.TestCase):
                     time.sleep(0.05)
                 time.sleep(0.5)
                 subprocess.run(["tmux", "-L", SOCKET, "send-keys", "-t", sessions[-1], "C-c"], check=True)
-                self.assertEqual(finish(run), -2)
+                # make dies by SIGINT (-2), or exits 2 when it reaps the
+                # interrupted child first; either is an interruption.
+                self.assertIn(finish(run), (-2, 2))
                 self.assertEqual(state(run), "interrupted")
                 run = launch("hold")
                 code, out = wait(run, timeout=1)
