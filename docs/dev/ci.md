@@ -26,8 +26,8 @@ trailer and leak check at commit time.
   characters, DESCRIPTION of at most 3 lines, HOMEPAGE, SECTION, LICENSE,
   LIC_FILES_CHKSUM except for CLOSED, image and bundle recipes, no BUGTRACKER
   pointing at this repository), and every new commit message passing
-  `scripts/hooks/check-commit-trailers.sh`: an `Assisted-by: <tool>:<model-id>`
-  trailer, no AI `Co-Authored-By:`, no `scratch/` or `/home/<user>/` paths
+  `scripts/hooks/check-commit-trailers.sh`: no AI `Co-Authored-By:`, no
+  `scratch/` or `/home/<user>/` paths
 - the private-key guard over all tracked files
 - shellcheck at warning level on every shell script
 - the ModelPack unit tests, the systemd-boot RAUC backend selftest, and the

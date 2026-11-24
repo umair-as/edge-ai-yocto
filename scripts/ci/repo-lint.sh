@@ -91,11 +91,9 @@ done
 [ "$bad_rec" -eq 1 ] && bad "recipe header metadata (see the recipe header rules in AGENTS.md)" || ok "all recipes"
 
 hdr "INVARIANT: new commit messages pass the trailer and leak check"
-# Scope: commits this branch adds, not all history. AGENTS.md grandfathers
-# everything before 2026-08-12, and a rebase-merge rewrites committer dates,
-# so a date filter on history is unreliable -- the range is the honest scope.
-# Same checker as the commit-msg hook. Bot-authored commits ("[bot]" suffix)
-# have no AI participation to attest and are skipped.
+# Scope: commits this branch adds, not all history: older commits predate
+# the rules. Same checker as the commit-msg hook. Bot-authored commits
+# ("[bot]" suffix) are skipped.
 RANGE="${LINT_RANGE:-main..HEAD}"
 if git rev-parse --quiet --verify "${RANGE%%..*}" >/dev/null 2>&1; then
     msgf=$(mktemp)

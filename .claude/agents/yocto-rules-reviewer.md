@@ -45,8 +45,8 @@ For each changed hunk, check the rules that apply to its file type:
 
 - `.patch`: header fields, `Upstream-Status` value fits the patch (run the
   counterfactual test for mixed motives), and if a `Backport` header changed,
-  anything beyond the `Upstream-Status:` line is a violation. An `Assisted-by:`
-  sits above `Signed-off-by:`; an agent never adds a `Signed-off-by:`.
+  anything beyond the `Upstream-Status:` line is a violation. A newly written
+  patch has no `Assisted-by:`; an agent never adds a `Signed-off-by:`.
 - `.bb`/`.bbappend`/`.inc`: header rules for new recipes, `S`/`UNPACKDIR`,
   `IMAGE_FSTYPES ?=`, `PACKAGE_ARCH` before `inherit packagegroup`,
   `FILESEXTRAPATHS:prepend :=`, leading space in `:append`, SRCREV pinned, a
