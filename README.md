@@ -69,6 +69,6 @@ capability flags (`TPM=1`, `SBOM_TUNE=1`, …).
 ---
 
 **Hardware:** Renesas RZ/V2L SMARC EVK (dual Cortex-A55 + DRP-AI accelerator); Raspberry Pi 5 (quad Cortex-A76, PCIe accelerator slot); Arduino VENTUNO Q (Qualcomm QCS8275: 4x Cortex-A78C + 4x Cortex-A55, Hexagon NPU, STM32H5 co-processor).
-**License:** MIT (recipes and configuration in this repo). Upstream firmware (TF-A, U-Boot, OP-TEE) carries its respective BSD/GPL license.
+**License:** MIT (recipes and configuration in this repo). Upstream firmware (TF-A, U-Boot, OP-TEE) carries its respective BSD/GPL license. The repository holds no vendor binaries; vendor packages are obtained at build time under their own licences. An image built with a proprietary accelerator stack (DX-M1, QNN HTP) gets a `NOT-REDISTRIBUTABLE` marker beside it, and neither it nor a bundle built from it may be redistributed.
 
 *Reference implementation — not certified, not for fleet deployment as-is.*
