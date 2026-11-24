@@ -39,7 +39,7 @@ DEFAULT_BOARD = "rzv2l"  # the Makefile's BOARD default
 # Makefile targets that end up running bitbake; keep in step with the Makefile
 # and the parallel-build hook's MAKE_BUILD_TARGETS.
 BUILD_TARGETS = {"base", "dev", "prod", "bundle", "parse", "layers", "shell", "ci",
-                 "kernel-config-export", "kernel-hardening-check", "bitbake-task",
+                 "kernel-config-export", "kernel-hardening-check",
                  "bootchain-bundle", "bootloader-package"}
 RUNNING = r"bin/(bitbake|bitbake-server|kas|kas-container)( |$)"
 

@@ -1,4 +1,6 @@
-.PHONY: help base dev prod bundle bootchain-bundle bootloader-package parse bitbake-task preflight layers shell info clean-lock netboot-sync lock verify-pins purge hooks check ci kernel-config-export kernel-hardening-check cve
+.PHONY: help base dev prod bundle bootchain-bundle bootloader-package parse preflight layers shell info clean-lock netboot-sync lock verify-pins purge hooks check ci kernel-config-export kernel-hardening-check cve
+
+.DEFAULT_GOAL := help
 
 KAS ?= kas
 
@@ -72,6 +74,7 @@ unexport EDGE_PROFILE BUNDLE_IMAGE_NAME EDGE_BUNDLE_SBOM_CVE
 # $(1) = build settings for kas env:, $(2) = command run in the kas shell.
 kas_run = $(1) $(KAS) shell -c '$(2)' $(STACK)
 
+# Writes the layout stamp; runs after every check that can refuse the build.
 define layout_guard
 	@if [ -n "$(LAYOUT)" ] && [ -n "$(BUILT_LAYOUT)" ] && [ "$(LAYOUT)" != "$(BUILT_LAYOUT)" ] \
 	    && [ "$(LAYOUT_CHANGE)" != 1 ]; then \
@@ -129,20 +132,20 @@ help: ## this list
 	@echo "Composition: $(STACK)"
 
 base: | $(KAS_DIRS) ## edge-image-base (dev tier)
-	$(layout_guard)
 	$(require_module_key)
+	$(layout_guard)
 	$(check_rauc_keys)
 	$(call kas_run,EDGE_PROFILE=dev,bitbake edge-image-base)
 
 dev: | $(KAS_DIRS) ## edge-image-dev (dev tier; debug, profiling and stress tools)
-	$(layout_guard)
 	$(require_module_key)
+	$(layout_guard)
 	$(check_rauc_keys)
 	$(call kas_run,EDGE_PROFILE=dev,bitbake edge-image-dev)
 
 prod: | $(KAS_DIRS) ## edge-image-prod (prod tier; hardened, no package management)
-	$(layout_guard)
 	$(require_module_key)
+	$(layout_guard)
 	$(check_rauc_keys)
 	$(call kas_run,EDGE_PROFILE=prod,bitbake edge-image-prod)
 
@@ -150,9 +153,9 @@ bundle: | $(KAS_DIRS) ## edge-bundle (.raucb) for OTA; builds the image too
 	@test "$(origin EDGE_PROFILE)" != "command line" -a "$(origin BUNDLE_IMAGE_NAME)" != "command line" || { \
 		echo "bundle: IMAGE=dev|prod selects tier and image together; drop EDGE_PROFILE/BUNDLE_IMAGE_NAME"; exit 1; }
 	@case "$(IMAGE)" in dev|prod) ;; *) echo "IMAGE=$(IMAGE): expected dev or prod"; exit 1;; esac
-	$(layout_guard)
 	$(require_rauc_signer)
 	$(require_module_key)
+	$(layout_guard)
 	$(check_rauc_keys)
 	$(call kas_run,EDGE_PROFILE=$(IMAGE) BUNDLE_IMAGE_NAME=edge-image-$(IMAGE)$(if $(filter 1,$(SBOM_CVE)), EDGE_BUNDLE_SBOM_CVE=1),bitbake edge-bundle)
 	@find $(KAS_BUILD_DIR)/tmp/deploy/images -name '*.raucb' -printf '    %p\n'
@@ -160,9 +163,9 @@ bundle: | $(KAS_DIRS) ## edge-bundle (.raucb) for OTA; builds the image too
 bootchain-bundle: | $(KAS_DIRS) ## RZ/V2L bootloader-only bundle for the eMMC boot-emmc slot (LAYOUT=emmc)
 	$(require_rzv2l)
 	@test "$(LAYOUT_EFF)" = emmc || { echo "bootchain-bundle: needs LAYOUT=emmc (tree is $(LAYOUT_EFF))"; exit 1; }
-	$(layout_guard)
 	$(require_rauc_signer)
 	$(require_module_key)
+	$(layout_guard)
 	$(check_rauc_keys)
 	$(call kas_run,EDGE_PROFILE=$(EDGE_PROFILE),bitbake rzv2l-bootchain-bundle)
 	@find $(KAS_BUILD_DIR)/tmp/deploy/images -name 'rzv2l-bootchain-bundle*.raucb' -printf '    %p\n'
@@ -176,15 +179,6 @@ bootloader-package: | $(KAS_DIRS) ## RZ/V2L host package: BL2/FIP + manifest + u
 parse: | $(KAS_DIRS) ## bitbake -p (parse-only check; EDGE_PROFILE=, LAYOUT= apply)
 	$(call kas_run,EDGE_PROFILE=$(EDGE_PROFILE),bitbake -p)
 
-# BB_TASK is passed inside a single-quoted kas shell -c string; it is read from
-# the environment for the check so no value reaches the recipe shell unvetted.
-bitbake-task: export BB_TASK := $(BB_TASK)
-bitbake-task: | $(KAS_DIRS) ## one BitBake task: BB_TASK="<recipe…> -c <task>" (EDGE_PROFILE= applies)
-	@[ "$$(printf '%s' "$$BB_TASK" | wc -l)" -eq 0 ] && \
-	 printf '%s' "$$BB_TASK" | grep -qE '^[A-Za-z0-9._/+ -]+ -c [a-z_]+$$' || { \
-		echo 'bitbake-task: set BB_TASK="<recipe…> -c <task>"'; exit 2; }
-	$(call kas_run,EDGE_PROFILE=$(EDGE_PROFILE),bitbake $(BB_TASK))
-
 preflight: ## cheapest checks for the changed paths (PREFLIGHT_ARGS=--plan|--bitbake|--base REF)
 	python3 scripts/ci/preflight.py --board $(BOARD) $(PREFLIGHT_ARGS)
 
@@ -197,6 +191,12 @@ ci: ## parse-check origin/main in a worktree, post commit statuses (CI_ARGS=…,
 KHC_PROFILE ?= prod
 KHC_OUT     ?= $(CURDIR)/build/khc/$(BOARD)-$(KHC_PROFILE).config
 KHC_DIR      = meta-edge-bsp/recipes-kernel/linux/files/khc
+# Checked at parse time so a board without a baseline fails before the export.
+ifneq ($(filter kernel-hardening-check,$(MAKECMDGOALS)),)
+  ifeq ($(wildcard $(KHC_DIR)/$(BOARD)-$(KHC_PROFILE).baseline.json),)
+    $(error kernel-hardening-check: no $(KHC_DIR)/$(BOARD)-$(KHC_PROFILE).baseline.json)
+  endif
+endif
 
 kernel-config-export: | $(KAS_DIRS) ## expanded kernel .config (configure only) -> build/khc/<board>-prod.config
 	$(require_module_key)
@@ -247,6 +247,8 @@ hooks: ## install the commit and commit-msg git hooks (once per clone)
 # Not `kas purge`: on kas 4.8.2 that also wipes KAS_REPO_REF_DIR, a shared cache.
 purge: ## wipe .kas/ and build/ (every board's TMPDIR); CONFIRM=1 required
 	@test "$(CONFIRM)" = 1 || { echo "Refusing: removes $(KAS_WORK_DIR)/ and $(CURDIR)/build/. Re-run with CONFIRM=1."; exit 1; }
+	@case "$(abspath $(KAS_WORK_DIR))" in "$(CURDIR)"/?*) ;; *) \
+		echo "Refusing: KAS_WORK_DIR=$(KAS_WORK_DIR) is not below $(CURDIR)"; exit 1;; esac
 	rm -rf $(KAS_WORK_DIR) $(CURDIR)/build
 
 netboot-sync: ## copy the last rootfs + fitImage to the NFS/TFTP export (docs/dev/netboot/)

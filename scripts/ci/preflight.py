@@ -37,6 +37,7 @@ import fcntl
 import os
 import pathlib
 import re
+import shlex
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -104,6 +105,15 @@ def kas_chain(board):
     return seen
 
 
+def kas_task(board, task):
+    """argv running `bitbake <task>` in the kas shell `make` would compose for board."""
+    chain = f"kas/base.yml:kas/machines/{board}.yml"
+    if (REPO / "kas" / "local.yml").is_file():
+        chain += ":kas/local.yml"
+    shell = f". scripts/env.sh >/dev/null && kas shell -c {shlex.quote('bitbake ' + task)} {chain}"
+    return ("env", f"BOARD={board}", "EDGE_PROFILE=dev", "bash", "-c", shell)
+
+
 @dataclass
 class Plan:
     board: str
@@ -122,17 +132,17 @@ class Plan:
     evidence: dict = field(default_factory=dict)
 
     def bitbake_checks(self):
-        """(name, make argv) for each selected bitbake-tier check, cheapest first."""
+        """(name, argv) for each selected bitbake-tier check, cheapest first."""
         b = f"BOARD={self.board}"
         out = []
         if self.recipes:
             task = " ".join(sorted(self.recipes)) + " -c patch"
-            out.append(("recipe-patch", ("make", "bitbake-task", b, "BB_TASK=" + task)))
+            out.append(("recipe-patch", kas_task(self.board, task)))
         if self.kernel:
             out.append(
                 (
                     "kernel-configure",
-                    ("make", "bitbake-task", b, "BB_TASK=virtual/kernel -c configure"),
+                    kas_task(self.board, "virtual/kernel -c configure"),
                 )
             )
         if self.khc:
@@ -523,7 +533,7 @@ def refusal(board, allow_cold, repo=REPO):
 
 
 def run(argv):
-    print("  $ " + " ".join(argv), flush=True)
+    print("  $ " + shlex.join(argv), flush=True)
     return subprocess.run(argv, cwd=REPO, check=False).returncode
 
 
@@ -536,7 +546,10 @@ def report(plan, paths, ran_bitbake):
         )
     for name, argv in plan.bitbake_checks():
         ev = plan.evidence.get(name) or plan.evidence.get("parse", "")
-        print(f"  [bitbake] {name:24} {' '.join(argv[1:])}  (e.g. {ev})")
+        shown = (
+            " ".join(argv[1:]) if argv[0] == "make" else " ".join(argv[1:3] + argv[5:])
+        )
+        print(f"  [bitbake] {name:24} {shown}  (e.g. {ev})")
     if plan.recipes and len(plan.recipes) > 10:
         print(
             f"  note: do_patch spans {len(plan.recipes)} recipes and recreates their "

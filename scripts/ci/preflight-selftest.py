@@ -235,6 +235,22 @@ class BoardsAndKas(unittest.TestCase):
             p.bitbake_checks(), [("parse", ("make", "parse", "BOARD=ventuno-q"))]
         )
 
+    def test_recipe_task_runs_in_the_boards_kas_shell(self):
+        p = plan(
+            ["meta-edge-bsp/recipes-support/edge-systemd-presets/files/90-edge.preset"],
+            board="raspberrypi5",
+        )
+        [(_, argv)] = p.bitbake_checks()
+        self.assertEqual(
+            argv[:5], ("env", "BOARD=raspberrypi5", "EDGE_PROFILE=dev", "bash", "-c")
+        )
+        self.assertTrue(
+            argv[5].startswith(". scripts/env.sh >/dev/null && kas shell -c ")
+        )
+        self.assertIn("'bitbake edge-systemd-presets -c patch'", argv[5])
+        self.assertIn(" kas/base.yml:kas/machines/raspberrypi5.yml", argv[5])
+        self.assertNotIn("make", argv)
+
 
 class SecondReview(unittest.TestCase):
     def test_no_khc_without_a_board_baseline(self):

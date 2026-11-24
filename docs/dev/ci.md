@@ -53,8 +53,9 @@ counts for its recipe, and a shared `files/` directory counts for the recipes
 that add it through `${EDGE_BSP_LAYERDIR}`), kernel `do_configure` for kernel
 paths, the KSPP gate (`make kernel-hardening-check`) for fragments, the kernel
 policy and KHC baselines on a board that has a baseline, and otherwise a parse for metadata and for kas files
-in the board's default chain. It goes through
-`make bitbake-task BB_TASK="<recipe…> -c <task>"`.
+in the board's default chain. Recipe and kernel tasks run as
+`kas shell -c 'bitbake <recipe…> -c <task>'` over that chain, with
+`scripts/env.sh` sourced.
 
 A path the board's run does not exercise is listed as not covered, with the
 reason: another board's dynamic layer, board include or KHC baseline, a kas
