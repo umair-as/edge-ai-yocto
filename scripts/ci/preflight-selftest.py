@@ -245,7 +245,9 @@ class BoardsAndKas(unittest.TestCase):
             argv[:5], ("env", "BOARD=raspberrypi5", "EDGE_PROFILE=dev", "bash", "-c")
         )
         self.assertTrue(
-            argv[5].startswith(". scripts/env.sh >/dev/null && kas shell -c ")
+            argv[5].startswith(
+                '. scripts/env.sh >/dev/null && mkdir -p "$KAS_BUILD_DIR" && kas shell -c '
+            )
         )
         self.assertIn("'bitbake edge-systemd-presets -c patch'", argv[5])
         self.assertIn(" kas/base.yml:kas/machines/raspberrypi5.yml", argv[5])

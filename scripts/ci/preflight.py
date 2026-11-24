@@ -110,7 +110,16 @@ def kas_task(board, task):
     chain = f"kas/base.yml:kas/machines/{board}.yml"
     if (REPO / "kas" / "local.yml").is_file():
         chain += ":kas/local.yml"
-    shell = f". scripts/env.sh >/dev/null && kas shell -c {shlex.quote('bitbake ' + task)} {chain}"
+    # The layout stamped in the build dir, as the Makefile's STACK reuses it.
+    stamp = REPO / "build" / board / "edge-layout"
+    layout = stamp.read_text().strip() if stamp.is_file() else "esd"
+    if layout != "esd" and (REPO / "kas" / "boot" / f"{layout}.yml").is_file():
+        chain += f":kas/boot/{layout}.yml"
+    # kas refuses a KAS_BUILD_DIR that does not exist.
+    shell = (
+        '. scripts/env.sh >/dev/null && mkdir -p "$KAS_BUILD_DIR" && '
+        f"kas shell -c {shlex.quote('bitbake ' + task)} {chain}"
+    )
     return ("env", f"BOARD={board}", "EDGE_PROFILE=dev", "bash", "-c", shell)
 
 
