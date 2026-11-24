@@ -229,8 +229,8 @@ The two loops and the reasons for them are in
   status stays the same, and such a finding does not appear in the monitor diff.
 - **Release** changes, builds, compares, passes the release gate (section 9), and installs.
 
-The monitor runs weekly while the project is active, at the start of each security work
-session, and before a release. Releases happen at validated milestones. Vendor, kernel and
+The monitor runs at the start of each security work session and before a release, not on a
+fixed calendar. Releases happen at validated milestones. Vendor, kernel and
 layer pins and the carried backports are reviewed at each milestone.
 
 The date of the last scan is recorded. An old scan is not current: when work starts again
