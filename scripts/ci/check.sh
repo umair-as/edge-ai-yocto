@@ -63,6 +63,7 @@ step "commit trailer check selftest" sh scripts/ci/commit-trailers-selftest.sh
 step "preflight mapping selftest" python3 scripts/ci/preflight-selftest.py
 step "ModelPack host tests" python3 -m unittest -q scripts/modelpack/tests/test_modelpack.py
 step "systemd-boot RAUC backend selftest" bash scripts/ci/edge-sdboot-backend-selftest.sh
+step "on-device check suites selftest" bash scripts/ci/edge-checks-selftest.sh
 slow "serial console tee selftest" \
     '^scripts/(dev/serial-console-tee\.py|ci/serial-console-tee-selftest\.py)$' \
     python3 scripts/ci/serial-console-tee-selftest.py

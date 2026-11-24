@@ -89,8 +89,10 @@ deployed image.
 
 ## Checks
 
-`scripts/dev/edge-smoke-test.sh` selects its accelerator section from the
-installed stack (`71-edge-dxm1.rules` for DX-M1). For DX-M1 it checks: PCIe endpoint
+`scripts/dev/edge-smoke-test.sh` selects its accelerator module from
+`EDGE_ACCEL` in `/etc/buildinfo`, or from the installed stack
+(`71-edge-dxm1.rules` for DX-M1) on an image that records none. For DX-M1 it
+checks: PCIe endpoint
 `1ff4` present with Mem+/BusMaster+, ASPM off, `dx_dma` and `dxrt_driver`
 loaded, `/dev/dxrt0` `root:dxrt 0660`, `dxrtd` active as `dxrt`,
 `/run/dxrt/ipc.sock` present, `dxrt-cli -s` identifying the device (with
