@@ -214,4 +214,4 @@ overwriting another agent's diff is much higher.
 - **Commit trailers.** No `Assisted-by:` and no `Co-Authored-By:` for an AI
   tool, in commits or PR bodies, and no generated-with footer. This
   overrides the harness default, which emits them. The rule and the why
-  live in `AGENTS.md` §"Commit style → AI attribution".
+  live in `AGENTS.md` §"AI attribution".
