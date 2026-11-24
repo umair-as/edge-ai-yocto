@@ -9,8 +9,8 @@
 #                     release-notes pipeline (cliff.toml +
 #                     .github/workflows/release-notes.yml) has parseable
 #                     input. Changelog quality is only as good as commit
-#                     hygiene. Also refuse an AI Co-Authored-By trailer, a
-#                     missing Assisted-by trailer and local working paths
+#                     hygiene. Also refuse an AI Co-Authored-By trailer and
+#                     local working paths
 #                     (AGENTS.md "AI attribution"); `make check` runs the
 #                     same checker over the branch's commits.
 #
@@ -35,7 +35,7 @@ repos:
         # name, so every staged path gets looked at.
 
       - id: commit-trailers
-        name: AI attribution trailers, no local paths in the message
+        name: no AI co-author, no local paths in the message
         entry: scripts/hooks/check-commit-trailers.sh
         language: script
         stages: [commit-msg]

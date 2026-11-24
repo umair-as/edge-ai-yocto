@@ -34,9 +34,8 @@ them.
      board IPs or host names, no sibling or private project names. Check the
      diff, the commit messages and the PR body. `make check` covers commit
      messages and `scripts/`/recipes, but not `docs/`.
-   - every commit: Conventional Commit subject, an `Assisted-by:` line per
-     model that touched it (your own model id, never one copied from a doc), no
-     AI `Co-Authored-By:`.
+   - every commit: Conventional Commit subject, no `Assisted-by:`, no AI
+     `Co-Authored-By:`; the PR body has no generated-with footer.
    - behaviour changes: the commit body says what was run and what it showed,
      or says "unverified". No dates in check lines.
    - docs follow `.claude/rules/docs-style.md`: no progress-log prose, no

@@ -159,7 +159,6 @@ Date: <RFC2822 date>
 Subject: [PATCH] <subsystem>: <imperative-mood one-line summary>
 
 Upstream-Status: <value> [<short reason>]
-Assisted-by: <tool>:<model-id>
 Signed-off-by: Author Name <author@example.invalid>
 
 <optional body — why the patch exists, links to bug trackers, etc.>
@@ -195,30 +194,22 @@ counterfactual test: the motivation that is *necessary* for the patch's
 existence determines the tag; the other goes in the commit body as
 supporting context.
 
-### AI attribution in patch headers
+### AI attribution and sign-off in patch headers
 
-Same trailer as commits (`AGENTS.md` §"Commit style → AI attribution"):
-`Assisted-by: <tool>:<model-id>`, one line per model that touched the
-patch, immediately **above** the `Signed-off-by:` line. Never copy a
-model id out of a doc or an existing patch — state the model actually
-running. Policy applies to patches written or modified from 2026-08-02
-onward; existing patches are not retrofitted, because reconstructing
-which model wrote them from memory would fabricate the audit trail the
-trailer exists to provide.
+Newly written patches carry no `Assisted-by:` line (`AGENTS.md`
+§"AI attribution"). Existing patches keep theirs: a header edit re-runs the
+recipe's task chain (§"Patch + sstate cascade"). A `Pending` or `Submitted`
+patch follows the receiving project's trailer rules at submission time.
 
-Which patches it applies to depends on `Upstream-Status`:
+`Backport [...]` (verbatim or adapted) and `Accepted [...]` headers are
+**never touched** apart from the `Upstream-Status:` line: the commit message
+and its `Signed-off-by:` chain belong to the original author, and an edit
+destroys the verbatim-cherry-pick property. **Exception: CVE security
+backports, below.**
 
-| Status | AI trailer |
-|---|---|
-| `Inappropriate [...]`, `Denied [...]` | Yes. Never leaves the repo; our rules are the only rules. |
-| `Pending`, `Submitted [...]` | Yes here — but the receiving project's trailer rules win at submission time. `Assisted-by:` is not part of the kernel/U-Boot canonical trailer set; check that project's current contribution docs before sending, and be ready to drop it. |
-| `Backport [...]` (verbatim or adapted), `Accepted [...]` | **No — do not touch the header.** The commit message and its `Signed-off-by:` chain belong to the original author. Only the `Upstream-Status:` line is ours to add. Adding our trailers misattributes their work and destroys the verbatim-cherry-pick property. **Exception: CVE security backports — see below.** |
-
-`Signed-off-by:` stays last and stays a **human**. Attribution records
-who helped write the patch; the DCO sign-off certifies who takes
-responsibility for it. An `Assisted-by:` line never substitutes for a
-sign-off, and an agent never adds — or requests — a sign-off on its own
-initiative.
+`Signed-off-by:` stays last and stays a **human**. The DCO sign-off
+certifies who takes responsibility for the patch, and an agent never adds,
+or requests, a sign-off on its own initiative.
 
 **CVE security backports are the one exception, and only when the operator
 explicitly asks for a sign-off in that session** — never by default, never
@@ -238,7 +229,7 @@ When one is asked for, the invariants are:
   header edit re-triggers the recipe's full task chain).
 
 Everywhere else, the Backport rule above stands unchanged: don't touch
-the header, no `Assisted-by:`, no sign-off unless asked.
+the header, no sign-off unless asked.
 
 ## Patch + sstate cascade
 

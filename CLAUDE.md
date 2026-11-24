@@ -211,18 +211,7 @@ overwriting another agent's diff is much higher.
   strategy). Do not run `git add`, `git commit`, `git branch`,
   `git tag`, or other state-changing git commands without operator
   confirmation. If a change feels like it warrants a commit, stop and ask.
-- **Commit trailers.** The canonical rule is `AGENTS.md` §"Commit style →
-  AI attribution": an `Assisted-by: <tool>:<model-id>` line per model that
-  touched the change. From Claude Code that is
-  `Assisted-by: claude-code:<the model id you are running as>`.
-
-  **Do not copy a model name from this file.** This bullet deliberately
-  contains no literal model id: an earlier revision pinned one, and it was
-  already two releases stale before anyone noticed. Read your own model
-  identity from your instructions and write that.
-
-  **Do not add `Co-Authored-By:` for an AI tool** — not in commits, not
-  in PR bodies. This overrides the harness default, which emits one;
-  drop that line along with the generated-with footer. The why and the
-  applicability date live in `AGENTS.md` §"Commit style → AI
-  attribution".
+- **Commit trailers.** No `Assisted-by:` and no `Co-Authored-By:` for an AI
+  tool, in commits or PR bodies, and no generated-with footer. This
+  overrides the harness default, which emits them. The rule and the why
+  live in `AGENTS.md` §"Commit style → AI attribution".

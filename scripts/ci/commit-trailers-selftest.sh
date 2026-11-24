@@ -20,20 +20,18 @@ case_() {
     else printf '  FAIL %s (expected %s, got %s)\n' "$2" "$1" "$got"; fails=$((fails + 1)); fi
 }
 
-OK='Assisted-by: claude-code:claude-opus-5-5'
+# An Assisted-by trailer is no longer required; older commits carry one and pass.
+OK='Signed-off-by: Jane Doe <jane@example.invalid>'
 
-case_ pass "plain Assisted-by" "fix(bsp): do a thing
+case_ pass "no trailers" "fix(bsp): do a thing
 
-Body.
+Body."
+case_ pass "legacy Assisted-by is accepted" "fix(bsp): do a thing
 
-$OK"
-case_ pass "two models in order" "fix(bsp): do a thing
+Assisted-by: claude-code:some-model"
+case_ pass "legacy malformed Assisted-by is not checked" "docs: x
 
-Assisted-by: claude-code:claude-sonnet-5
-$OK"
-case_ pass "model id with context suffix" "docs: x
-
-Assisted-by: claude-code:claude-opus-5[1m]"
+Assisted-by: Claude"
 case_ pass "human Co-Authored-By is fine" "docs: x
 
 Co-Authored-By: Jane Doe <jane@example.invalid>
@@ -63,15 +61,12 @@ $OK
 # Do not modify or remove the line above.
 diff --git a/scratch/x b/scratch/x
 +Co-Authored-By: Claude <noreply@anthropic.com>"
-case_ pass "fixup skips Assisted-by" "fixup! docs: x"
+case_ pass "fixup" "fixup! docs: x"
 case_ pass "device user path /home/devel/ is not a leak" "docs: x
 
 Runs as /home/devel/bin/x on the board.
 
 $OK"
-case_ pass "model id with a date tag" "docs: x
-
-Assisted-by: claude-code:claude-opus-4-5@20251101"
 case_ pass "build path is not a leak" "docs: x
 
 Mentions build/<BOARD>/tmp only.
@@ -97,17 +92,6 @@ Co-authored-by: copilot-swe-agent[bot] <x@example.invalid>"
 case_ fail "AI Co-Authored-By on a fixup" "fixup! docs: x
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
-case_ fail "no Assisted-by" "docs: x
-
-Body only."
-case_ fail "Assisted-by in the body, not the trailer block" "docs: x
-
-Assisted-by: claude-code:claude-opus-5-5
-
-Trailing paragraph."
-case_ fail "malformed Assisted-by" "docs: x
-
-Assisted-by: Claude"
 case_ fail "scratch path" "docs: x
 
 See scratch/notes.md.

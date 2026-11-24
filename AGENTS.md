@@ -6,6 +6,12 @@ specific extras (skills, MCP servers) live in `CLAUDE.md`.
 
 ## What this repo is
 
+This project is agent-driven. Its commits, patches and docs are written by
+AI coding agents (Claude Code, Codex, Kiro) under the maintainer's direction
+and review; the maintainer is the commit author and answers for every
+change. Because that holds for the whole repository, individual commits do
+not carry an AI attribution trailer (§"AI attribution").
+
 See [README.md](README.md) for the platform summary. Short version:
 KAS-driven Yocto 6.0 (wrynose) build, custom `edge-ai` distro, and a
 per-board vendor BSP and kernel (ADR-0011): the Renesas RZ/V2L SMARC EVK
@@ -229,11 +235,10 @@ make hooks     # run once after cloning; idempotent
   content check matches the PEM armor line, not the bare words, so
   security docs that discuss key handling commit normally.
 - **commit-msg stage** — Conventional Commit subject, per §"Commit
-  style" above, and `scripts/hooks/check-commit-trailers.sh`: an
-  `Assisted-by:` trailer, no AI `Co-Authored-By:`, no `scratch/` or
-  `/home/<user>/` paths in the message (§"AI attribution"). It requires
-  the trailer on every commit, as `make check` does over the branch's
-  commits; a commit with no AI involvement needs `--no-verify`.
+  style" above, and `scripts/hooks/check-commit-trailers.sh`: no AI
+  `Co-Authored-By:`, no `scratch/` or `/home/<user>/` paths in the
+  message (§"AI attribution"). `make check` runs the same check over
+  the branch's commits.
 
 pre-commit installs into `.git/hooks`, which is per-clone and untracked:
 a fresh clone has **both gates silently disabled** until `make hooks`
@@ -246,47 +251,26 @@ is the real control there. CI and review still matter.
 
 ### AI attribution
 
-Every commit an agent contributed to ends with an `Assisted-by:` trailer naming
-the tool and the **exact model that did the work**:
+Agents write the changes and the maintainer authors and answers for them
+(§"What this repo is"). That is stated once, here, not per commit.
 
-```
-Assisted-by: <tool>:<model-id>
-```
+- **No `Assisted-by:` trailer** on new commits or newly written patches.
+  Existing commits and patches keep theirs: history is not rewritten, and a
+  patch-header edit forces a rebuild of the recipe.
+- **No `Co-Authored-By:` for an AI tool**, in commits or PR bodies, and no
+  generated-with footer in PR bodies. This overrides tool defaults that emit
+  them. The commit-msg hook refuses an AI co-author; a non-AI bot such as
+  Dependabot passes.
+- When how a change was made matters to its review, the PR description says
+  so.
 
-Tool names in use: `claude-code`, `codex`, `kiro`. The model id half is
-deliberately shown as a placeholder here and nowhere spelled out — see the first
-rule below.
-
-- **Never copy a model id out of this file, `CLAUDE.md`, or a past commit.**
-  State the model the session is actually running as. A doc-pinned model string
-  goes stale the moment the next release ships, and every agent that copies it
-  writes a trailer that is quietly false.
-- **One trailer per model that touched the change, in the order they touched
-  it.** If Sonnet drafted and Opus later reviewed and amended, both lines stay.
-  That is the whole point: a later reader — human or model — can see which model
-  produced the original reasoning and which one revised it.
-- **Never drop an earlier agent's trailer when amending.** The trailer records
-  participation, not the largest share.
-- Attribution is not certification. The operator remains the commit author and
-  is responsible for having reviewed what the agent produced.
+The trailer came from the Linux kernel, which removed it from its docs in
+commit 1e035297ffda ("docs: remove Assisted-by references"): a per-change
+tag that many contributors leave off gives no reliable signal.
 
 **Patches are not commits.** Shipped `.patch` files carry their own headers
-and their own rules — including the hard rule that a `Backport` patch's header
-is never touched. See `.claude/rules/yocto-patterns.md` §"AI attribution in
-patch headers" before adding a trailer to anything under `files/`.
-
-**Do not add `Co-Authored-By:` for an AI tool** — not in commits, not in PR
-bodies. This overrides tool defaults that emit one (Claude Code's
-generated-with footer); drop those lines. `Assisted-by:` already records the
-same participation and records it better: it names the exact tool and model,
-one line per model in the order they touched the change. `Co-Authored-By:`
-asserts conventional authorship by something that cannot hold it, and
-duplicates a fact the line above states precisely. One label, deliberately.
-
-Applies to **new** commits from 2026-08-12 onward. Existing history keeps
-whatever it carries — do not retrofit, amend or rewrite past commits to
-match. A mixed history is honest; a rewritten one destroys the record the
-trailer exists to provide.
+and their own rules, including the hard rule that a `Backport` patch's header
+is never touched. See `.claude/rules/yocto-patterns.md` §"Patch headers".
 
 Mechanics for Claude Code sessions are in `CLAUDE.md`.
 
