@@ -48,9 +48,19 @@ them.
    anything changed. Record the verdict for the PR comment.
 
 6. **PR.** Ask the operator before pushing. Body: what changed and why in a
-   few lines, how it was validated, and the `RESULT:` line. Keep internal gaps,
-   parked work and known issues out of the public text. No generated-with
-   footer.
+   few lines, how it was validated, a **Workflow** section, and the `RESULT:`
+   line. Keep internal gaps, parked work and known issues out of the public
+   text. No generated-with footer.
+
+   The Workflow section makes the agent-driven process visible, one line each
+   (write "none" rather than omitting a line):
+   - **Learn:** the mistake, finding or decision this change comes from.
+   - **Guard:** the deterministic check added or changed, and the proof it
+     rejects the bad case (fails on the old code) and accepts a good one.
+   - **Review:** reviewer model(s), rounds, and the verdict, with a link to the
+     PR comment that records it.
+   - **Score:** what was measured against a baseline (differential run, eval
+     scenario), or "not scored".
 
 Merging is a separate step under the operator's merge rules; this skill ends
 at an open PR.

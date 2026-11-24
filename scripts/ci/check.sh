@@ -69,6 +69,8 @@ slow "serial console tee selftest" \
 slow "VENTUNO Q flash tool selftest" \
     '^scripts/(dev/ventunoq-flash\.py|ci/ventunoq-flash-selftest\.py)$' \
     python3 scripts/ci/ventunoq-flash-selftest.py
+slow "agent evidence helper tests" '^scripts/agent-workflow/' \
+    python3 -m pytest -q -p no:cacheprovider scripts/agent-workflow/tests
 
 printf '\n'
 [ ${#skipped[@]} -gt 0 ] && printf 'skipped (unchanged): %s\n' "$(IFS=,; echo "${skipped[*]}")"
