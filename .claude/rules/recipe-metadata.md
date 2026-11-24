@@ -1,3 +1,9 @@
+---
+paths:
+  - "meta-edge-bsp/**"
+  - "meta-edge-distro/**"
+---
+
 # Recipe metadata — canonical header layout
 
 Distilled from `openembedded-core/meta/conf/documentation.conf`,
@@ -244,36 +250,6 @@ SRC_URI:append:smarc-rzv2l = " file://board-patch.patch"
 ```
 
 Don't write `RDEPENDS_${PN}` — parser rejects it on wrynose.
-
-## What our internal recipes look like, fully populated
-
-Example: `edge-slot-udev_1.0.bb` with canonical metadata. Adapt this
-template for any new internal recipe.
-
-```bitbake
-SUMMARY     = "Stable RAUC slot udev symlinks for the edge distro"
-DESCRIPTION = "Provides /dev/disk/by-rauc-slot/{boot,rootfsA,rootfsB,data} \
-symlinks based on partition identity (mmcblk0pN). This avoids slot lookup \
-failures if ext4 labels change during OTA writes."
-HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
-SECTION     = "base"
-LICENSE     = "MIT"
-LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
-
-SRC_URI = "file://99-edge-rauc-slots.rules"
-
-inherit allarch
-
-S = "${UNPACKDIR}"
-
-do_install() {
-    install -d ${D}${nonarch_base_libdir}/udev/rules.d
-    install -m 0644 ${UNPACKDIR}/99-edge-rauc-slots.rules \
-        ${D}${nonarch_base_libdir}/udev/rules.d/
-}
-
-FILES:${PN} = "${nonarch_base_libdir}/udev/rules.d/99-edge-rauc-slots.rules"
-```
 
 ## Audit (state at the time this rule was written)
 
