@@ -14,7 +14,7 @@ import sys
 
 # Makefile targets that end up running bitbake; keep in step with the Makefile.
 MAKE_BUILD_TARGETS = {"base", "dev", "prod", "bundle", "parse", "layers", "shell", "ci",
-                      "kernel-config-export", "kernel-hardening-check", "bitbake-task",
+                      "kernel-config-export", "kernel-hardening-check",
                       "bootchain-bundle", "bootloader-package"}
 KAS_BUILD_SUBCOMMANDS = {"build", "shell"}
 # Words that only wrap the real command.
