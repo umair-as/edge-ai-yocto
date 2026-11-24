@@ -1,3 +1,9 @@
+---
+paths:
+  - "docs/**"
+  - "README.md"
+---
+
 # Docs style — `docs/`, `README.md`, ADRs
 
 Rules for prose under `docs/` and the top-level `README.md`. The audience is

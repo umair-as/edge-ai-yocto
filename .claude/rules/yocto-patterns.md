@@ -1,3 +1,10 @@
+---
+paths:
+  - "meta-edge-bsp/**"
+  - "meta-edge-distro/**"
+  - "kas/**"
+---
+
 # Yocto patterns — wrynose 6.0
 
 Rules that apply to recipe edits and kas wiring in this repo.

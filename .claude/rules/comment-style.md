@@ -1,3 +1,11 @@
+---
+paths:
+  - "meta-edge-bsp/**"
+  - "meta-edge-distro/**"
+  - "kas/**"
+  - "scripts/**"
+---
+
 # Comment style — recipes, kas, scripts
 
 Rules for comments in any file that lands in `meta-edge-bsp/`,
