@@ -69,8 +69,16 @@ slow "serial console tee selftest" \
 slow "VENTUNO Q flash tool selftest" \
     '^scripts/(dev/ventunoq-flash\.py|ci/ventunoq-flash-selftest\.py)$' \
     python3 scripts/ci/ventunoq-flash-selftest.py
-slow "agent evidence helper tests" '^scripts/agent-workflow/' \
-    python3 -m pytest -q -p no:cacheprovider scripts/agent-workflow/tests
+# pytest from the host when installed, else an ephemeral uv environment.
+run_evidence_tests() {
+    if python3 -c 'import pytest' 2>/dev/null; then
+        python3 -m pytest -q -p no:cacheprovider scripts/agent-workflow/tests
+    else
+        uv run -q --no-project --with pytest \
+            pytest -q -p no:cacheprovider scripts/agent-workflow/tests
+    fi
+}
+slow "agent evidence helper tests" '^scripts/agent-workflow/' run_evidence_tests
 
 printf '\n'
 [ ${#skipped[@]} -gt 0 ] && printf 'skipped (unchanged): %s\n' "$(IFS=,; echo "${skipped[*]}")"
