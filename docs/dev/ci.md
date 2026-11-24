@@ -30,8 +30,11 @@ trailer and leak check at commit time.
   `scratch/` or `/home/<user>/` paths
 - the private-key guard over all tracked files
 - shellcheck at warning level on every shell script
-- the ModelPack unit tests, the systemd-boot RAUC backend selftest, and the
-  commit trailer check and preflight mapping selftests
+- the ModelPack unit tests, the systemd-boot RAUC backend selftest, the
+  commit trailer check and preflight mapping selftests, and the on-device
+  check suites selftest (the generated `edge-smoke-test.sh` and
+  `edge-verity-check.sh` match `scripts/dev/edge-checks/`, and the suites'
+  parsers and runner pass on fixtures)
 - the serial-console tee and VENTUNO Q flash tool selftests and the agent
   evidence helper tests (pytest), only when the tool or its tests changed (tens
   of seconds each; `CHECK_ALL=1` forces them)

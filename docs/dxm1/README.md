@@ -75,8 +75,8 @@ NPU 0..2: voltage 750 mV, clock 1000 MHz, temperature 52'C
 
 `dxrtd` runs as uid 609 (`/proc/<pid>/status`), `/dev/dxrt0` is
 `crw-rw---- root dxrt`, and `id edge-ctr` lists `dxrt`. The smoke test's
-accelerator section (`scripts/dev/edge-smoke-test.sh`, selected by the
-installed accelerator stack) checks each of these.
+accelerator module (`scripts/dev/edge-smoke-test.sh`, selected by the
+composed accelerator in `/etc/buildinfo`) checks each of these.
 
 From the same board, image `20260916084924`, the shipped
 `dxm1-inference` Quadlet running unattended at boot as `edge-ctr`:
