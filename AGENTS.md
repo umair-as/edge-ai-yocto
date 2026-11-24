@@ -322,6 +322,14 @@ What makes it actually work:
 
 ## Working economically
 
+- **Evidence and continuity:** for multi-phase work, pickup or an explicit pause,
+  read `.claude/skills/agent-evidence/SKILL.md` (Codex and Claude Code alike).
+  Save long reviews/findings in the ignored scratch directory and link them
+  from chat, unless the user specifies another output. Shared format:
+  `docs/dev/agent-workflow.md`.
+- **Operator corrections:** use `.claude/skills/correction-loop/SKILL.md` to
+  turn demonstrated mistakes into scoped checks; do not expand the task or
+  treat proposed controls as implemented enforcement.
 - Inspect narrowly before scanning broadly — a recipe name or
   `bitbake-getvar` beats a repo-wide grep.
 - Validate progressively: `make parse` → the affected recipe's task →
@@ -402,6 +410,7 @@ deferred until the first release needs them.
 | Security docs — SBOM/CVE triage, SELinux, U-Boot hardening, kernel-config gate, vuln mgmt | `docs/security/README.md` (index) |
 | CI — `make check` before every PR, `make ci` on the build host, release notes | `docs/dev/ci.md` |
 | Launching and watching long builds (agent-build launcher) | `docs/dev/agent-builds.md` |
+| Evidence trail, session pickup/pause, correcting agent mistakes | `docs/dev/agent-workflow.md` |
 | OTA updates + rollback testing | `docs/dev/ota-updates.md`, `docs/dev/ota-rollback-test-plan.md` |
 | Bootchain update (per board) | `docs/dev/bootchain/README.md`, ADR-0014 |
 | Netboot dev workflow (per board) | `docs/dev/netboot/README.md` |

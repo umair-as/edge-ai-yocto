@@ -32,8 +32,9 @@ trailer and leak check at commit time.
 - shellcheck at warning level on every shell script
 - the ModelPack unit tests, the systemd-boot RAUC backend selftest, and the
   commit trailer check and preflight mapping selftests
-- the serial-console tee and VENTUNO Q flash tool selftests, only when the tool
-  or its selftest changed (tens of seconds each; `CHECK_ALL=1` forces them)
+- the serial-console tee and VENTUNO Q flash tool selftests and the agent
+  evidence helper tests (pytest), only when the tool or its tests changed (tens
+  of seconds each; `CHECK_ALL=1` forces them)
 
 ## `make preflight`
 

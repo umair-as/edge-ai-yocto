@@ -13,7 +13,7 @@ apply to other agents.
 
 ## Skills available
 
-`.claude/skills/` holds four repo-local skills:
+`.claude/skills/` holds six repo-local skills:
 
 - `devtool-workflow` — iterating on recipe source (U-Boot,
   `linux-renesas`, app) via `devtool` instead of hand-editing patches.
@@ -27,6 +27,16 @@ apply to other agents.
   build and how to read it (host tier, BitBake tier, uncovered paths).
 - `pr-ready` — operator-invoked (`/pr-ready`): hardware gate, `make check`
   / `make ci`, diff and commit hygiene, independent review, PR body.
+- `agent-evidence` — shared decision trail, session pickup and explicit pause;
+  durable records and long reports stay in the ignored scratch directory
+  (`docs/dev/agent-workflow.md`).
+- `correction-loop` — turn demonstrated agent mistakes into scoped, verified
+  guards; record unsupported claims and unavailable verification honestly.
+
+General plugin workflows, including superpowers, defer to these domain rules.
+Use `yocto-worktree` for build isolation and `docs/dev/agent-workflow.md` for
+shared evidence; generic worktree setup and fresh-verification rules do not
+authorize an unseeded build, an unnecessary rebuild or taking over the bench.
 
 `.claude/agents/build-watcher.md` is a read-only subagent that reports
 one `scripts/agent-build/agent-build.py` run in five lines and, on a
