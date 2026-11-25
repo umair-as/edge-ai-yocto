@@ -32,6 +32,13 @@ SRCREV_machine = "4700e3adf3b24b39dd4929e9c6d62811ba3ccea8"
 SRCREV_meta = "03eefba5e2b51af531fee31cf9705613a45d3688"
 SRCREV_FORMAT = "machine_meta"
 
+# meta-virtualization's linux-%.bbappend would merge its kernel-cache container
+# features (docker, lxc, vswitch, criu, ...) after the policy fragments and
+# re-enable the legacy x_tables engine and IPVLAN. Opted out: the container
+# runtime's options come from containers-cgroups.cfg and container-storage-net.cfg.
+SKIP_META_VIRT_KERNEL_INCLUDE = "1"
+META_VIRT_KERNEL_CHECK_WARNING_INHIBIT = "1"
+
 SRC_URI = " \
     git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git;name=machine;branch=${KBRANCH};protocol=https \
     git://git.yoctoproject.org/yocto-kernel-cache;type=kmeta;name=meta;branch=yocto-6.18;destsuffix=${KMETA};protocol=https \
@@ -66,6 +73,8 @@ SRC_URI:append = " \
     file://cfg/rtc-rpi.cfg \
     file://cfg/localversion-rpi5.cfg \
     file://cfg/wireless-rpi5.cfg \
+    file://cfg/xtables-legacy-off.cfg \
+    file://cfg/9p-off.cfg \
 "
 
 # VCIO mailbox userspace char device (/dev/vcio): backport of the Raspberry Pi
