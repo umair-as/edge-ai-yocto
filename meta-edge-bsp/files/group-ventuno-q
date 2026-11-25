@@ -7,3 +7,6 @@ dmaheap:*:630:
 
 # meta-qcom fastrpc: owner group of the /dev/fastrpc-* DSP nodes.
 fastrpc:*:631:
+
+# meta-qcom qcom-rtss-mailbox-dlkm: owner group of the RTSS mailbox device (rtssmb.rules).
+rtssmb:*:632:

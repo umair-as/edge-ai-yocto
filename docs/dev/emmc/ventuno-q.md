@@ -23,9 +23,13 @@ from the factory `system` partition.
 | 75 | `data` | `/data` | install (seed, grown on first boot) |
 
 Each slot boots a unified kernel image (UKI) holding the kernel, the board DTB
-and a command line with that slot's dm-verity table. systemd-boot picks the slot
-from the UKI file names in `\EFI\Linux\` (`edge-<generation>-<slot>[+tries].efi`);
-no EFI variable takes part in slot selection.
+and a command line with that slot's dm-verity table. The DTB in the UKI is the
+kernel's board DTB with the build-time overlays of `EDGE_UKI_DTB_OVERLAYS`
+merged in; for this board they disable the four IPCC mailboxes whose probe
+aborts on the factory firmware and that no node of this board's DT uses.
+systemd-boot picks the slot from the UKI file names in `\EFI\Linux\`
+(`edge-<generation>-<slot>[+tries].efi`); no EFI variable takes part in slot
+selection.
 
 ## Prerequisites
 
