@@ -50,6 +50,7 @@ __pycache__/
 .kas_shell_history
 tio-session-logs/
 scratch/**
+/.agents/
 
 # Claude Code per-user local settings — board IP, credentials, personal
 # paths. Never commit. Everything else under .claude/ is tracked.
