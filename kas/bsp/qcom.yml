@@ -18,15 +18,16 @@ repos:
   meta-qcom:
     url: https://github.com/qualcomm-linux/meta-qcom.git
     branch: wrynose
-    # The revision meta-qcom-arduino's ci/base.lock.yml builds against.
-    commit: a6c92fad47164e6f051ab5d90567bc92afa661ae
+    # meta-qcom-arduino's CI builds against this branch's head (no lock file);
+    # move both pins together.
+    commit: b9c78a706f64efb8feb03261fc0cb0f40f64eea2
     layers:
       .:
 
   meta-qcom-arduino:
     url: https://github.com/qualcomm-linux/meta-qcom-arduino.git
     branch: wrynose
-    commit: 2760e59c4d3dac6b5b1c4c5e4e8410c7e4731f3f
+    commit: 9fbe0ecdcba978a2955cb529fa91f477d58b2c6f
     layers:
       .:
 
