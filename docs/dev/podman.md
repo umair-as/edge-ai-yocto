@@ -272,11 +272,10 @@ the bring-up surface without `sudo`.
   label=disable` does not bypass.
 - **netavark uses the nftables firewall driver.** Set via
   `firewall_driver = "nftables"` in containers.conf (`10-edge-network.conf`).
-  The kernel ships a complete `nf_tables` set but not the full xtables
-  match set (no `xt_comment`), so netavark's *default* iptables driver
-  aborts bridge rule setup with `Extension comment ... missing kernel
-  module` / `iptables: No chain/target/match by that name`. If bridge
-  networking breaks, confirm the driver is still nftables.
+  The kernel is nftables-only: it ships the `nf_tables` set and no legacy
+  x_tables engine (`ip_tables`, `ip6_tables`) and no IPVLAN, so netavark's
+  *default* iptables driver cannot set up bridge rules. If bridge networking
+  breaks, confirm the driver is still nftables.
 - **Container IPs change between netavark restarts.** Don't hardcode
   IPs in app config; use container names + aardvark-dns.
 

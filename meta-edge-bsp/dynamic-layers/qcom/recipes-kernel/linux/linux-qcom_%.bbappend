@@ -16,6 +16,8 @@ SRC_URI:append:ventuno-q = " \
     file://cfg/ventuno-q-mcu.cfg \
     file://cfg/ventuno-q-qrtr.cfg \
     file://cfg/wireless-ventuno-q.cfg \
+    file://cfg/xtables-legacy-off.cfg \
+    file://cfg/9p-off.cfg \
 "
 
 # Asserted with the platform symbols. QRTR carries the remoteproc QMI
