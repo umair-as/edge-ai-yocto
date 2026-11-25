@@ -85,7 +85,7 @@ offline runner, a signature policy for the base image, and a verified model stor
 
 | Control | Status | Implementation |
 |---|---|---|
-| 2.a — SBOM | ✅ | SPDX 3.0.1 always-on via `OE_FRAGMENTS += "yocto/sbom-cve-check"`. |
+| 2.a — SBOM | ✅ | SPDX 3.0.1 always-on via `INHERIT += "create-spdx"` and `IMAGE_CLASSES:append = " sbom-cve-check"` in `edge-floor.inc`. |
 | 2.b — CVE scanning at build | ✅ | `sbom-cve-check-update-{nvd,cvelist}-native` pulled into every build. SRCREVs pinned (no AUTOREV drift). |
 | 2.c — Fail-on-critical-CVE policy | 🟡 | Sketched in `kas/sbom-cve.yml` as an `IMAGE_POSTPROCESS_COMMAND` hook; not wired, it needs an SBOM-walk script. |
 | 2.d — Vulnerability handling process | 🟡 | [`VULN-HANDLING.md`](VULN-HANDLING.md) + [ADR-0013](../adr/0013-vulnerability-handling-cadence-and-release-gate.md): reachability triage, fix-vs-mitigate, verification, release gate, OTA delivery via RAUC. No response-time commitment by design; report intake not covered (see [Vulnerability handling process](#vulnerability-handling-process)). |

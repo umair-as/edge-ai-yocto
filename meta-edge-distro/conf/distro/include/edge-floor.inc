@@ -154,14 +154,12 @@ PODMAN_FEATURES:pn-podman            ?= ""
 # Non-negotiable: every edge-ai build emits an SBOM and runs the CVE check.
 # CVE-DB revision pins live in edge-cve-db.inc (required below).
 #
-# IMAGE_CLASSES:append wires sbom-cve-check.bbclass directly. The
-# fragment's same line via OE_FRAGMENTS is unreliable in this wrynose
-# pin — addfragments does not parse a leading-space OE_FRAGMENTS value
-# (artefact of `+= " yocto/..."`). Explicit assignment here is the
-# load-bearing one; OE_FRAGMENTS is left in for the fragment's remaining
-# settings.
-INHERIT       += "create-spdx"
-OE_FRAGMENTS  += "yocto/sbom-cve-check"
+# Enabled directly, not through the upstream core/yocto/sbom-cve-check
+# fragment: fragments load before the distro conf, so OE_FRAGMENTS set here
+# would load nothing, and that fragment hard-assigns the CVE-DB SRCREVs to
+# AUTOREV, overriding the dated pin in edge-cve-db.inc. Its other settings
+# are set explicitly below and per board.
+INHERIT += "create-spdx"
 IMAGE_CLASSES:append = " sbom-cve-check"
 
 require conf/distro/include/edge-cve-db.inc
@@ -180,10 +178,10 @@ INHERIT += "own-mirrors"
 # and re-baseline together.
 PREFERRED_VERSION_kernel-hardening-checker-native = "0.6.17.1"
 
-# The sbom-cve-check fragment hard-codes the SPDX compiled-sources flag for
-# linux-yocto only, so every other kernel provider needs it set explicitly or
-# its SPDX output omits compiled sources and kernel CVE source-attribution
-# over-reports. The flag names a recipe, which is a board fact, so each
+# SPDX compiled sources must be enabled for the kernel recipe, or its SPDX
+# output omits compiled sources and kernel CVE source-attribution
+# over-reports. (The upstream fragment sets it for linux-yocto only.) The flag
+# names a recipe, which is a board fact, so each
 # conf/machine/include/edge-board-<machine>.inc sets it for its own kernel.
 
 # The default ("current") drops fixed-version and cpe-stable-backport
@@ -300,9 +298,18 @@ FETCHCMD:wget = "${FETCHCMD_wget}"
 
 SDK_NAME_PREFIX ?= "edge"
 
-# Hash-equivalence DB next to the shared SSTATE_DIR. Silences the
-# "hashserv DB is inside build dir but sstate is shared" warning.
-BB_HASHSERVE_DB_DIR ?= "${SSTATE_DIR}/hashserv"
+# Hash-equivalence DB in the shared SSTATE_DIR itself. Sstate objects are
+# found by unihash and each DB hands out its own, so builds sharing an
+# SSTATE_DIR only reuse each other's work when they also share this DB.
+# Moving the path orphans work recorded under the old DB, and each build
+# dir's cache/bb_unihashes.dat must be removed for the move to take effect.
+BB_HASHSERVE_DB_DIR ?= "${SSTATE_DIR}"
+
+# LLVM backends for llvm, llvm-native and rust: AArch64 target, ARM, X86 build
+# host, BPF objects. Drops OE-core's GPU backends, used only by mesa's llvm
+# drivers, which no edge image builds. Builds sharing an SSTATE_DIR reuse llvm
+# and rust only with the same list; a change rebuilds both.
+LLVM_TARGETS_TO_BUILD ?= "AArch64;ARM;BPF;X86"
 
 # defaultsetup.conf auto-pulls default-distrovars/maintainers/security_flags
 # once DISTRO is set — don't re-require, triggers "Duplicate inclusion".

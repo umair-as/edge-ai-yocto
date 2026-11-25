@@ -25,10 +25,9 @@ local_conf_header:
     # worth paying (development inner loop only — production / release
     # builds MUST keep this off so SBOM stays on).
     #
-    # Uncomment all three lines together; they're paired.
+    # Uncomment both lines together; they're paired.
     #
     # INHERIT:remove       = "create-spdx"
-    # OE_FRAGMENTS:remove  = "yocto/sbom-cve-check"
     # IMAGE_CLASSES:remove = "sbom-cve-check"
 
   spdx_profiles: |
