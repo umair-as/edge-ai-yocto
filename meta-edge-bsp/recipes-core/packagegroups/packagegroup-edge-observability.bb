@@ -1,7 +1,7 @@
 SUMMARY     = "Observability: profilers, tracers, system introspection"
 DESCRIPTION = "htop, iotop, lsof, sysstat (sar/iostat/pidstat), trace-cmd, \
-systemd-analyze, stress-ng. Complements oe-core's tools-profile IMAGE_FEATURE \
-(perf, lttng-tools)."
+systemd-analyze, stress-ng, kernel-hardening-checker. The dev image adds perf, \
+valgrind and memtester."
 HOMEPAGE    = "https://github.com/umair-as/edge-ai-yocto"
 SECTION     = "base"
 LICENSE     = "MIT"
@@ -13,7 +13,6 @@ inherit packagegroup
 RDEPENDS:${PN} = " \
     htop \
     iotop \
-    kernel-dev \
     kernel-hardening-checker \
     lsof \
     sysstat \
