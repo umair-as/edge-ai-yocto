@@ -24,13 +24,11 @@ python () {
             "requires EDGE_PROFILE=dev (got '%s'); build with 'make dev'" % p)
 }
 
-# Pull in the standard oe-core debug + profile feature buckets: gdb,
-# gdbserver, strace (tools-debug) and perf, lttng-tools (tools-profile).
-# Tracks upstream changes to those sets.
-IMAGE_FEATURES:append = " \
-    tools-debug \
-    tools-profile \
-"
+# gdb, gdbserver, strace from oe-core's tools-debug. Profiling is an explicit
+# list, not tools-profile: that set also pulls systemtap, whose runtime-built
+# modules MODULE_SIG_FORCE refuses, and LTTng (perf and trace-cmd cover tracing).
+IMAGE_FEATURES:append = " tools-debug"
+IMAGE_INSTALL:append = " perf powertop systemd-analyze valgrind memtester"
 
 # Dev tier — single packagegroup handle aggregating shell QoL,
 # observability, hwtools, netdiag, storage, and media. New dev userspace
