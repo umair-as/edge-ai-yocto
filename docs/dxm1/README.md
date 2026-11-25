@@ -19,7 +19,7 @@ a pre-compiled artifact from the vendor's DX-Stream sample tarball.
 | | |
 |---|---|
 | Board | Raspberry Pi 5, DX-M1 in the M.2 slot (PCIe Gen2 x1 to the BCM2712 root port `0001:00:00.0`) |
-| Vendor layer | `meta-deepx-m1` at `703831e7` (walnascar branch), two wrynose patches under `kas/patches/meta-deepx-m1/` |
+| Vendor layer | `meta-deepx-m1` at `189b5924` (walnascar branch), two wrynose patches under `kas/patches/meta-deepx-m1/` |
 | Composition | `kas/accel/dxm1.yml`, included by `kas/machines/raspberrypi5.yml`; `EDGE_ACCEL = "dxm1"` |
 | Kernel side | `dx_dma` (PCIe, single-MSI path for the brcmstb root port) and `dxrt_driver` (chardev) out-of-tree modules, signed like every other module |
 | Userspace | `dx-rt` 3.4.1: `libdxrt`, `dxrtd`, `dxrt-cli`, `run_model` |

@@ -505,7 +505,7 @@ The migration stamp in `rauc-uboot-env-init.sh` is bumped to
 meta-selinux:
   url: https://git.yoctoproject.org/meta-selinux
   branch: wrynose
-  commit: 1c3a699f363167571ab39fecb0fe6f56691a4e20
+  commit: 83b742346d5aac41ad9a7a5cb07c3a698e89eb11
   layers:
     .:
 ```

@@ -5,7 +5,7 @@ with a mainline 6.18 kernel, and the kernel facts the card depends on.
 
 ## Vendor layer: one branch, two patches
 
-`meta-deepx-m1` is pinned at commit `703831e7` on its `walnascar` (Yocto
+`meta-deepx-m1` is pinned at commit `189b5924` on its `walnascar` (Yocto
 5.2) branch: one release away from wrynose, one `dx-driver` version, the
 newest driver SRCREV. Neither upstream branch is wrynose-compatible on its
 own, so kas applies two patches from `kas/patches/meta-deepx-m1/` at

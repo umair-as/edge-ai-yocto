@@ -1,9 +1,3 @@
-# The recipe is named 2.6.0 but its SRCREV is the v2.4.1 commit (module
-# reports 2.2.0). The v2.6.0 tip carries PCIe link-health monitoring with an
-# MMIO guard (v2.4.1 takes a fatal SError on the first MMIO after a probe
-# with Mem- and BusMaster- clear) and the RPI_BUILD code path below.
-SRCREV = "7074748e7104f470b02f517583abba652b3f05fa"
-
 # wrynose source layout: the recipe's S = "${WORKDIR}/git/modules" is a hard
 # QA error since oe-core dropped the source-move shim; the checkout lands at
 # ${UNPACKDIR}/${BP}. LIC_FILES_CHKSUM is S-relative and follows.

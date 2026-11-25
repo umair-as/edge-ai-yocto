@@ -38,39 +38,38 @@ repos:
   # --- Yocto upstream layers (SHA-pinned to the wrynose 6.0 baseline) ---
   openembedded-core:
     url: https://git.openembedded.org/openembedded-core
-    # wrynose, 2026-09-30 (stable-branch CVE backports and recipe
-    # updates; carries sbom-cve-check 1.3.5)
-    commit: 0f03c732a0a2d0506b41b1abe60b3f368b2300dc
+    # wrynose, 2026-11-20 (stable-branch CVE backports and recipe updates)
+    commit: 16a03ed6c2db2fa1d7edac4f288a74958a00eb9f
     layers:
       meta:
 
   bitbake:
     url: https://git.openembedded.org/bitbake
-    # 2.18 branch, 2026-07-09 (still 2.18.0; moves with the poky cluster)
-    commit: fae9db3168dbff1b8c76fe9c6726a9687ff97514
+    # 2.18 branch, 2026-10-07 (moves with the poky cluster)
+    commit: 6e260eb6ab1631607ea414d9ff8ede1155faa5d9
     layers:
       bitbake: disabled
 
   meta-yocto:
     url: https://git.yoctoproject.org/meta-yocto
-    # wrynose, 2026-07-30 (poky cluster: moves with oe-core/bitbake)
-    commit: 1b132647002eea43a2c7a7f857f63f42dacbc26c
+    # wrynose, 2026-11-20 (poky cluster: moves with oe-core/bitbake)
+    commit: e941c69844c28fc40c4f149251f7281207525abe
     layers:
       meta-poky:
 
   meta-arm:
     url: https://git.yoctoproject.org/meta-arm
-    # wrynose, 2026-04-29
-    commit: 052c2cf333ecf16fc2ded4c5d09749ebaff8c0c5
+    # wrynose, 2026-09-16
+    commit: 673e8d7c5dcd14de58092eb73e6ecc5eee5c1735
     layers:
       meta-arm-toolchain:
       meta-arm:
 
   meta-openembedded:
     url: https://git.openembedded.org/meta-openembedded
-    # wrynose, 2026-08-07 (moves in lockstep with the poky cluster;
+    # wrynose, 2026-11-09 (moves in lockstep with the poky cluster;
     # shares oe-core's class/python API, carries userland CVE backports)
-    commit: 6bf0d8ad57b33950bab4c7f6c037e1ccb6f6e2eb
+    commit: c0fcd7cca3760ef24e087ac4a31b8f357cb204da
     # All meta-oe sublayers any edge image might need are activated here.
     # meta-networking + meta-filesystems are parse-only for edge-image-base
     # (no packagegroup pulls from them); edge-image-dev consumes them via
@@ -108,7 +107,7 @@ repos:
   meta-selinux:
     url: https://git.yoctoproject.org/meta-selinux
     branch: wrynose
-    commit: 1c3a699f363167571ab39fecb0fe6f56691a4e20
+    commit: 83b742346d5aac41ad9a7a5cb07c3a698e89eb11
     layers:
       .:
 
@@ -119,7 +118,7 @@ repos:
   meta-virtualization:
     url: https://git.yoctoproject.org/meta-virtualization
     branch: wrynose
-    commit: 781735b97ae5013cacabbecd38e6da6b510cf3fb
+    commit: f27e2594ab43f4e596eb8e287e7e446ef4064810
     layers:
       .:
 

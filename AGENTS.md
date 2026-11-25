@@ -403,6 +403,7 @@ deferred until the first release needs them.
 | Prose in `docs/` and `README.md` (what may and may not be written) | `.claude/rules/docs-style.md` |
 | Cross-compiling apps outside bitbake | `.claude/rules/cross-compilation.md` |
 | Settled architecture decisions | `docs/adr/README.md` (index) |
+| Layer compatibility: what `yocto-check-layer` checks and where the layers deliberately deviate | `docs/dev/layer-compatibility.md` |
 | Vulnerability handling — reachability ladder, fix choice, release gate | `docs/security/VULN-HANDLING.md`, ADR-0013 |
 | Security docs — SBOM/CVE triage, SELinux, U-Boot hardening, kernel-config gate, vuln mgmt | `docs/security/README.md` (index) |
 | CI — `make check` before every PR, `make ci` on the build host, release notes | `docs/dev/ci.md` |

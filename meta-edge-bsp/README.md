@@ -33,7 +33,7 @@ carry a dangling append:
 
 ## Maintainer
 
-Umair Ahmed Shah <https://github.com/umair-as>
+Umair Ahmed Shah <https://github.com/umair-as> • 11776979+umair-as@users.noreply.github.com
 
 ## License
 

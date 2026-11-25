@@ -28,7 +28,7 @@ repos:
     # walnascar (Yocto 5.2) branch: nearest to wrynose, one dx-driver
     # version. No upstream branch is wrynose-compatible; see the patches.
     branch: walnascar
-    commit: 703831e7aacd7a6d18b0291a94e99aa59bf9113e
+    commit: 189b59246151669c81c21ea75501bd129fe1db9e
     # The layer sits at the repo root.
     layers:
       .:

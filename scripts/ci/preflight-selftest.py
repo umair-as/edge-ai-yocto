@@ -225,7 +225,10 @@ class BoardsAndKas(unittest.TestCase):
 
     def test_every_dynamic_layer_has_a_board_mapping(self):
         for layer in pf.LAYERS:
-            for d in (pf.REPO / layer / "dynamic-layers").iterdir():
+            dyn = pf.REPO / layer / "dynamic-layers"
+            if not dyn.is_dir():
+                continue
+            for d in dyn.iterdir():
                 with self.subTest(collection=d.name):
                     self.assertIn(d.name, pf.COLLECTION_BOARDS)
 
