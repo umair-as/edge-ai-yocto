@@ -25,15 +25,21 @@ IMAGE_FSTYPES:remove = "wic.zst wic.bmap qcomflash"
 # the UKI file names; rauc-conf-edge pulls in the backend.
 IMAGE_INSTALL:append = " systemd-boot"
 
-# Board DTB embedded in each UKI, by its deploy name.
+# Board DTB embedded in each UKI, by its deploy name. EDGE_UKI_DTB_OVERLAYS
+# names .dtbo files from edge-dt-overlays that fdtoverlay merges into it.
+# The DTB the UKIs embed is also deployed as a real file, EDGE_UKI_DTB_OUT:
+# the kernel's versioned DTB names are symlinks to the latest build.
 EDGE_UKI_DTB ?= ""
+EDGE_UKI_DTB_OVERLAYS ?= ""
+EDGE_UKI_DTB_OUT = "${IMAGE_LINK_NAME}.uki.dtb"
 EDGE_UKI_A = "${IMAGE_LINK_NAME}.uki-A.efi"
 EDGE_UKI_B = "${IMAGE_LINK_NAME}.uki-B.efi"
 
-DEPENDS:append = " systemd-boot-native"
+DEPENDS:append = " systemd-boot-native${@' dtc-native' if d.getVar('EDGE_UKI_DTB_OVERLAYS').strip() else ''}"
 do_image_verity_uki[depends] += " \
     virtual/kernel:do_deploy \
     systemd-boot:do_deploy \
+    ${@'edge-dt-overlays:do_deploy' if d.getVar('EDGE_UKI_DTB_OVERLAYS').strip() else ''} \
 "
 do_image_verity_uki[dirs] = "${WORKDIR}/verity-uki"
 do_image_verity_uki[cleandirs] = "${WORKDIR}/verity-uki"
@@ -87,9 +93,19 @@ python do_image_verity_uki() {
                  "deploy name." % (d.getVar("MACHINE"), d.getVar("MACHINE")))
     dtb = os.path.join(deploy, dtb_name)
     osrel = os.path.join(d.getVar("IMAGE_ROOTFS"), "usr/lib/os-release")
-    for path in (stub, kernel, dtb, osrel):
+    overlays = [os.path.join(deploy, name)
+                for name in (d.getVar("EDGE_UKI_DTB_OVERLAYS") or "").split()]
+    for path in [stub, kernel, dtb, osrel] + overlays:
         if not os.path.isfile(path):
             bb.fatal("UKI input not found: %s" % path)
+
+    merged = os.path.join(work, "uki.dtb")
+    if overlays:
+        subprocess.run(["fdtoverlay", "-i", dtb, "-o", merged] + overlays, check=True)
+    else:
+        shutil.copyfile(dtb, merged)
+    dtb = merged
+    shutil.copyfile(dtb, os.path.join(image_deploy, d.getVar("EDGE_UKI_DTB_OUT")))
 
     # systemd-boot orders entries by sort key (ID), version, then file name.
     # A constant IMAGE_VERSION, the version field systemd-boot reads first,

@@ -56,6 +56,8 @@ EDGE_BOOT_ANCHOR = "none"
 # One UKI per slot embeds this DTB; the dm-verity slot holds the Qualcomm
 # DSP/NPU userspace, hence 8 GiB.
 EDGE_UKI_DTB = "monaco-arduino-monza.dtb"
+# Disables the monaco.dtsi IPCC mailboxes that abort on this board.
+EDGE_UKI_DTB_OVERLAYS = "ventuno-q-fixups.dtbo"
 EDGE_SLOT_SIZE_MB = "8192"
 
 # --- Kernel command line (UKI .cmdline) ---------------------------------

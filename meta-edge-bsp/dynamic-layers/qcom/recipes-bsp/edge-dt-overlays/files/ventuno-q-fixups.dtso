@@ -1,0 +1,25 @@
+// SPDX-License-Identifier: MIT
+/*
+ * linux-qcom eb0489fac75f enables ipcc1-4 in monaco.dtsi for the RTSS mailbox;
+ * their first register read aborts on this board (panic in qcom_ipcc_probe).
+ * Needed until monaco.dtsi ships ipcc1-4 disabled.
+ */
+
+/dts-v1/;
+/plugin/;
+
+&ipcc1 {
+	status = "disabled";
+};
+
+&ipcc2 {
+	status = "disabled";
+};
+
+&ipcc3 {
+	status = "disabled";
+};
+
+&ipcc4 {
+	status = "disabled";
+};
