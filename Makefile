@@ -1,4 +1,4 @@
-.PHONY: help base dev prod bundle bootchain-bundle bootloader-package parse preflight layers shell info clean-lock netboot-sync lock verify-pins purge hooks check ci kernel-config-export kernel-hardening-check cve
+.PHONY: help base dev prod bundle bootchain-bundle bootloader-package parse preflight layers shell info clean-lock netboot-sync lock verify-pins purge hooks check ci kernel-config-export kernel-hardening-check cve dtb-diff kernel-hash
 
 .DEFAULT_GOAL := help
 
@@ -209,6 +209,14 @@ kernel-hardening-check: kernel-config-export ## KSPP gate on the exported .confi
 cve: ## host CVE monitor, no kas: make cve ARGS='<subcommand> …' (scripts/cve-monitor.py)
 	@test -n "$(ARGS)" || { python3 scripts/cve-monitor.py --help; exit 2; }
 	python3 scripts/cve-monitor.py $(ARGS)
+
+kernel-hash: | $(KAS_DIRS) ## kernel task hashes, no build: make kernel-hash BOARD=… OUT=file (diff two runs)
+	@test -n "$(OUT)" || { echo "usage: make kernel-hash BOARD=<board> OUT=<file>"; exit 2; }
+	$(call kas_run,,$(CURDIR)/scripts/dev/kernel-hash.sh $(abspath $(OUT)))
+
+dtb-diff: ## node diff of two DTBs or UKIs, no kas: make dtb-diff OLD=… NEW=… [ACCEPT=file]; fails on new enabled nodes
+	@test -n "$(OLD)" -a -n "$(NEW)" || { python3 scripts/dev/dtb-diff.py --help; exit 2; }
+	python3 scripts/dev/dtb-diff.py $(if $(ACCEPT),--accept $(ACCEPT)) $(OLD) $(NEW)
 
 layers: | $(KAS_DIRS) ## bitbake-layers show-layers
 	$(call kas_run,EDGE_PROFILE=$(EDGE_PROFILE),bitbake-layers show-layers)

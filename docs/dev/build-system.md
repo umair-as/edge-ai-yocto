@@ -93,3 +93,19 @@ encryption off.
 - `make lock` writes `kas/base.lock.yml`, freezing floating branches to SHAs.
 - `make cve ARGS='<subcommand> …'` runs `scripts/cve-monitor.py` on the host
   (no kas); its `--help` lists the subcommands and options.
+- `make dtb-diff OLD=… NEW=…` compares two DTBs or UKIs node by node (status,
+  `reg`, `compatible`) and fails when a node becomes enabled that `ACCEPT=`
+  does not list. It is a review aid for kernel and layer bumps, not a full
+  device-tree equivalence check.
+- `make kernel-hash BOARD=… OUT=…` writes the board kernel's task hashes without
+  building; two runs diff to empty when a change leaves that kernel alone. When
+  a hash differs, `bitbake-diffsigs <old sigdata> <new sigdata>` on the two
+  exact `<stamp>.<task>.sigdata.<hash>` files names the change; `-t` compares
+  the two newest files instead, which can belong to unrelated runs. The
+  signature run is not free of side effects: OE removes the deploy outputs of
+  tasks whose signature changed at runqueue start, although no task runs.
+  Every kernel recipe checksums each directory on its `FILESEXTRAPATHS`, so a
+  new file in the shared `recipes-kernel/linux/files/` changes all kernels.
+- `scripts/dev/preserve-deploy.sh <board> <label>` copies a board's deploy
+  directory to `build/deploy-preserved/` before a rebuild or a signature run
+  replaces or removes its outputs.
