@@ -6,9 +6,10 @@ the resulting SDK / sysroot.
 ## Target
 
 - Architecture: `aarch64`
-- Vendor: `-edgeai` (set by `TARGET_VENDOR` in `conf/distro/edge-ai.conf`)
+- Vendor: `-oe`, oe-core's default (`TARGET_VENDOR` in `conf/distro/edge-ai.conf`; matching it lets
+  native and cross sstate be shared with other oe-core builds on the host)
 - OS: `linux`
-- Tuple: `aarch64-edgeai-linux`
+- Tuple: `aarch64-oe-linux`
 
 ## SDK
 
@@ -25,9 +26,10 @@ kas shell -c 'bitbake edge-image-base -c populate_sdk' \
 SDK installer lands under `build/<BOARD>/tmp/deploy/sdk/`. Install with:
 
 ```bash
-./poky-edgeai-glibc-x86_64-edge-image-base-aarch64-edgeai-toolchain-0.1.0.sh
-# Default install: /opt/edgeai/0.1.0/
-source /opt/edgeai/0.1.0/environment-setup-aarch64-edgeai-linux
+# Name: ${SDK_NAME}-toolchain-${SDK_VERSION}.sh, SDK_NAME = edge-<image>-x86_64-<tune>-<machine>
+./edge-edge-image-base-x86_64-<tune>-<machine>-toolchain-<version>.sh
+# Default install: /usr/local/edge-x86_64 (SDKPATHINSTALL)
+source /usr/local/edge-x86_64/environment-setup-<tune>-oe-linux
 ```
 
 After sourcing, the standard cross-compile variables are exported:
@@ -37,7 +39,7 @@ After sourcing, the standard cross-compile variables are exported:
 ## Verifying you are cross-compiling correctly
 
 ```bash
-${CC} --version            # should print aarch64-edgeai-linux-gcc
+${CC} --version            # should print aarch64-oe-linux-gcc
 echo | ${CC} -E -dM - | grep '__aarch64__'   # confirms target arch
 file $(which ${CC})         # the compiler binary is x86_64; output is aarch64
 ```

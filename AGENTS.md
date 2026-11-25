@@ -147,7 +147,7 @@ docs/
   rules/yocto-patterns.md              # wrynose features, SBOM/CVE wiring, pin moves
   rules/recipe-metadata.md             # recipe header layout — read before a new .bb
   rules/comment-style.md               # comment rules — read before a recipe/config comment
-  rules/cross-compilation.md           # aarch64-edgeai-linux SDK notes
+  rules/cross-compilation.md           # aarch64-oe-linux SDK notes
   settings.json                        # registers the hook below (Claude Code only)
   hooks/no-parallel-bitbake.py         # refuses a second bitbake/kas/make build or parse
   agents/build-watcher.md              # read-only build-run reporter (Claude Code only)
