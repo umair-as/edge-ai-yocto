@@ -1,0 +1,17 @@
+
+[2A[JWaiting for 1 running task to finish:
+0: glibc-locale-2.43+git-r0 do_package - 7m35s (pid 3641252)  99% |########### |
+[2A[JWaiting for 0 running tasks to finish:
+[1A[J[1;29mNOTE[0m: [29mTasks Summary: Attempted 6934 tasks of which 6839 didn't need to be rerun and 1 failed.[0m
+Waiting for 0 running tasks to finish:
+[1A[J
+Summary: 1 task failed:
+  /work/edge-ai-yocto/build/ventuno-q/../../.kas/meta-qcom/recipes-kernel/linux/linux-qcom_6.18.bb:do_patch
+    log: ]8;;file:///work/edge-ai-yocto/build/ventuno-q/tmp/work/ventuno_q-oe-linux/linux-qcom/6.18.56/temp/log.do_patch.3656035\/work/edge-ai-yocto/build/ventuno-q/tmp/work/ventuno_q-oe-linux/linux-qcom/6.18.56/temp/log.do_patch.3656035]8;;\
+Summary: There were 2 WARNING messages.
+Summary: There was 1 ERROR message, returning a non-zero exit code.
+2026-11-24 20:30:45 - ERROR    - Shell returned non-zero exit status
+2026-11-24 20:30:45 - ERROR    - Command "/bin/sh -c 'bitbake edge-bundle'" failed with error 1
+make: *** [Makefile:159: bundle] Error 1
+
+BUILD EXIT=2

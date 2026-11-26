@@ -1,0 +1,9 @@
+[1;29mNOTE[0m: [29mExecuting Tasks[0m
+[1;29mNOTE[0m: [29mTasks Summary: Attempted 761 tasks of which 761 didn't need to be rerun and all succeeded.[0m
+kernel-config-export: 1889 options -> rzv2l-prod.config
+meta-edge-bsp/recipes-kernel/linux/files/khc/khc-gate.py --config /work/edge-ai-yocto/build/khc/rzv2l-prod.config --baseline meta-edge-bsp/recipes-kernel/linux/files/khc/rzv2l-prod.baseline.json \
+    --report /work/edge-ai-yocto/build/khc/rzv2l-prod-report.md
+[khc-gate] ERROR: kernel-hardening-checker not on PATH
+make: *** [Makefile:206: kernel-hardening-check] Error 2
+
+BUILD EXIT=2

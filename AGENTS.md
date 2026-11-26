@@ -148,8 +148,9 @@ docs/
   rules/recipe-metadata.md             # recipe header layout — read before a new .bb
   rules/comment-style.md               # comment rules — read before a recipe/config comment
   rules/cross-compilation.md           # aarch64-oe-linux SDK notes
-  settings.json                        # registers the hook below (Claude Code only)
+  settings.json                        # registers the hooks below (Claude Code only)
   hooks/no-parallel-bitbake.py         # refuses a second bitbake/kas/make build or parse
+  hooks/build-wait-reminder.py         # after agent-build.py start: reminds to attach a background wait
   agents/build-watcher.md              # read-only build-run reporter (Claude Code only)
   agents/yocto-rules-reviewer.md       # read-only diff review against rules/ (Claude Code only)
 meta-edge-distro/                      # brand identity + DISTRO=edge-ai
