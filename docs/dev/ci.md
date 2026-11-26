@@ -35,9 +35,12 @@ trailer and leak check at commit time.
   check suites selftest (the generated `edge-smoke-test.sh` and
   `edge-verity-check.sh` match `scripts/dev/edge-checks/`, and the suites'
   parsers and runner pass on fixtures)
-- the serial-console tee and VENTUNO Q flash tool selftests and the agent
-  evidence helper tests (pytest), only when the tool or its tests changed (tens
-  of seconds each; `CHECK_ALL=1` forces them)
+- the build target sets selftest: the Makefile's bitbake-running targets, the
+  build launcher's `BUILD_TARGETS` and the parallel-build hook's
+  `MAKE_BUILD_TARGETS` name the same targets
+- the serial-console tee, VENTUNO Q flash tool and build launcher selftests and
+  the agent evidence helper tests (pytest), only when the tool or its tests
+  changed (tens of seconds each; `CHECK_ALL=1` forces them)
 
 ## `make preflight`
 

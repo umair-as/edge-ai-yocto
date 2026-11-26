@@ -38,11 +38,20 @@ Use `yocto-worktree` for build isolation and `docs/dev/agent-workflow.md` for
 shared evidence; generic worktree setup and fresh-verification rules do not
 authorize an unseeded build, an unnecessary rebuild or taking over the bench.
 
+After every `agent-build.py start` or relaunch, attach
+`agent-build.py wait <run-dir>` as a background Bash task (no `--timeout`)
+in the same turn; its exit is the completion notification. On pickup,
+run `agent-build.py list` in each worktree that may have started runs and
+re-attach a wait to each run still running.
+`.claude/hooks/build-wait-reminder.py` (PostToolUse and PostToolUseFailure) names each new run
+directory after a start: a reminder, not enforcement
+(`docs/dev/agent-builds.md`).
+
 `.claude/agents/build-watcher.md` is a read-only subagent that reports
 one `scripts/agent-build/agent-build.py` run in five lines and, on a
-failure, the first causal error from the task log. Use it after starting a
-build with the launcher, so the terminal log stays out of the main
-context.
+failure, the first causal error from the task log. It is optional failure
+diagnosis, for a failure log worth keeping out of the main context; the
+background wait above, not the watcher, carries completion.
 
 `.claude/agents/yocto-rules-reviewer.md` is a read-only subagent (Sonnet)
 that reviews a recipe/patch/kas diff against `.claude/rules/` and reports

@@ -1,0 +1,15 @@
+[11A[J[1;33mWARNING[0m: [33mThe free space of /cache/downloads (/dev/sdb1) is running low (14.762GB left)[0m
+[1;31mERROR[0m: [31mNo new tasks can be executed since the disk space monitor action is "STOPTASKS"![0m
+[2A[JWaiting for 1 running task to finish:
+0: m4-1.4.21-r0 do_configure - 1m1s (pid 3578352)
+[2A[JWaiting for 0 running tasks to finish:
+[1A[J[1;29mNOTE[0m: [29mTasks Summary: Attempted 8073 tasks of which 3590 didn't need to be rerun and all succeeded.[0m
+Waiting for 0 running tasks to finish:
+[1A[J
+Summary: There were 5 WARNING messages.
+Summary: There were 2 ERROR messages, returning a non-zero exit code.
+2026-11-24 20:19:49 - ERROR    - Shell returned non-zero exit status
+2026-11-24 20:19:49 - ERROR    - Command "/bin/sh -c 'bitbake edge-bundle'" failed with error 1
+make: *** [Makefile:159: bundle] Error 1
+
+BUILD EXIT=2

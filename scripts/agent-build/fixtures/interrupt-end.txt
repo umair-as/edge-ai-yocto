@@ -1,0 +1,25 @@
+[2A[JWaiting for 1 running task to finish:
+0: linux-edge-mainline-6.18.65+git-r0 do_compile - 11m49s (pid 143226)
+[2A[JWaiting for 1 running task to finish:
+0: linux-edge-mainline-6.18.65+git-r0 do_compile - 11m54s (pid 143226)
+[2A[JWaiting for 1 running task to finish:
+0: linux-edge-mainline-6.18.65+git-r0 do_compile - 11m59s (pid 143226)
+[2A[J
+Second Keyboard Interrupt, stopping...
+
+Waiting for 1 running task to finish:
+0: linux-edge-mainline-6.18.65+git-r0 do_compile - 12m2s (pid 143226)
+[2A[J[1;33mWARNING[0m: [33mExiting due to interrupt.[0m
+Waiting for 1 running task to finish:
+0: linux-edge-mainline-6.18.65+git-r0 do_compile - 12m3s (pid 143226)
+[2A[J[1;29mNOTE[0m: [29mSending SIGTERM to remaining 1 tasks[0m
+Waiting for 1 running task to finish:
+0: linux-edge-mainline-6.18.65+git-r0 do_compile - 12m3s (pid 143226)
+[2A[J
+Summary: There were 3 WARNING messages.
+Execution was interrupted, returning a non-zero exit code.
+2026-11-25 17:45:06 - ERROR    - Shell returned non-zero exit status
+2026-11-25 17:45:06 - ERROR    - Command "/bin/sh -c 'bitbake edge-bundle'" failed with error -2
+make: *** [Makefile:159: bundle] Interrupt
+
+BUILD EXIT=-2

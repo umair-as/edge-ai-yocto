@@ -1,6 +1,6 @@
 ---
 name: build-watcher
-description: Watches one scripts/agent-build/agent-build.py run and reports its outcome in five lines or fewer. On a nonzero exit it pulls the first causal error out of the failing task's log. Use it after starting a build with agent-build.py, or to triage a finished run in build/agent-runs/<run-id>, so the terminal log stays out of the main context. Read-only. It never starts, stops, or reruns a build.
+description: Reports one scripts/agent-build/agent-build.py run in five lines or fewer and, on a nonzero exit, pulls the first causal error out of the failing task's log. Optional failure diagnosis: use it to triage a run in build/agent-runs/<run-id> when its failure log is worth keeping out of the main context. Completion notification comes from a background agent-build.py wait, not from this agent. Read-only. It never starts, stops, or reruns a build.
 tools: Bash, Read, Grep, Glob
 model: haiku
 ---

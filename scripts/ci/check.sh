@@ -61,6 +61,12 @@ step "eMMC provisioning guard selftest" bash scripts/ci/emmc-provision-guard-sel
 step "device-cert staging guard selftest" bash scripts/ci/stage-device-certs-selftest.sh
 step "commit trailer check selftest" sh scripts/ci/commit-trailers-selftest.sh
 step "preflight mapping selftest" python3 scripts/ci/preflight-selftest.py
+step "build target sets selftest" python3 scripts/ci/build-targets-selftest.py
+# Located by name: shipped scripts carry no agent-tooling paths (repo-lint).
+run_reminder_hook_test() {
+    python3 "$(git ls-files -- '*/test-build-wait-reminder.py')"
+}
+step "build-wait reminder hook selftest" run_reminder_hook_test
 step "ModelPack host tests" python3 -m unittest -q scripts/modelpack/tests/test_modelpack.py
 step "systemd-boot RAUC backend selftest" bash scripts/ci/edge-sdboot-backend-selftest.sh
 step "on-device check suites selftest" bash scripts/ci/edge-checks-selftest.sh
@@ -71,6 +77,9 @@ slow "serial console tee selftest" \
 slow "VENTUNO Q flash tool selftest" \
     '^scripts/(dev/ventunoq-flash\.py|ci/ventunoq-flash-selftest\.py)$' \
     python3 scripts/ci/ventunoq-flash-selftest.py
+# Dummy make targets in tmux sessions on a socket of the test's own.
+slow "build launcher selftest" '^scripts/agent-build/' \
+    python3 scripts/agent-build/test-agent-build.py
 # pytest from the host when installed, else an ephemeral uv environment.
 run_evidence_tests() {
     if python3 -c 'import pytest' 2>/dev/null; then
