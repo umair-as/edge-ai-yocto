@@ -1,0 +1,38 @@
+[Unit]
+Description=DX-M1 inference from the bundled app image (rootless, edge-ctr)
+# Runner and runtime come from the image; only the model is on /data.
+After=data.mount
+ConditionPathExists=/data/dxm1/model/model.dxnn
+# One owner of the NPU at a time; dxm1-inference runs the /data payload.
+# Conflicts= alone does not order the stop before the start; After= does,
+# in either switching direction. Covers systemd-managed starts only.
+Conflicts=dxm1-inference.service
+After=dxm1-inference.service
+StartLimitIntervalSec=600
+StartLimitBurst=3
+
+[Container]
+# Read-only rootfs copy, imported into edge-ctr's store on start; no registry.
+# An image store pre-populated by root is not runnable rootless (layers owned
+# by an unmapped uid), so the archive is the hand-off, not /var/lib/containers.
+Image=oci-archive:/usr/share/edge-oci/dxm1-app.tar
+Pull=never
+
+AddDevice=/dev/dxrt0
+GroupAdd=keep-groups
+# See dxm1-inference.container: libdxrt's dxrtd liveness check and IPC socket.
+PodmanArgs=--pid=host
+Volume=/run/dxrt:/run/dxrt
+Volume=/data/dxm1/model:/models:ro
+Network=none
+
+Notify=false
+
+[Service]
+Type=oneshot
+ExecStartPre=/usr/bin/timeout 60 /bin/sh -c 'until [ -S /run/dxrt/ipc.sock ]; do sleep 1; done'
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=default.target
